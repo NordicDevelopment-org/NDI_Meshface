@@ -561,13 +561,26 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert ".self-node-identity-slot {" in html
     assert ".self-node-slot-label {" in html
     assert ".value.self-node-value.is-dual-node-context" in html
+    assert "#m-self.self-node-value.is-dual-node-context" in html
+    assert "grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);" in html
+    assert "grid-template-columns: minmax(0, 1fr);" in html
+    assert "grid-template-rows: minmax(14px, auto) 10px 11px;" in html
+    assert ".self-node-identity-slot .self-node-name" in html
+    assert ".self-node-identity-slot .self-node-id" in html
+    assert "display: flex;" in html
+    assert "display: block;" in html
+    assert ".self-node-identity-slot .self-node-city[hidden]" in html
+    assert "display: block !important;" in html
+    assert "visibility: hidden;" in html
     assert ".self-node-identity-selected {" in html
-    assert "position: absolute;" in html
+    assert "position: relative;" in html
     assert "left: var(--self-node-watermark-local-x);" in html
     assert "left: var(--self-node-watermark-selected-x);" in html
     assert "font-size: var(--self-node-watermark-size);" in html
     assert "justify-content: center;" in html
+    assert "flex: 0 1 auto;" in html
     assert "text-align: right;" in html
+    assert ".self-node-identity-selected .self-node-city" in html
     assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-dual-node-watermarks::before' in html
     assert ".self-node-name {" in html
     assert ".self-node-status.chat-member-status {" in html

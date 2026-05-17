@@ -1164,28 +1164,66 @@
       text-overflow: ellipsis;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context {{
-      display: block;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: stretch;
+      column-gap: 8px;
       position: relative;
-      padding-right: min(45%, 142px);
+      padding-right: 0;
       white-space: nowrap;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot {{
+      width: 100%;
+      max-width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(14px, auto) 10px 11px;
+      align-content: center;
+      justify-content: stretch;
+      row-gap: 2px;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot .self-node-name {{
+      display: flex;
+      flex: 0 1 auto;
+      min-height: 14px;
+      width: 100%;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      white-space: nowrap;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot .self-node-id {{
+      display: block;
+      width: 100%;
+      min-height: 10px;
+      flex-basis: auto;
       max-width: 100%;
     }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot .self-node-city {{
+      width: 100%;
+      min-height: 11px;
+      max-width: 100%;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot .self-node-city[hidden] {{
+      display: block !important;
+      visibility: hidden;
+    }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-local {{
-      align-items: flex-start;
+      align-items: stretch;
+      justify-items: stretch;
       text-align: left;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected {{
-      position: absolute;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      width: min(45%, 142px);
-      align-items: flex-end;
+      position: relative;
+      right: auto;
+      top: auto;
+      bottom: auto;
+      width: auto;
+      align-items: stretch;
+      justify-items: stretch;
       text-align: right;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-name {{
+      flex: 0 1 auto;
       width: 100%;
       justify-content: flex-end;
       text-align: right;
@@ -1194,6 +1232,11 @@
       text-align: right;
     }}
     .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-id {{
+      max-width: 100%;
+      text-align: right;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-city {{
+      width: 100%;
       max-width: 100%;
       text-align: right;
     }}
@@ -1212,10 +1255,10 @@
     }}
     .topbar .summary-ticker-item-self > .label.is-dual-node-label {{
       grid-column: 1 / -1;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      column-gap: 8px;
       width: 100%;
       max-width: 100%;
       text-align: left;
@@ -1233,7 +1276,7 @@
       text-overflow: ellipsis;
     }}
     .topbar .summary-ticker-item-self > .label.is-dual-node-label .self-node-label-selected {{
-      margin-left: auto;
+      justify-self: end;
       text-align: right;
     }}
     .topbar:not(.ticker-expanded) .summary-ticker-item > .label {{
@@ -1641,7 +1684,9 @@
     }}
     .topbar.ticker-expanded .summary-ticker-item-self > .label.is-dual-node-label {{
       grid-column: 1 / -1;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      column-gap: 12px;
       width: 100%;
       max-width: 100%;
       white-space: nowrap;
@@ -1740,24 +1785,38 @@
       max-width: 100%;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context {{
-      display: block;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: stretch;
+      column-gap: 12px;
       position: relative;
-      padding-right: min(45%, 160px);
+      padding-right: 0;
       white-space: nowrap;
       overflow: hidden;
     }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot {{
+      width: 100%;
+      max-width: 100%;
+      grid-template-rows: minmax(20px, auto) 13px 13px;
+      row-gap: 2px;
+    }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-name {{
       width: 100%;
+      min-height: 20px;
       flex-wrap: nowrap;
       overflow: hidden;
       white-space: nowrap;
     }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-id {{
+      min-height: 13px;
       flex-basis: auto;
       max-width: 100%;
     }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-city {{
+      min-height: 13px;
+    }}
     .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected {{
-      width: min(45%, 160px);
+      width: auto;
     }}
     .topbar.ticker-expanded .summary-ticker-item .value.wifi-ticker-value {{
       font-size: 14px;
@@ -5400,6 +5459,15 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }}
+    #m-self.self-node-value.is-dual-node-context {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: stretch;
+      column-gap: 8px;
+    }}
+    .topbar.ticker-expanded #m-self.self-node-value.is-dual-node-context {{
+      column-gap: 12px;
     }}
     #m-radio.radio-ticker-value {{
       display: block;
