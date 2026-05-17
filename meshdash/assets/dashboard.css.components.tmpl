@@ -3663,7 +3663,6 @@
       color: var(--ui-text);
       box-shadow: none;
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node,
     [data-theme="dark"] .topbar .summary-ticker-item-bots.has-active-bot-sessions,
     [data-theme="dark"] .topbar .summary-ticker-item-bots.has-pending-bot-activity {{
       border-color: transparent;
@@ -3680,7 +3679,6 @@
         0 0 0 1px color-mix(in srgb, var(--workspace-shell-active-text) 18%, transparent),
         0 0 18px color-mix(in srgb, var(--workspace-shell-active-text) 20%, transparent);
     }}
-    [data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node::before,
     [data-theme="dark"] .topbar .summary-ticker-item-bots.has-active-bot-sessions::before,
     [data-theme="dark"] .topbar .summary-ticker-item-bots.has-pending-bot-activity::before {{
       background:
@@ -3727,6 +3725,15 @@
     [data-theme="dark"] .topbar .summary-ticker-item-self.has-node-emoji::after {{
       opacity: 0.07;
       filter: grayscale(0.22) saturate(0.72) blur(1.1px) brightness(1.08);
+    }}
+    [data-theme="dark"] .topbar .summary-ticker-item-self.has-dual-node-watermarks::before,
+    [data-theme="dark"] .topbar .summary-ticker-item-self.has-dual-node-watermarks::after {{
+      opacity: 0.055;
+      filter: grayscale(0.22) saturate(0.72) blur(0.8px) brightness(1.08);
+    }}
+    [data-theme="dark"] .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot.has-node-emoji::after {{
+      opacity: 0.065;
+      filter: grayscale(0.22) saturate(0.72) blur(0.8px) brightness(1.08);
     }}
     [data-theme="dark"] .topbar .summary-ticker-item .radio-ticker-status {{
       color: var(--ui-text-soft);

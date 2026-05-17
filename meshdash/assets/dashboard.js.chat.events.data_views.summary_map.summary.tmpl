@@ -1599,38 +1599,51 @@
       const localNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === localId) || null;
       const localOwner = localNodeUserFromState(state);
       const selectedTickerId = normalizeNodeId(selectedNodeId || "");
-      const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId);
-      const tickerNodeId = hasSelectedTickerNode ? selectedTickerId : localId;
-      const tickerNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === tickerNodeId) || null;
-      const tickerIsLocal = isCanonicalNodeId(localId) && tickerNodeId === localId;
-      const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;
-      const tickerOwner = tickerIsLocal ? localOwner : null;
-      const tickerLongName = String(
-        (tickerOwner && tickerOwner.long_name) || (tickerNode && tickerNode.long_name) || ""
-      ).trim();
-      const tickerShortName = String(
-        (tickerOwner && tickerOwner.short_name) || (tickerNode && tickerNode.short_name) || ""
-      ).trim();
-      const tickerNodeName = preferredNodeName(tickerNode)
-        || tickerLongName
-        || tickerShortName
-        || (isSelectableNodeId(tickerNodeId) ? String(nodeNameCache.get(tickerNodeId) || "").trim() : "");
-      const tickerFallbackName = tickerIsLocal ? "Local node" : "Selected node";
-      const hasTickerIdentity = !!tickerNodeName || isSelectableNodeId(tickerNodeId);
+      const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId) && selectedTickerId !== localId;
+      const selectedTickerNode = hasSelectedTickerNode
+        ? (nodes.find((entry) => normalizeNodeId(entry && entry.id) === selectedTickerId) || null)
+        : null;
+      const resolveTickerIdentityName = (nodeId, node, owner, fallbackName) => {{
+        const longName = String(
+          (owner && owner.long_name)
+          || (node && node.long_name)
+          || ""
+        ).trim();
+        const shortName = String(
+          (owner && owner.short_name)
+          || (node && node.short_name)
+          || ""
+        ).trim();
+        return preferredNodeName(node)
+          || longName
+          || shortName
+          || (isSelectableNodeId(nodeId) ? String(nodeNameCache.get(nodeId) || "").trim() : "")
+          || fallbackName;
+      }};
+      const localNodeName = resolveTickerIdentityName(localId, localNode, localOwner, "Local node");
+      const selectedNodeName = hasSelectedTickerNode
+        ? resolveTickerIdentityName(selectedTickerId, selectedTickerNode, null, "Selected node")
+        : "";
       const targetDisplay = compactTargetMetric(targetValue);
       const selfMetric = document.getElementById("m-self");
       const selfCard = document.getElementById("summary-ticker-self");
       if (selfCard instanceof HTMLElement) {{
-        selfCard.classList.toggle("has-selected-node", hasSelectedTickerNode);
+        selfCard.classList.remove("has-selected-node");
         const selfLabel = selfCard.querySelector("[data-ticker-label]");
         if (selfLabel instanceof HTMLElement) {{
-          selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";
+          selfLabel.textContent = "Self";
         }}
-        if (isSelectableNodeId(tickerNodeId)) {{
-          selfCard.dataset.nodeId = tickerNodeId;
+        const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;
+        if (isSelectableNodeId(cardNodeId)) {{
+          selfCard.dataset.nodeId = cardNodeId;
           selfCard.tabIndex = 0;
           selfCard.setAttribute("role", "button");
-          selfCard.setAttribute("aria-label", `Select node ${{tickerNodeName || tickerNodeId}}`);
+          selfCard.setAttribute(
+            "aria-label",
+            hasSelectedTickerNode
+              ? `Local radio ${{localNodeName || localId}}; selected node ${{selectedNodeName || selectedTickerId}}`
+              : `Local radio ${{localNodeName || localId}}`
+          );
         }} else {{
           delete selfCard.dataset.nodeId;
           selfCard.removeAttribute("tabindex");
@@ -1640,76 +1653,119 @@
       }}
       if (selfMetric instanceof HTMLElement) {{
         const fullTarget = String(targetValue == null ? "" : targetValue).trim();
-        selfMetric.classList.remove("self-node-value", "node-ticker-value", "has-self-node-city");
+        selfMetric.classList.remove("self-node-value", "node-ticker-value", "has-self-node-city", "is-dual-node-context");
         delete selfMetric.dataset.cityRequestKey;
         selfMetric.replaceChildren();
-        if (hasTickerIdentity) {{
+        const hasLocalIdentity = !!localNodeName || isSelectableNodeId(localId);
+        if (hasLocalIdentity) {{
           selfMetric.classList.add("self-node-value", "node-ticker-value");
-          const selfEmoji = (typeof nodeVisualEmojiForNode === "function")
-            ? String(nodeVisualEmojiForNode(tickerNodeId, null, tickerNode) || "").trim()
-            : "";
-          const displayName = (selfEmoji && typeof stripNodeVisualEmojiFromLabel === "function")
-            ? stripNodeVisualEmojiFromLabel(tickerNodeName || tickerFallbackName, selfEmoji)
-            : (tickerNodeName || tickerFallbackName);
+          selfMetric.classList.toggle("is-dual-node-context", hasSelectedTickerNode);
           if (selfCard instanceof HTMLElement) {{
-            selfCard.classList.toggle("has-node-emoji", !!selfEmoji);
-            if (selfEmoji) {{
-              selfCard.dataset.nodeEmoji = selfEmoji;
-            }} else {{
-              delete selfCard.dataset.nodeEmoji;
+            selfCard.classList.remove("has-node-emoji");
+            selfCard.classList.toggle("has-dual-node-watermarks", hasSelectedTickerNode);
+            delete selfCard.dataset.nodeEmoji;
+            delete selfCard.dataset.localNodeEmoji;
+            delete selfCard.dataset.selectedNodeEmoji;
+          }}
+          const addIdentitySlot = (kind, label, nodeId, node, owner, nodeName, fallbackName) => {{
+            const emoji = (typeof nodeVisualEmojiForNode === "function")
+              ? String(nodeVisualEmojiForNode(nodeId, null, node) || "").trim()
+              : "";
+            const displayName = (emoji && typeof stripNodeVisualEmojiFromLabel === "function")
+              ? stripNodeVisualEmojiFromLabel(nodeName || fallbackName, emoji)
+              : (nodeName || fallbackName);
+            const slot = document.createElement("div");
+            slot.className = `self-node-identity-slot self-node-identity-${{kind}}`;
+            if (emoji) {{
+              if (hasSelectedTickerNode && selfCard instanceof HTMLElement) {{
+                selfCard.classList.add("has-dual-node-watermarks");
+                if (kind === "selected") {{
+                  selfCard.dataset.selectedNodeEmoji = emoji;
+                }} else {{
+                  selfCard.dataset.localNodeEmoji = emoji;
+                }}
+              }} else if (selfCard instanceof HTMLElement) {{
+                selfCard.classList.add("has-node-emoji");
+                selfCard.dataset.nodeEmoji = emoji;
+              }}
+            }}
+            if (label) {{
+              const slotLabel = document.createElement("div");
+              slotLabel.className = "self-node-slot-label";
+              slotLabel.textContent = label;
+              slot.appendChild(slotLabel);
+            }}
+            const nameRow = document.createElement("div");
+            nameRow.className = "self-node-name";
+            const nameText = document.createElement("span");
+            nameText.className = "self-node-name-text";
+            nameText.textContent = displayName;
+            nameRow.appendChild(nameText);
+            slot.appendChild(nameRow);
+            const idText = document.createElement("span");
+            idText.className = "self-node-id";
+            idText.textContent = isSelectableNodeId(nodeId) ? nodeId : "ID unavailable";
+            slot.appendChild(idText);
+            const cityText = document.createElement("div");
+            cityText.className = "self-node-city";
+            cityText.hidden = true;
+            slot.appendChild(cityText);
+            selfMetric.appendChild(slot);
+            return {{ slot, cityText }};
+          }};
+          const localSlot = addIdentitySlot("local", "", localId, localNode, localOwner, localNodeName, "Local node");
+          if (hasSelectedTickerNode) {{
+            addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");
+          }}
+          const titleParts = [`Local radio: ${{localNodeName || localId || "n/a"}}`];
+          if (isSelectableNodeId(localId)) {{
+            titleParts.push(localId);
+          }}
+          if (hasSelectedTickerNode) {{
+            titleParts.push(`Selected node: ${{selectedNodeName || selectedTickerId}}`);
+            if (isSelectableNodeId(selectedTickerId)) {{
+              titleParts.push(selectedTickerId);
             }}
           }}
-          const nameRow = document.createElement("div");
-          nameRow.className = "self-node-name";
-          const nameText = document.createElement("span");
-          nameText.className = "self-node-name-text";
-          nameText.textContent = displayName;
-          nameRow.appendChild(nameText);
-          const idText = document.createElement("span");
-          idText.className = "self-node-id";
-          idText.textContent = isSelectableNodeId(tickerNodeId) ? tickerNodeId : "ID unavailable";
-          nameRow.appendChild(idText);
-          selfMetric.appendChild(nameRow);
-          const cityText = document.createElement("div");
-          cityText.className = "self-node-city";
-          cityText.hidden = true;
-          selfMetric.appendChild(cityText);
-          const cityLocation = resolveSelfNodeCityLocation(state, tickerNode, tickerOwner, tickerNodeId);
-          const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
-          const titleParts = [tickerNodeName || tickerFallbackName];
-          if (isSelectableNodeId(tickerNodeId)) {{
-            titleParts.push(tickerNodeId);
-          }}
-          if (tickerIsLocal && fullTarget) {{
+          if (!hasSelectedTickerNode && fullTarget) {{
             titleParts.push(`Target ${{fullTarget}}`);
           }}
           const metricBaseTitle = titleParts.join(" • ");
           selfMetric.dataset.baseTitle = metricBaseTitle;
           selfMetric.title = metricBaseTitle;
           if (selfCard instanceof HTMLElement) {{
-            const cardBaseTitle = `${{metricBaseTitle}} • Click to select in node list`;
+            const cardBaseTitle = hasSelectedTickerNode
+              ? `${{metricBaseTitle}} • Click to select selected node in node list`
+              : `${{metricBaseTitle}} • Click to select local node in node list`;
             selfCard.dataset.baseTitle = cardBaseTitle;
             selfCard.title = cardBaseTitle;
           }}
-          if (cityCacheKey) {{
+          const cityLocation = !hasSelectedTickerNode
+            ? resolveSelfNodeCityLocation(state, localNode, localOwner, localId)
+            : null;
+          const cityCacheKey = selfNodeNearestCityCacheKey(cityLocation);
+          if (cityCacheKey && localSlot && localSlot.cityText instanceof HTMLElement) {{
             const cityRequestKey = `${{cityCacheKey}}:${{++selfNodeNearestCityRenderSeq}}`;
             selfMetric.dataset.cityRequestKey = cityRequestKey;
             if (selfNodeNearestCityCache.has(cityCacheKey)) {{
               applySelfNodeNearestCityLine(
                 selfMetric,
                 selfCard,
-                cityText,
+                localSlot.cityText,
                 selfNodeNearestCityCache.get(cityCacheKey) || "",
                 cityLocation
               );
             }} else {{
-              void updateSelfNodeNearestCityLine(selfMetric, selfCard, cityText, cityLocation, cityRequestKey);
+              void updateSelfNodeNearestCityLine(selfMetric, selfCard, localSlot.cityText, cityLocation, cityRequestKey);
             }}
           }}
         }} else {{
           if (selfCard instanceof HTMLElement) {{
             selfCard.classList.remove("has-node-emoji");
+            selfCard.classList.remove("has-dual-node-watermarks");
             delete selfCard.dataset.nodeEmoji;
+            delete selfCard.dataset.localNodeEmoji;
+            delete selfCard.dataset.selectedNodeEmoji;
           }}
           selfMetric.textContent = targetDisplay;
           const metricBaseTitle = fullTarget || "n/a";

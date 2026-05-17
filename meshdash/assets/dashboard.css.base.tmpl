@@ -885,7 +885,6 @@
       isolation: isolate;
       overflow: hidden;
     }}
-    .topbar .summary-ticker-item-self.has-selected-node,
     .topbar .summary-ticker-item-bots.has-active-bot-sessions,
     .topbar .summary-ticker-item-bots.has-pending-bot-activity {{
       border-color: transparent;
@@ -902,7 +901,6 @@
         0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent),
         0 0 18px color-mix(in srgb, var(--accent) 22%, transparent);
     }}
-    .topbar .summary-ticker-item-self.has-selected-node::before,
     .topbar .summary-ticker-item-bots.has-active-bot-sessions::before,
     .topbar .summary-ticker-item-bots.has-pending-bot-activity::before {{
       content: "";
@@ -931,6 +929,35 @@
       user-select: none;
       white-space: nowrap;
       z-index: 0;
+    }}
+    .topbar .summary-ticker-item-self.has-dual-node-watermarks::before,
+    .topbar .summary-ticker-item-self.has-dual-node-watermarks::after {{
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(48px, 4.8vw, 82px);
+      line-height: 1;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+      opacity: 0.065;
+      filter: grayscale(0.16) saturate(0.78) blur(0.8px);
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      text-align: center;
+      z-index: 0;
+    }}
+    .topbar .summary-ticker-item-self.has-dual-node-watermarks::before {{
+      content: attr(data-local-node-emoji);
+      left: 0;
+      width: 55%;
+    }}
+    .topbar .summary-ticker-item-self.has-dual-node-watermarks::after {{
+      content: attr(data-selected-node-emoji);
+      right: 0;
+      width: 45%;
     }}
     .topbar .summary-ticker-item-self > .label,
     .topbar .summary-ticker-item-self > .value,
@@ -1102,6 +1129,86 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot {{
+      min-width: 0;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      justify-content: center;
+      align-self: stretch;
+      gap: 2px;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot.has-node-emoji::after {{
+      content: attr(data-node-emoji);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(44px, 5.4vw, 82px);
+      line-height: 1;
+      font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+      opacity: 0.075;
+      filter: grayscale(0.16) saturate(0.78) blur(0.8px);
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      text-align: center;
+      z-index: 0;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot > * {{
+      position: relative;
+      z-index: 1;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value .self-node-slot-label {{
+      min-width: 0;
+      font-size: 8px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: 0.26px;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--muted) 88%, var(--accent-2) 12%);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context {{
+      display: block;
+      position: relative;
+      padding-right: min(45%, 142px);
+      white-space: nowrap;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-slot {{
+      max-width: 100%;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-local {{
+      align-items: flex-start;
+      text-align: left;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected {{
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: min(45%, 142px);
+      align-items: flex-end;
+      text-align: right;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-name {{
+      width: 100%;
+      justify-content: flex-end;
+      text-align: right;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-name-text {{
+      text-align: right;
+    }}
+    .topbar .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected .self-node-id {{
+      max-width: 100%;
+      text-align: right;
     }}
     .topbar .summary-ticker-item .label {{
       grid-column: 1;
@@ -1604,6 +1711,26 @@
     .topbar.ticker-expanded .summary-ticker-item-radio .value.radio-ticker-value .radio-ticker-detail {{
       flex-basis: 100%;
       max-width: 100%;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context {{
+      display: block;
+      position: relative;
+      padding-right: min(45%, 160px);
+      white-space: nowrap;
+      overflow: hidden;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-name {{
+      width: 100%;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      white-space: nowrap;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-id {{
+      flex-basis: auto;
+      max-width: 100%;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item-self .value.self-node-value.is-dual-node-context .self-node-identity-selected {{
+      width: min(45%, 160px);
     }}
     .topbar.ticker-expanded .summary-ticker-item .value.wifi-ticker-value {{
       font-size: 14px;

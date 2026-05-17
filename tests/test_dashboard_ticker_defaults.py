@@ -467,27 +467,36 @@ def test_dashboard_js_renders_selected_or_local_identity_in_node_ticker() -> Non
     assert "function resolveSelfNodeCityLocation(state, node, owner, nodeId)" in js
     assert "function resolveSelfNodeNearestCityLabel(location)" in js
     assert 'const selectedTickerId = normalizeNodeId(selectedNodeId || "");' in js
-    assert "const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId);" in js
-    assert "const tickerNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
-    assert "const tickerShowsSelf = !hasSelectedTickerNode || tickerIsLocal;" in js
-    assert 'selfCard.classList.toggle("has-selected-node", hasSelectedTickerNode);' in js
-    assert 'selfLabel.textContent = tickerShowsSelf ? "Self" : "Node";' in js
-    assert "if (isSelectableNodeId(tickerNodeId))" in js
-    assert 'selfCard.setAttribute("aria-label", `Select node ${tickerNodeName || tickerNodeId}`);' in js
-    assert 'const cardBaseTitle = `${metricBaseTitle} • Click to select in node list`;' in js
+    assert "const hasSelectedTickerNode = isSelectableNodeId(selectedTickerId) && selectedTickerId !== localId;" in js
+    assert "const selectedTickerNode = hasSelectedTickerNode" in js
+    assert "const resolveTickerIdentityName = (nodeId, node, owner, fallbackName) => {" in js
+    assert 'selfCard.classList.remove("has-selected-node");' in js
+    assert 'selfLabel.textContent = "Self";' in js
+    assert "const cardNodeId = hasSelectedTickerNode ? selectedTickerId : localId;" in js
+    assert "if (isSelectableNodeId(cardNodeId))" in js
+    assert "Local radio ${localNodeName || localId}; selected node ${selectedNodeName || selectedTickerId}" in js
+    assert 'selfMetric.classList.toggle("is-dual-node-context", hasSelectedTickerNode);' in js
+    assert 'const addIdentitySlot = (kind, label, nodeId, node, owner, nodeName, fallbackName) => {' in js
+    assert "slot.className = `self-node-identity-slot self-node-identity-${kind}`;" in js
+    assert 'const localSlot = addIdentitySlot("local", "", localId, localNode, localOwner, localNodeName, "Local node");' in js
+    assert 'addIdentitySlot("selected", "", selectedTickerId, selectedTickerNode, null, selectedNodeName, "Selected node");' in js
+    assert '? `${metricBaseTitle} • Click to select selected node in node list`' in js
     assert "nearestOfflineCityHintFromCoords(" in js
     assert 'source: "linked",' in js
     assert 'selfMetric.classList.add("self-node-value", "node-ticker-value");' in js
     assert 'nameRow.className = "self-node-name";' in js
     assert "nameRow.appendChild(statusText);" not in js
     assert 'statusGlyph.className = "chat-member-status-emoji-glyph";' not in js
-    assert 'selfCard.classList.toggle("has-node-emoji", !!selfEmoji);' in js
-    assert "selfCard.dataset.nodeEmoji = selfEmoji;" in js
+    assert "if (hasSelectedTickerNode) {" in js
+    assert 'selfCard.classList.add("has-dual-node-watermarks");' in js
+    assert "selfCard.dataset.selectedNodeEmoji = emoji;" in js
+    assert "selfCard.dataset.localNodeEmoji = emoji;" in js
+    assert 'selfCard.classList.add("has-node-emoji");' in js
     assert 'nameText.className = "self-node-name-text";' in js
     assert 'statusText.className = "target-node-status status-unknown";' not in js
     assert 'statusText.id = "m-target-status-inline";' not in js
     assert 'idText.className = "self-node-id";' in js
-    assert "nameRow.appendChild(idText);" in js
+    assert "slot.appendChild(idText);" in js
     assert 'cityText.className = "self-node-city";' in js
     assert 'selfMetric.dataset.cityRequestKey = cityRequestKey;' in js
     assert 'selfMetric.dataset.baseTitle = metricBaseTitle;' in js
@@ -521,16 +530,28 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert 'id="ticker-rate-radio"' in html
     assert 'id="ticker-chart-radio"' in html
     assert ".topbar .summary-ticker-item-self .value.self-node-value" in html
-    assert ".topbar .summary-ticker-item-self.has-selected-node," in html
     assert ".topbar .summary-ticker-item-bots.has-active-bot-sessions," in html
     assert ".topbar .summary-ticker-item-bots.has-pending-bot-activity {" in html
-    assert ".topbar .summary-ticker-item-self.has-selected-node::before," in html
     assert ".topbar .summary-ticker-item-bots.has-active-bot-sessions::before," in html
     assert ".topbar .summary-ticker-item-bots.has-pending-bot-activity::before {" in html
-    assert '[data-theme="dark"] .topbar .summary-ticker-item-self.has-selected-node,' in html
     assert '[data-theme="dark"] .topbar .summary-ticker-item-bots.has-active-bot-sessions,' in html
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
+    assert ".summary-ticker-item-self.has-dual-node-watermarks::before" in html
+    assert ".summary-ticker-item-self.has-dual-node-watermarks::after" in html
+    assert "content: attr(data-selected-node-emoji);" in html
+    assert "content: attr(data-local-node-emoji);" in html
+    assert ".self-node-identity-slot {" in html
+    assert ".self-node-identity-slot.has-node-emoji::after" in html
+    assert ".self-node-slot-label {" in html
+    assert ".value.self-node-value.is-dual-node-context" in html
+    assert ".self-node-identity-selected {" in html
+    assert "position: absolute;" in html
+    assert "inset: 0;" in html
+    assert "justify-content: center;" in html
+    assert "font-size: clamp(44px, 5.4vw, 82px);" in html
+    assert "text-align: right;" in html
+    assert '[data-theme="dark"] .topbar .summary-ticker-item-self .value.self-node-value .self-node-identity-slot.has-node-emoji::after' in html
     assert ".self-node-name {" in html
     assert ".self-node-status.chat-member-status {" in html
     assert ".self-node-name-text {" in html
