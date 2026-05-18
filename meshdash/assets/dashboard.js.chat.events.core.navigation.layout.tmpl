@@ -2637,6 +2637,8 @@
       const fromSelect = document.getElementById("network-routes-from");
       const toSelect = document.getElementById("network-routes-to");
       if (!(summary instanceof HTMLElement) || !(result instanceof HTMLElement)) return;
+      summary.hidden = false;
+      summary.setAttribute("aria-hidden", "false");
 
       const data = buildNetworkRoutesData(state);
       const nodeIds = networkRoutesSortedNodeIds(data.nodeMap);
@@ -2680,14 +2682,10 @@
         return;
       }}
 
-      const hopCount = Math.max(0, route.path.length - 1);
-      const totalWeight = route.edges.reduce((sum, edge) => sum + Math.max(0, Number(edge && edge.weight) || 0), 0);
-      const confidence = networkRoutesConfidenceText(route);
-      summary.innerHTML = `<span><strong>Inferred route</strong> - ${{escAttr(fromName)}} to ${{escAttr(toName)}}</span><span>${{escAttr(String(hopCount))}} hop${{hopCount === 1 ? "" : "s"}} - ${{escAttr(confidence)}} - ${{escAttr(networkGraphEdgeModeLabel(data.edgeMode))}}</span>`;
-      result.innerHTML = `<div class="network-route-result-head">
-        <span>${{escAttr(String(route.path.length))}} nodes</span>
-        <span>${{escAttr(networkTopNodesNumberText(totalWeight))}} observed packets</span>
-      </div>${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId)}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
+      summary.innerHTML = "";
+      summary.hidden = true;
+      summary.setAttribute("aria-hidden", "true");
+      result.innerHTML = `${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId)}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
       bindNetworkRoutesScopeInteractions(result);
     }}
 
