@@ -9,9 +9,13 @@ from .helpers import to_int
 def _load_meshtastic_modules():
     try:
         from meshtastic.protobuf import channel_pb2, mesh_pb2, portnums_pb2  # type: ignore
+        try:
+            from meshtastic.protobuf import telemetry_pb2  # type: ignore
+        except Exception:
+            telemetry_pb2 = None
     except Exception as exc:
         raise RuntimeError("Meshtastic protobuf support is unavailable") from exc
-    return channel_pb2, mesh_pb2, portnums_pb2
+    return channel_pb2, mesh_pb2, portnums_pb2, telemetry_pb2
 
 
 def _channel_is_enabled(iface: object, channel_index: int, channel_pb2_module: object) -> bool:
@@ -202,6 +206,73 @@ def _coerce_bool(value: object) -> bool:
     return bool(value)
 
 
+_TELEMETRY_TYPE_ALIASES = {
+    "device": "device_metrics",
+    "device_metrics": "device_metrics",
+    "environment": "environment_metrics",
+    "environment_metrics": "environment_metrics",
+    "air_quality": "air_quality_metrics",
+    "airquality": "air_quality_metrics",
+    "air_quality_metrics": "air_quality_metrics",
+    "power": "power_metrics",
+    "power_metrics": "power_metrics",
+    "localstats": "local_stats",
+    "local_stats": "local_stats",
+}
+
+
+def _normalize_telemetry_type(value: object) -> str:
+    clean = str(value or "").strip().lower()
+    if not clean:
+        return "device_metrics"
+    normalized = _TELEMETRY_TYPE_ALIASES.get(clean)
+    if not normalized:
+        raise ValueError(f"Unsupported telemetry type: {clean}")
+    return normalized
+
+
+def _build_telemetry_request_message(telemetry_pb2_module: object, telemetry_type: str) -> object:
+    telemetry_request = telemetry_pb2_module.Telemetry()
+    if telemetry_type == "environment_metrics":
+        telemetry_request.environment_metrics.CopyFrom(telemetry_pb2_module.EnvironmentMetrics())
+    elif telemetry_type == "air_quality_metrics":
+        telemetry_request.air_quality_metrics.CopyFrom(telemetry_pb2_module.AirQualityMetrics())
+    elif telemetry_type == "power_metrics":
+        telemetry_request.power_metrics.CopyFrom(telemetry_pb2_module.PowerMetrics())
+    elif telemetry_type == "local_stats":
+        telemetry_request.local_stats.CopyFrom(telemetry_pb2_module.LocalStats())
+    else:
+        telemetry_request.device_metrics.CopyFrom(telemetry_pb2_module.DeviceMetrics())
+    return telemetry_request
+
+
+def _parse_telemetry_response_payload(payload: object, telemetry_pb2_module: object) -> dict[str, object]:
+    if not isinstance(payload, (bytes, bytearray)):
+        raise ValueError("Telemetry response payload missing")
+    telemetry = telemetry_pb2_module.Telemetry()
+    telemetry.ParseFromString(bytes(payload))
+    try:
+        from google.protobuf import json_format  # type: ignore
+    except Exception:
+        json_format = None
+    if json_format is not None:
+        try:
+            as_dict = json_format.MessageToDict(telemetry, preserving_proto_field_name=True)
+            if isinstance(as_dict, dict):
+                return as_dict
+        except Exception:
+            pass
+    fallback_to_dict = getattr(telemetry, "to_dict", None)
+    if callable(fallback_to_dict):
+        try:
+            as_dict = fallback_to_dict()
+        except Exception:
+            as_dict = {}
+        if isinstance(as_dict, dict):
+            return as_dict
+    return {}
+
+
 def _build_local_nodeinfo_payload(
     iface: object,
     *,
@@ -258,7 +329,7 @@ def _run_ping(
     if not destination:
         raise ValueError("Missing destination")
 
-    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_pb2, mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
     channel_index = request.channel_index if request.channel_index is not None else 0
     timeout_ms = request.timeout_ms if request.timeout_ms is not None else 8000
     if not _channel_is_enabled(iface, channel_index, channel_pb2):
@@ -417,7 +488,7 @@ def _run_send_node_info(
     send_lock,
     to_int_fn=to_int,
 ) -> dict[str, object]:
-    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_pb2, mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
     channel_index = request.channel_index if request.channel_index is not None else 0
     if not _channel_is_enabled(iface, channel_index, channel_pb2):
         return _error_response(
@@ -494,6 +565,177 @@ def _run_send_node_info(
     }
 
 
+def _run_request_telemetry(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    channel_pb2, _mesh_pb2, portnums_pb2, telemetry_pb2 = _load_meshtastic_modules()
+    if telemetry_pb2 is None:
+        return _error_response(
+            request,
+            summary_label="telemetry",
+            detail="Telemetry protobuf support is unavailable",
+        )
+
+    channel_index = request.channel_index if request.channel_index is not None else 0
+    timeout_ms = request.timeout_ms if request.timeout_ms is not None else 12000
+    if not _channel_is_enabled(iface, channel_index, channel_pb2):
+        return _error_response(
+            request,
+            summary_label="telemetry",
+            detail=f"Channel {channel_index} is not enabled on the local node",
+        )
+
+    try:
+        telemetry_type = _normalize_telemetry_type(request.telemetry_type)
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="telemetry",
+            detail=str(exc),
+        )
+
+    telemetry_request = _build_telemetry_request_message(telemetry_pb2, telemetry_type)
+    try:
+        sent_packet_id, response_packet = _send_mesh_request(
+            iface=iface,
+            send_lock=send_lock,
+            message=telemetry_request,
+            destination=destination,
+            port_num=portnums_pb2.PortNum.TELEMETRY_APP,
+            channel_index=channel_index,
+            timeout_ms=timeout_ms,
+            hop_limit=request.hop_limit,
+            to_int_fn=to_int_fn,
+        )
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="telemetry",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="telemetry",
+            detail=f"Telemetry request failed: {exc}",
+        )
+
+    if response_packet is None:
+        return {
+            "ok": False,
+            "command": "request_telemetry",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "telemetry_type": telemetry_type,
+            "error": "Timed out waiting for telemetry response",
+            "console_lines": [f"[telemetry] {destination} | timed out waiting for response"],
+        }
+
+    routing_error = _routing_error_reason(response_packet)
+    if routing_error == "NO_RESPONSE":
+        return {
+            "ok": False,
+            "command": "request_telemetry",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "telemetry_type": telemetry_type,
+            "error": "Destination did not respond",
+            "console_lines": [f"[telemetry] {destination} | destination did not respond"],
+        }
+    if routing_error:
+        return {
+            "ok": False,
+            "command": "request_telemetry",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "telemetry_type": telemetry_type,
+            "error": f"Telemetry request failed: {routing_error}",
+            "console_lines": [f"[telemetry] {destination} | error={routing_error}"],
+        }
+
+    decoded = response_packet.get("decoded") if isinstance(response_packet, dict) else None
+    if not isinstance(decoded, dict) or not _portnum_matches(decoded.get("portnum"), "TELEMETRY_APP"):
+        return {
+            "ok": False,
+            "command": "request_telemetry",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "telemetry_type": telemetry_type,
+            "error": "Invalid telemetry response payload",
+            "console_lines": [f"[telemetry] {destination} | invalid response payload"],
+        }
+
+    try:
+        telemetry_payload = _parse_telemetry_response_payload(decoded.get("payload"), telemetry_pb2)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "command": "request_telemetry",
+            "destination": destination,
+            "channel_index": channel_index,
+            "hop_limit": request.hop_limit,
+            "sent_packet_id": sent_packet_id,
+            "telemetry_type": telemetry_type,
+            "error": f"Malformed telemetry response: {exc}",
+            "console_lines": [f"[telemetry] {destination} | malformed response payload"],
+        }
+
+    response_type = ""
+    response_metrics: object = {}
+    if isinstance(telemetry_payload, dict):
+        for key, value in telemetry_payload.items():
+            if key == "time":
+                continue
+            response_type = str(key).strip()
+            response_metrics = value
+            break
+
+    console_parts = [
+        f"[telemetry] {destination}",
+        f"type={telemetry_type}",
+    ]
+    if response_type:
+        console_parts.append(f"response={response_type}")
+    if isinstance(response_metrics, dict):
+        preview = []
+        for key, value in list(response_metrics.items())[:3]:
+            preview.append(f"{key}={value}")
+        if preview:
+            console_parts.append(", ".join(preview))
+
+    return {
+        "ok": True,
+        "command": "request_telemetry",
+        "destination": destination,
+        "channel_index": channel_index,
+        "hop_limit": request.hop_limit,
+        "sent_packet_id": sent_packet_id,
+        "telemetry_type": telemetry_type,
+        "result": {
+            "requested_type": telemetry_type,
+            "response_type": response_type or None,
+            "response": telemetry_payload if telemetry_payload else {},
+        },
+        "console_lines": [" | ".join(console_parts)],
+    }
+
+
 def _run_request_position(
     request: NetworkToolRequest,
     *,
@@ -505,7 +747,7 @@ def _run_request_position(
     if not destination:
         raise ValueError("Missing destination")
 
-    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_pb2, mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
     channel_index = request.channel_index if request.channel_index is not None else 0
     timeout_ms = request.timeout_ms if request.timeout_ms is not None else 8000
     if not _channel_is_enabled(iface, channel_index, channel_pb2):
@@ -733,7 +975,7 @@ def _run_traceroute(
     if not destination:
         raise ValueError("Missing destination")
 
-    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_pb2, mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
     channel_index = request.channel_index if request.channel_index is not None else 0
     hop_limit = request.hop_limit if request.hop_limit is not None else _traceroute_default_hop_limit(
         iface,
@@ -954,10 +1196,11 @@ def run_network_tool(
             to_int_fn=to_int_fn,
         )
     if request.command == "request_telemetry":
-        return _not_implemented_response(
+        return _run_request_telemetry(
             request,
-            summary_label="telemetry",
-            detail="request_telemetry is not implemented on this dashboard instance yet",
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
         )
     if request.command == "traceroute":
         return _run_traceroute(

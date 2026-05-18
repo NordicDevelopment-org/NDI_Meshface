@@ -67,9 +67,13 @@ def test_dashboard_js_registers_console_ping_and_position_commands() -> None:
     assert 'usage: "request-position <id|name|num>' in js
     assert 'name: "--request-position"' in js
     assert 'name: "where"' in js
+    assert 'name: "request-telemetry"' in js
+    assert 'name: "--request-telemetry"' in js
+    assert 'name: "telemetry"' in js
     assert "runConsolePingCommand" in js
     assert "runConsoleSendNodeInfoCommand" in js
     assert "runConsoleRequestPositionCommand" in js
+    assert "runConsoleRequestTelemetryCommand" in js
     assert "runConsoleNetworkNodeCommand" in js
 
 

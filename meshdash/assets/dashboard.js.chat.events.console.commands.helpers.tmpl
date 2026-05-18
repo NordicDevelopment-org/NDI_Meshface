@@ -1026,6 +1026,135 @@
       }}
     }}
 
+    const consoleTelemetryTypeAliases = {{
+      device: "device_metrics",
+      device_metrics: "device_metrics",
+      environment: "environment_metrics",
+      environment_metrics: "environment_metrics",
+      air_quality: "air_quality_metrics",
+      airquality: "air_quality_metrics",
+      air_quality_metrics: "air_quality_metrics",
+      power: "power_metrics",
+      power_metrics: "power_metrics",
+      localstats: "local_stats",
+      local_stats: "local_stats",
+    }};
+
+    function normalizeConsoleTelemetryType(rawType) {{
+      const clean = String(rawType == null ? "" : rawType).trim().toLowerCase();
+      if (!clean) return "device_metrics";
+      return consoleTelemetryTypeAliases[clean] || "";
+    }}
+
+    async function runConsoleRequestTelemetryCommand(ctx) {{
+      const options = (ctx && ctx.options && typeof ctx.options === "object")
+        ? ctx.options
+        : {{}};
+      const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
+      const commandLabel = "telemetry";
+
+      const channelIndexParsed = parseConsoleNetworkIntOption(
+        options,
+        ["ch-index", "ch_index", "channel-index", "channel_index"],
+        "ch-index",
+        0,
+        commandLabel,
+      );
+      if (!channelIndexParsed.ok) return channelIndexParsed.error;
+      const hopLimitParsed = parseConsoleNetworkIntOption(
+        options,
+        ["hop-limit", "hop_limit"],
+        "hop-limit",
+        1,
+        commandLabel,
+      );
+      if (!hopLimitParsed.ok) return hopLimitParsed.error;
+      const timeoutParsed = parseConsoleNetworkIntOption(
+        options,
+        ["timeout", "timeout_ms"],
+        "timeout",
+        1,
+        commandLabel,
+      );
+      if (!timeoutParsed.ok) return timeoutParsed.error;
+
+      const explicitDest = String(options.dest ?? options.destination ?? "").trim();
+      const explicitTypeRaw = String(options.type ?? options.telemetry_type ?? options["telemetry-type"] ?? "").trim();
+
+      let rawTarget = "";
+      let rawType = explicitTypeRaw;
+      if (explicitDest) {{
+        rawTarget = explicitDest;
+        if (args.length > 1) {{
+          return `[${{commandLabel}}] too many positional arguments. Use one optional telemetry type.`;
+        }}
+        if (!rawType && args.length === 1) {{
+          rawType = String(args[0] || "").trim();
+        }}
+      }} else {{
+        rawTarget = String(args[0] || "").trim();
+        if (!rawTarget) {{
+          return `[${{commandLabel}}] missing target. Example: request-telemetry !abcd1234`;
+        }}
+        if (!rawType && args.length > 1) {{
+          rawType = String(args[1] || "").trim();
+        }}
+        if (args.length > 2) {{
+          return `[${{commandLabel}}] too many positional arguments.`;
+        }}
+      }}
+
+      const resolved = resolveConsoleNetworkCommandDestination(rawTarget, ctx && ctx.state, commandLabel);
+      if (!resolved.ok) {{
+        return Array.isArray(resolved.lines) ? resolved.lines : `[${{commandLabel}}] invalid target: ${{rawTarget}}`;
+      }}
+      const destination = String(resolved.destination || "").trim();
+      if (!isCanonicalNodeId(destination)) {{
+        return `[${{commandLabel}}] invalid destination: ${{destination || rawTarget}}`;
+      }}
+
+      const telemetryType = normalizeConsoleTelemetryType(rawType);
+      if (!telemetryType) {{
+        return `[${{commandLabel}}] invalid telemetry type: ${{rawType}} (use device|environment|air_quality|power|localstats)`;
+      }}
+
+      const body = {{
+        command: "request-telemetry",
+        destination,
+        telemetry_type: telemetryType,
+      }};
+      if (channelIndexParsed.value != null) {{
+        body.channel_index = channelIndexParsed.value;
+      }}
+      if (hopLimitParsed.value != null) {{
+        body.hop_limit = hopLimitParsed.value;
+      }}
+      if (timeoutParsed.value != null) {{
+        body.timeout_ms = timeoutParsed.value;
+      }}
+
+      try {{
+        const payload = await postNetworkToolCommand(body);
+        const lines = Array.isArray(payload && payload.console_lines)
+          ? payload.console_lines
+              .map((line) => String(line == null ? "" : line).trimEnd())
+              .filter((line) => !!line)
+          : [];
+        return lines.length ? lines : [`[${{commandLabel}}] ${{destination}} | request completed`];
+      }} catch (err) {{
+        const payload = (err && typeof err === "object") ? err.payload : null;
+        const lines = Array.isArray(payload && payload.console_lines)
+          ? payload.console_lines
+              .map((line) => String(line == null ? "" : line).trimEnd())
+              .filter((line) => !!line)
+          : [];
+        if (lines.length) {{
+          return lines;
+        }}
+        throw err;
+      }}
+    }}
+
     async function runConsoleRequestPositionCommand(ctx) {{
       return runConsoleNetworkNodeCommand(ctx, {{
         command: "request-position",

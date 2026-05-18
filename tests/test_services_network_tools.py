@@ -22,6 +22,7 @@ class _FakeChannelPb2:
 class _FakePortNum:
     NODEINFO_APP = 4
     POSITION_APP = 3
+    TELEMETRY_APP = 67
     TRACEROUTE_APP = 70
 
 
@@ -113,6 +114,81 @@ class _FakeRouteDiscovery:
 _FakeMeshPb2.RouteDiscovery = _FakeRouteDiscovery
 
 
+class _FakeTelemetryMetrics:
+    def __init__(self) -> None:
+        object.__setattr__(self, "_values", {})
+
+    def CopyFrom(self, other) -> None:
+        source = getattr(other, "_values", {})
+        object.__setattr__(self, "_values", dict(source if isinstance(source, dict) else {}))
+
+    def __getattr__(self, name: str):
+        values = object.__getattribute__(self, "_values")
+        return values.get(name)
+
+    def __setattr__(self, name: str, value) -> None:
+        values = object.__getattribute__(self, "_values")
+        values[name] = value
+
+    def to_dict(self) -> dict[str, object]:
+        values = object.__getattribute__(self, "_values")
+        return dict(values if isinstance(values, dict) else {})
+
+
+class _FakeTelemetry:
+    def __init__(self) -> None:
+        self.device_metrics = _FakeTelemetryMetrics()
+        self.environment_metrics = _FakeTelemetryMetrics()
+        self.air_quality_metrics = _FakeTelemetryMetrics()
+        self.power_metrics = _FakeTelemetryMetrics()
+        self.local_stats = _FakeTelemetryMetrics()
+
+    def SerializeToString(self) -> bytes:
+        return b"telemetry-request"
+
+    def ParseFromString(self, payload: bytes) -> None:
+        self.device_metrics = _FakeTelemetryMetrics()
+        self.environment_metrics = _FakeTelemetryMetrics()
+        self.air_quality_metrics = _FakeTelemetryMetrics()
+        self.power_metrics = _FakeTelemetryMetrics()
+        self.local_stats = _FakeTelemetryMetrics()
+        if payload == b"good-telemetry-device":
+            self.device_metrics.battery_level = 88
+            self.device_metrics.voltage = 4.21
+            return
+        if payload == b"good-telemetry-power":
+            self.power_metrics.ch1_voltage = 12.3
+            self.power_metrics.ch1_current = 1.1
+            return
+        if payload == b"bad-telemetry":
+            raise ValueError("bad telemetry payload")
+
+    def to_dict(self) -> dict[str, object]:
+        for key in (
+            "device_metrics",
+            "environment_metrics",
+            "air_quality_metrics",
+            "power_metrics",
+            "local_stats",
+        ):
+            metrics = getattr(self, key, None)
+            if metrics is None or not hasattr(metrics, "to_dict"):
+                continue
+            values = metrics.to_dict()
+            if values:
+                return {key: values}
+        return {}
+
+
+class _FakeTelemetryPb2:
+    Telemetry = _FakeTelemetry
+    DeviceMetrics = _FakeTelemetryMetrics
+    EnvironmentMetrics = _FakeTelemetryMetrics
+    AirQualityMetrics = _FakeTelemetryMetrics
+    PowerMetrics = _FakeTelemetryMetrics
+    LocalStats = _FakeTelemetryMetrics
+
+
 class _FakeSentPacket:
     def __init__(self, packet_id: int) -> None:
         self.id = packet_id
@@ -199,7 +275,7 @@ class _FakeIface:
 def test_run_network_tool_request_position_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(
         {
@@ -230,7 +306,7 @@ def test_run_network_tool_request_position_success(monkeypatch: pytest.MonkeyPat
 def test_run_network_tool_ping_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(
         {
@@ -267,7 +343,7 @@ def test_run_network_tool_ping_success(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_run_network_tool_send_node_info_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(None)
 
@@ -296,10 +372,72 @@ def test_run_network_tool_send_node_info_success(monkeypatch: pytest.MonkeyPatch
     assert iface.send_calls[0]["hopLimit"] == 2
 
 
+def test_run_network_tool_request_telemetry_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(
+        {
+            "decoded": {
+                "portnum": "TELEMETRY_APP",
+                "payload": b"good-telemetry-device",
+            }
+        }
+    )
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="request_telemetry",
+            destination="!abcd1234",
+            telemetry_type="device_metrics",
+            hop_limit=4,
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "request_telemetry"
+    assert response["destination"] == "!abcd1234"
+    assert response["telemetry_type"] == "device_metrics"
+    assert response["result"]["requested_type"] == "device_metrics"
+    assert response["result"]["response_type"] == "device_metrics"
+    assert response["result"]["response"]["device_metrics"]["battery_level"] == 88
+    assert response["sent_packet_id"] == 1234
+    assert iface.send_calls[0]["portNum"] == _FakePortNum.TELEMETRY_APP
+    assert iface.send_calls[0]["wantResponse"] is True
+    assert iface.send_calls[0]["hopLimit"] == 4
+
+
+def test_run_network_tool_request_telemetry_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="request_telemetry",
+            destination="!abcd1234",
+            timeout_ms=50,
+            telemetry_type="power_metrics",
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is False
+    assert response["command"] == "request_telemetry"
+    assert response["error"] == "Timed out waiting for telemetry response"
+    assert response["console_lines"] == ["[telemetry] !abcd1234 | timed out waiting for response"]
+
+
 def test_run_network_tool_ping_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(None)
 
@@ -317,7 +455,7 @@ def test_run_network_tool_ping_handles_timeout(monkeypatch: pytest.MonkeyPatch) 
 def test_run_network_tool_ping_handles_no_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(
         {
@@ -343,7 +481,7 @@ def test_run_network_tool_ping_handles_no_response(monkeypatch: pytest.MonkeyPat
 def test_run_network_tool_request_position_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(None)
 
@@ -364,7 +502,7 @@ def test_run_network_tool_request_position_handles_timeout(monkeypatch: pytest.M
 def test_run_network_tool_request_position_rejects_disabled_channel(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(None, channel_role=0)
 
@@ -381,7 +519,7 @@ def test_run_network_tool_request_position_rejects_disabled_channel(monkeypatch:
 def test_run_network_tool_traceroute_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(
         {
@@ -428,7 +566,7 @@ def test_run_network_tool_traceroute_success(monkeypatch: pytest.MonkeyPatch) ->
 def test_run_network_tool_traceroute_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(None)
 
@@ -451,7 +589,7 @@ def test_run_network_tool_traceroute_handles_timeout(monkeypatch: pytest.MonkeyP
 def test_run_network_tool_traceroute_handles_no_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "meshdash.services_network_tools._load_meshtastic_modules",
-        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
     )
     iface = _FakeIface(
         {

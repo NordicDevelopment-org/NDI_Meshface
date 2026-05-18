@@ -563,6 +563,27 @@
         run: runConsoleRequestPositionCommand,
       }});
       registerConsoleCommand({{
+        name: "request-telemetry",
+        usage: "request-telemetry <id|name|num> [type=device|environment|air_quality|power|localstats] [--dest=<id>] [--type=<type>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
+        description: "Ask one node to reply with telemetry metrics.",
+        supportsVerbosity: false,
+        run: runConsoleRequestTelemetryCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--request-telemetry",
+        usage: "--request-telemetry <id|name|num> [type=device|environment|air_quality|power|localstats] [--dest=<id>] [--type=<type>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
+        description: "Meshtastic-style alias for request-telemetry.",
+        supportsVerbosity: false,
+        run: runConsoleRequestTelemetryCommand,
+      }});
+      registerConsoleCommand({{
+        name: "telemetry",
+        usage: "telemetry <id|name|num> [type=device|environment|air_quality|power|localstats] [--dest=<id>] [--type=<type>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
+        description: "Alias for request-telemetry.",
+        supportsVerbosity: false,
+        run: runConsoleRequestTelemetryCommand,
+      }});
+      registerConsoleCommand({{
         name: "traceroute",
         usage: "traceroute <id|name|num> [--dest=<id>] [--ch-index=<n>] [--hop-limit=<n>] [timeout=<ms>]",
         description: "Trace a route to one node over the mesh.",

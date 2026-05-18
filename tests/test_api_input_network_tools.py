@@ -63,6 +63,15 @@ def test_parse_network_tool_request_normalizes_telemetry_type_alias() -> None:
     assert request.telemetry_type == "power_metrics"
 
 
+def test_parse_network_tool_request_normalizes_telemetry_command_alias() -> None:
+    raw = b'{"command":"--request-telemetry","destination":"!abcd1234"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "request_telemetry"
+    assert request.destination == "!abcd1234"
+
+
 def test_parse_network_tool_request_allows_nodes_without_destination() -> None:
     request = parse_network_tool_request(b'{"command":"--nodes"}', to_int_fn=to_int)
 
