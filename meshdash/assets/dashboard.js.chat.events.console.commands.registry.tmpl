@@ -542,6 +542,20 @@
         run: runConsoleSendNodeInfoCommand,
       }});
       registerConsoleCommand({{
+        name: "send-alert",
+        usage: "send-alert <id|name|num> <text> [--dest=<id>] [--text=<text>] [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Send an alert message to one node.",
+        supportsVerbosity: false,
+        run: runConsoleSendAlertCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--send-alert",
+        usage: "--send-alert <id|name|num> <text> [--dest=<id>] [--text=<text>] [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Meshtastic-style alias for send-alert.",
+        supportsVerbosity: false,
+        run: runConsoleSendAlertCommand,
+      }});
+      registerConsoleCommand({{
         name: "request-position",
         usage: "request-position <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
         description: "Ask one node to reply with its position.",
@@ -582,6 +596,48 @@
         description: "Alias for request-telemetry.",
         supportsVerbosity: false,
         run: runConsoleRequestTelemetryCommand,
+      }});
+      registerConsoleCommand({{
+        name: "reboot",
+        usage: "reboot <id|name|num> [delay=<seconds>] [--dest=<id>]",
+        description: "Ask one node to reboot.",
+        supportsVerbosity: false,
+        run: runConsoleRebootCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--reboot",
+        usage: "--reboot <id|name|num> [delay=<seconds>] [--dest=<id>]",
+        description: "Meshtastic-style alias for reboot.",
+        supportsVerbosity: false,
+        run: runConsoleRebootCommand,
+      }});
+      registerConsoleCommand({{
+        name: "shutdown",
+        usage: "shutdown <id|name|num> [delay=<seconds>] [--dest=<id>]",
+        description: "Ask one node to shutdown.",
+        supportsVerbosity: false,
+        run: runConsoleShutdownCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--shutdown",
+        usage: "--shutdown <id|name|num> [delay=<seconds>] [--dest=<id>]",
+        description: "Meshtastic-style alias for shutdown.",
+        supportsVerbosity: false,
+        run: runConsoleShutdownCommand,
+      }});
+      registerConsoleCommand({{
+        name: "set-time",
+        usage: "set-time <id|name|num> [time=<epoch_seconds>] [--dest=<id>]",
+        description: "Set a node clock to now or a provided unix timestamp.",
+        supportsVerbosity: false,
+        run: runConsoleSetTimeCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--set-time",
+        usage: "--set-time <id|name|num> [time=<epoch_seconds>] [--dest=<id>]",
+        description: "Meshtastic-style alias for set-time.",
+        supportsVerbosity: false,
+        run: runConsoleSetTimeCommand,
       }});
       registerConsoleCommand({{
         name: "traceroute",

@@ -94,3 +94,32 @@ def test_parse_network_tool_request_allows_send_node_info_without_destination() 
 def test_parse_network_tool_request_rejects_missing_destination_for_radio_commands() -> None:
     with pytest.raises(ValueError, match="Missing destination"):
         parse_network_tool_request(b'{"command":"traceroute"}', to_int_fn=to_int)
+
+
+def test_parse_network_tool_request_normalizes_alert_and_text_aliases() -> None:
+    raw = (
+        b'{"command":"send-alert","destination":"!abcd1234","message":"Heads up",'
+        b'"ch_index":"2","hop_limit":"3"}'
+    )
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "send_alert"
+    assert request.destination == "!abcd1234"
+    assert request.text == "Heads up"
+    assert request.channel_index == 2
+    assert request.hop_limit == 3
+
+
+def test_parse_network_tool_request_parses_admin_fields() -> None:
+    raw = (
+        b'{"command":"set-time","destination":"!abcd1234","time":"1715985600",'
+        b'"delay":"5"}'
+    )
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "set_time"
+    assert request.destination == "!abcd1234"
+    assert request.time_sec == 1715985600
+    assert request.delay_seconds == 5

@@ -27,6 +27,20 @@ _COMMAND_ALIASES = {
     "request-telemetry": "request_telemetry",
     "--request-telemetry": "request_telemetry",
     "request_telemetry": "request_telemetry",
+    "send-alert": "send_alert",
+    "--send-alert": "send_alert",
+    "send_alert": "send_alert",
+    "alert": "send_alert",
+    "--alert": "send_alert",
+    "reboot": "reboot",
+    "--reboot": "reboot",
+    "shutdown": "shutdown",
+    "--shutdown": "shutdown",
+    "set-time": "set_time",
+    "--set-time": "set_time",
+    "set_time": "set_time",
+    "time": "set_time",
+    "--time": "set_time",
 }
 
 _DESTINATION_OPTIONAL_COMMANDS = {
@@ -57,6 +71,9 @@ class NetworkToolRequest:
     timeout_ms: int | None = None
     hop_limit: int | None = None
     telemetry_type: object = None
+    text: object = None
+    delay_seconds: int | None = None
+    time_sec: int | None = None
 
 
 def _normalize_command(value: object) -> str:
@@ -70,6 +87,13 @@ def _normalize_command(value: object) -> str:
 
 
 def _normalize_destination(value: object) -> str | None:
+    if value is None:
+        return None
+    clean = str(value).strip()
+    return clean or None
+
+
+def _normalize_optional_text(value: object) -> str | None:
     if value is None:
         return None
     clean = str(value).strip()
@@ -146,6 +170,27 @@ def parse_network_tool_request(
     telemetry_type = _normalize_telemetry_type(
         body.get("telemetry_type", body.get("type"))
     )
+    text = _normalize_optional_text(
+        body.get("text", body.get("message", body.get("msg")))
+    )
+    delay_seconds = _parse_optional_int(
+        body.get(
+            "delay_seconds",
+            body.get("delay", body.get("secs", body.get("seconds"))),
+        ),
+        label="delay_seconds",
+        to_int_fn=to_int_fn,
+        min_value=0,
+    )
+    time_sec = _parse_optional_int(
+        body.get(
+            "time_sec",
+            body.get("time", body.get("unix_time", body.get("timestamp"))),
+        ),
+        label="time_sec",
+        to_int_fn=to_int_fn,
+        min_value=1,
+    )
 
     return NetworkToolRequest(
         command=command,
@@ -154,6 +199,9 @@ def parse_network_tool_request(
         timeout_ms=timeout_ms,
         hop_limit=hop_limit,
         telemetry_type=telemetry_type,
+        text=text,
+        delay_seconds=delay_seconds,
+        time_sec=time_sec,
     )
 
 

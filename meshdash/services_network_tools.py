@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from .api_input_network_tools import NetworkToolRequest
 from .helpers import to_int
@@ -156,6 +157,12 @@ def _not_implemented_response(
         payload["hop_limit"] = request.hop_limit
     if request.telemetry_type is not None:
         payload["telemetry_type"] = request.telemetry_type
+    if request.text is not None:
+        payload["text"] = request.text
+    if request.delay_seconds is not None:
+        payload["delay_seconds"] = request.delay_seconds
+    if request.time_sec is not None:
+        payload["time_sec"] = request.time_sec
     return payload
 
 
@@ -736,6 +743,266 @@ def _run_request_telemetry(
     }
 
 
+def _preview_console_text(value: object, *, max_len: int = 80) -> str:
+    text = str(value or "").replace("\r", " ").replace("\n", " ").strip()
+    if len(text) <= max_len:
+        return text
+    return f"{text[:max_len - 3]}..."
+
+
+def _resolve_remote_node(
+    iface: object,
+    destination: str,
+) -> object:
+    get_node = getattr(iface, "getNode", None)
+    if not callable(get_node):
+        raise ValueError("Connected interface does not support getNode()")
+    try:
+        return get_node(
+            destination,
+            requestChannels=False,
+            requestChannelAttempts=0,
+            timeout=15,
+        )
+    except TypeError:
+        try:
+            return get_node(destination, False, 0, 15)
+        except TypeError:
+            return get_node(destination)
+
+
+def _run_send_alert(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    alert_text = str(request.text or "").strip()
+    if not alert_text:
+        return _error_response(
+            request,
+            summary_label="alert",
+            detail="Missing alert text",
+        )
+
+    channel_pb2, _mesh_pb2, _portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
+    channel_index = request.channel_index if request.channel_index is not None else 0
+    if not _channel_is_enabled(iface, channel_index, channel_pb2):
+        return _error_response(
+            request,
+            summary_label="alert",
+            detail=f"Channel {channel_index} is not enabled on the local node",
+        )
+
+    send_alert = getattr(iface, "sendAlert", None)
+    if not callable(send_alert):
+        return _error_response(
+            request,
+            summary_label="alert",
+            detail="Connected interface does not support sendAlert()",
+        )
+
+    try:
+        kwargs: dict[str, object] = {
+            "destinationId": destination,
+            "channelIndex": channel_index,
+        }
+        if request.hop_limit is not None:
+            kwargs["hopLimit"] = request.hop_limit
+        with send_lock:
+            sent_packet = send_alert(alert_text, **kwargs)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="alert",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="alert",
+            detail=f"Alert send failed: {exc}",
+        )
+
+    preview = _preview_console_text(alert_text).replace('"', "'")
+    console_parts = [
+        f"[alert] {destination}",
+        f'text="{preview}"',
+        f"ch={channel_index}",
+    ]
+    if request.hop_limit is not None:
+        console_parts.append(f"hop={request.hop_limit}")
+
+    return {
+        "ok": True,
+        "command": "send_alert",
+        "destination": destination,
+        "channel_index": channel_index,
+        "hop_limit": request.hop_limit,
+        "sent_packet_id": sent_packet_id,
+        "result": {
+            "text": alert_text,
+        },
+        "console_lines": [" | ".join(console_parts)],
+    }
+
+
+def _run_reboot(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    delay_seconds = request.delay_seconds if request.delay_seconds is not None else 10
+    if delay_seconds < 0:
+        return _error_response(
+            request,
+            summary_label="reboot",
+            detail="delay_seconds must be >= 0",
+        )
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        reboot_fn = getattr(node, "reboot", None)
+        if not callable(reboot_fn):
+            raise ValueError("Target node does not support reboot()")
+        with send_lock:
+            sent_packet = reboot_fn(secs=delay_seconds)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="reboot",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="reboot",
+            detail=f"Reboot request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "reboot",
+        "destination": destination,
+        "delay_seconds": delay_seconds,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[reboot] {destination} | scheduled reboot in {delay_seconds}s"],
+    }
+
+
+def _run_shutdown(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    delay_seconds = request.delay_seconds if request.delay_seconds is not None else 10
+    if delay_seconds < 0:
+        return _error_response(
+            request,
+            summary_label="shutdown",
+            detail="delay_seconds must be >= 0",
+        )
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        shutdown_fn = getattr(node, "shutdown", None)
+        if not callable(shutdown_fn):
+            raise ValueError("Target node does not support shutdown()")
+        with send_lock:
+            sent_packet = shutdown_fn(secs=delay_seconds)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="shutdown",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="shutdown",
+            detail=f"Shutdown request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "shutdown",
+        "destination": destination,
+        "delay_seconds": delay_seconds,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[shutdown] {destination} | scheduled shutdown in {delay_seconds}s"],
+    }
+
+
+def _run_set_time(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    time_sec = request.time_sec if request.time_sec is not None else int(time.time())
+    if time_sec < 1:
+        return _error_response(
+            request,
+            summary_label="set-time",
+            detail="time_sec must be >= 1",
+        )
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        set_time_fn = getattr(node, "setTime", None)
+        if not callable(set_time_fn):
+            raise ValueError("Target node does not support setTime()")
+        with send_lock:
+            sent_packet = set_time_fn(timeSec=time_sec)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="set-time",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="set-time",
+            detail=f"Set-time request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "set_time",
+        "destination": destination,
+        "time_sec": time_sec,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[set-time] {destination} | epoch={time_sec}"],
+    }
+
+
 def _run_request_position(
     request: NetworkToolRequest,
     *,
@@ -1197,6 +1464,34 @@ def run_network_tool(
         )
     if request.command == "request_telemetry":
         return _run_request_telemetry(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "send_alert":
+        return _run_send_alert(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "reboot":
+        return _run_reboot(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "shutdown":
+        return _run_shutdown(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "set_time":
+        return _run_set_time(
             request,
             iface=iface,
             send_lock=send_lock,

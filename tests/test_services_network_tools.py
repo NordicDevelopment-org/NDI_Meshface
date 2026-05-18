@@ -194,6 +194,26 @@ class _FakeSentPacket:
         self.id = packet_id
 
 
+class _FakeRemoteNode:
+    def __init__(self, node_id: str) -> None:
+        self.node_id = node_id
+        self.reboot_calls: list[int] = []
+        self.shutdown_calls: list[int] = []
+        self.set_time_calls: list[int] = []
+
+    def reboot(self, secs: int = 10):
+        self.reboot_calls.append(secs)
+        return _FakeSentPacket(5678)
+
+    def shutdown(self, secs: int = 10):
+        self.shutdown_calls.append(secs)
+        return _FakeSentPacket(6789)
+
+    def setTime(self, timeSec: int = 0):
+        self.set_time_calls.append(timeSec)
+        return _FakeSentPacket(7890)
+
+
 class _FakeChannel:
     def __init__(self, role: int) -> None:
         self.role = role
@@ -203,6 +223,9 @@ class _FakeLocalNode:
     def __init__(self, channel_role: int = 1, hop_limit: int = 4, node_num: int = 0x01020304) -> None:
         self._channel_role = channel_role
         self.nodeNum = node_num
+        self.reboot_calls: list[int] = []
+        self.shutdown_calls: list[int] = []
+        self.set_time_calls: list[int] = []
         self.user = {
             "id": f"!{node_num:08x}",
             "longName": "Local Ridge",
@@ -223,6 +246,18 @@ class _FakeLocalNode:
             return None
         return _FakeChannel(self._channel_role)
 
+    def reboot(self, secs: int = 10):
+        self.reboot_calls.append(secs)
+        return _FakeSentPacket(1111)
+
+    def shutdown(self, secs: int = 10):
+        self.shutdown_calls.append(secs)
+        return _FakeSentPacket(2222)
+
+    def setTime(self, timeSec: int = 0):
+        self.set_time_calls.append(timeSec)
+        return _FakeSentPacket(3333)
+
 
 class _FakeIface:
     def __init__(
@@ -240,6 +275,7 @@ class _FakeIface:
             node_num=local_node_num,
         )
         self.send_calls: list[dict[str, object]] = []
+        self.alert_calls: list[dict[str, object]] = []
         self.nodes_by_num = {
             0x11223344: "!11223344",
             0x55667788: "!55667788",
@@ -260,6 +296,10 @@ class _FakeIface:
                 },
             },
         }
+        self.remote_nodes = {
+            "!abcd1234": _FakeRemoteNode("!abcd1234"),
+            "!11223344": _FakeRemoteNode("!11223344"),
+        }
 
     def sendData(self, message, **kwargs):
         self.send_calls.append({"message": message, **kwargs})
@@ -270,6 +310,24 @@ class _FakeIface:
 
     def _nodeNumToId(self, num: int, isDest: bool = True):
         return self.nodes_by_num.get(num)
+
+    def sendAlert(self, text: str, **kwargs):
+        self.alert_calls.append({"text": text, **kwargs})
+        return _FakeSentPacket(4321)
+
+    def getNode(
+        self,
+        nodeId: str,
+        requestChannels: bool = True,
+        requestChannelAttempts: int = 3,
+        timeout: int = 300,
+    ):
+        if nodeId == "!01020304":
+            return self.localNode
+        node = self.remote_nodes.get(nodeId)
+        if node is None:
+            raise ValueError(f"Unknown node: {nodeId}")
+        return node
 
 
 def test_run_network_tool_request_position_success(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -408,6 +466,106 @@ def test_run_network_tool_request_telemetry_success(monkeypatch: pytest.MonkeyPa
     assert iface.send_calls[0]["portNum"] == _FakePortNum.TELEMETRY_APP
     assert iface.send_calls[0]["wantResponse"] is True
     assert iface.send_calls[0]["hopLimit"] == 4
+
+
+def test_run_network_tool_send_alert_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="send_alert",
+            destination="!abcd1234",
+            text="Weather warning",
+            channel_index=0,
+            hop_limit=2,
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "send_alert"
+    assert response["destination"] == "!abcd1234"
+    assert response["channel_index"] == 0
+    assert response["hop_limit"] == 2
+    assert response["sent_packet_id"] == 4321
+    assert response["result"]["text"] == "Weather warning"
+    assert response["console_lines"] == [
+        '[alert] !abcd1234 | text="Weather warning" | ch=0 | hop=2'
+    ]
+    assert iface.alert_calls[0]["destinationId"] == "!abcd1234"
+    assert iface.alert_calls[0]["channelIndex"] == 0
+    assert iface.alert_calls[0]["hopLimit"] == 2
+
+
+def test_run_network_tool_reboot_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="reboot", destination="!abcd1234", delay_seconds=5),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "reboot"
+    assert response["destination"] == "!abcd1234"
+    assert response["delay_seconds"] == 5
+    assert response["sent_packet_id"] == 5678
+    assert response["console_lines"] == ["[reboot] !abcd1234 | scheduled reboot in 5s"]
+    assert iface.remote_nodes["!abcd1234"].reboot_calls == [5]
+
+
+def test_run_network_tool_shutdown_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="shutdown", destination="!abcd1234", delay_seconds=7),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "shutdown"
+    assert response["destination"] == "!abcd1234"
+    assert response["delay_seconds"] == 7
+    assert response["sent_packet_id"] == 6789
+    assert response["console_lines"] == ["[shutdown] !abcd1234 | scheduled shutdown in 7s"]
+    assert iface.remote_nodes["!abcd1234"].shutdown_calls == [7]
+
+
+def test_run_network_tool_set_time_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="set_time", destination="!abcd1234", time_sec=1715985600),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "set_time"
+    assert response["destination"] == "!abcd1234"
+    assert response["time_sec"] == 1715985600
+    assert response["sent_packet_id"] == 7890
+    assert response["console_lines"] == ["[set-time] !abcd1234 | epoch=1715985600"]
+    assert iface.remote_nodes["!abcd1234"].set_time_calls == [1715985600]
 
 
 def test_run_network_tool_request_telemetry_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:

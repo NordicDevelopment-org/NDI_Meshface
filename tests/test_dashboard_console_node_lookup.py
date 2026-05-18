@@ -63,6 +63,9 @@ def test_dashboard_js_registers_console_ping_and_position_commands() -> None:
     assert 'name: "send-node-info"' in js
     assert 'usage: "send-node-info [--ch-index=<n>] [--hop-limit=<n>]"' in js
     assert 'name: "--send-node-info"' in js
+    assert 'name: "send-alert"' in js
+    assert 'usage: "send-alert <id|name|num> <text>' in js
+    assert 'name: "--send-alert"' in js
     assert 'name: "request-position"' in js
     assert 'usage: "request-position <id|name|num>' in js
     assert 'name: "--request-position"' in js
@@ -70,10 +73,20 @@ def test_dashboard_js_registers_console_ping_and_position_commands() -> None:
     assert 'name: "request-telemetry"' in js
     assert 'name: "--request-telemetry"' in js
     assert 'name: "telemetry"' in js
+    assert 'name: "reboot"' in js
+    assert 'name: "--reboot"' in js
+    assert 'name: "shutdown"' in js
+    assert 'name: "--shutdown"' in js
+    assert 'name: "set-time"' in js
+    assert 'name: "--set-time"' in js
     assert "runConsolePingCommand" in js
     assert "runConsoleSendNodeInfoCommand" in js
+    assert "runConsoleSendAlertCommand" in js
     assert "runConsoleRequestPositionCommand" in js
     assert "runConsoleRequestTelemetryCommand" in js
+    assert "runConsoleRebootCommand" in js
+    assert "runConsoleShutdownCommand" in js
+    assert "runConsoleSetTimeCommand" in js
     assert "runConsoleNetworkNodeCommand" in js
 
 
