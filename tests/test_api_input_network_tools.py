@@ -123,3 +123,51 @@ def test_parse_network_tool_request_parses_admin_fields() -> None:
     assert request.destination == "!abcd1234"
     assert request.time_sec == 1715985600
     assert request.delay_seconds == 5
+
+
+def test_parse_network_tool_request_parses_request_config_fields() -> None:
+    raw = b'{"command":"request-config","destination":"!abcd1234","config":"lora"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "request_config"
+    assert request.destination == "!abcd1234"
+    assert request.config_type == "lora"
+
+
+def test_parse_network_tool_request_parses_request_channels_fields() -> None:
+    raw = b'{"command":"request-channels","destination":"!abcd1234","start_index":"2"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "request_channels"
+    assert request.destination == "!abcd1234"
+    assert request.starting_index == 2
+
+
+def test_parse_network_tool_request_normalizes_official_sendtext_command() -> None:
+    raw = b'{"command":"--sendtext","destination":"!abcd1234","text":"hello"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "send_text"
+    assert request.destination == "!abcd1234"
+    assert request.text == "hello"
+
+
+def test_parse_network_tool_request_normalizes_device_metadata_command() -> None:
+    raw = b'{"command":"device-metadata","destination":"!abcd1234"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "device_metadata"
+    assert request.destination == "!abcd1234"
+
+
+def test_parse_network_tool_request_parses_confirm_bool() -> None:
+    raw = b'{"command":"factory-reset","destination":"!abcd1234","confirm":"true"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "factory_reset"
+    assert request.confirm is True

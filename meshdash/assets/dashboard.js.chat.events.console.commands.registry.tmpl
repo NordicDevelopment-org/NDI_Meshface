@@ -556,6 +556,20 @@
         run: runConsoleSendAlertCommand,
       }});
       registerConsoleCommand({{
+        name: "sendtext",
+        usage: "sendtext <id|name|num> <text> [--dest=<id>] [--text=<text>] [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Official Meshtastic command to send a text message to one node.",
+        supportsVerbosity: false,
+        run: runConsoleSendTextCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--sendtext",
+        usage: "--sendtext <id|name|num> <text> [--dest=<id>] [--text=<text>] [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Meshtastic CLI-style form for sendtext.",
+        supportsVerbosity: false,
+        run: runConsoleSendTextCommand,
+      }});
+      registerConsoleCommand({{
         name: "request-position",
         usage: "request-position <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
         description: "Ask one node to reply with its position.",
@@ -596,6 +610,90 @@
         description: "Alias for request-telemetry.",
         supportsVerbosity: false,
         run: runConsoleRequestTelemetryCommand,
+      }});
+      registerConsoleCommand({{
+        name: "request-config",
+        usage: "request-config <id|name|num> [config=device|position|power|network|display|lora|bluetooth|security|sessionkey|deviceui] [--dest=<id>] [--config=<type>]",
+        description: "Request a local config block from a node.",
+        supportsVerbosity: false,
+        run: runConsoleRequestConfigCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--request-config",
+        usage: "--request-config <id|name|num> [config=device|position|power|network|display|lora|bluetooth|security|sessionkey|deviceui] [--dest=<id>] [--config=<type>]",
+        description: "Meshtastic-style alias for request-config.",
+        supportsVerbosity: false,
+        run: runConsoleRequestConfigCommand,
+      }});
+      registerConsoleCommand({{
+        name: "request-channels",
+        usage: "request-channels <id|name|num> [start=<index>] [--dest=<id>] [--start-index=<n>]",
+        description: "Request channel records from a node.",
+        supportsVerbosity: false,
+        run: runConsoleRequestChannelsCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--request-channels",
+        usage: "--request-channels <id|name|num> [start=<index>] [--dest=<id>] [--start-index=<n>]",
+        description: "Meshtastic-style alias for request-channels.",
+        supportsVerbosity: false,
+        run: runConsoleRequestChannelsCommand,
+      }});
+      registerConsoleCommand({{
+        name: "device-metadata",
+        usage: "device-metadata <id|name|num> [--dest=<id>]",
+        description: "Official Meshtastic command to request device metadata.",
+        supportsVerbosity: false,
+        run: runConsoleDeviceMetadataCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--device-metadata",
+        usage: "--device-metadata <id|name|num> [--dest=<id>]",
+        description: "Meshtastic CLI-style form for device-metadata.",
+        supportsVerbosity: false,
+        run: runConsoleDeviceMetadataCommand,
+      }});
+      registerConsoleCommand({{
+        name: "reset-nodedb",
+        usage: "reset-nodedb <id|name|num> [--dest=<id>] --confirm",
+        description: "Dangerous: clear a node's NodeDB (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleResetNodeDbCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--reset-nodedb",
+        usage: "--reset-nodedb <id|name|num> [--dest=<id>] --confirm",
+        description: "Meshtastic CLI-style form for reset-nodedb (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleResetNodeDbCommand,
+      }});
+      registerConsoleCommand({{
+        name: "factory-reset",
+        usage: "factory-reset <id|name|num> [--dest=<id>] --confirm",
+        description: "Dangerous: reset node config to defaults (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleFactoryResetCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--factory-reset",
+        usage: "--factory-reset <id|name|num> [--dest=<id>] --confirm",
+        description: "Meshtastic CLI-style form for factory-reset (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleFactoryResetCommand,
+      }});
+      registerConsoleCommand({{
+        name: "factory-reset-device",
+        usage: "factory-reset-device <id|name|num> [--dest=<id>] --confirm",
+        description: "Dangerous: full device factory reset (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleFactoryResetDeviceCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--factory-reset-device",
+        usage: "--factory-reset-device <id|name|num> [--dest=<id>] --confirm",
+        description: "Meshtastic CLI-style form for factory-reset-device (requires --confirm).",
+        supportsVerbosity: false,
+        run: runConsoleFactoryResetDeviceCommand,
       }});
       registerConsoleCommand({{
         name: "reboot",

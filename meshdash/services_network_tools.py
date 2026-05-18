@@ -163,6 +163,12 @@ def _not_implemented_response(
         payload["delay_seconds"] = request.delay_seconds
     if request.time_sec is not None:
         payload["time_sec"] = request.time_sec
+    if request.config_type is not None:
+        payload["config_type"] = request.config_type
+    if request.starting_index is not None:
+        payload["starting_index"] = request.starting_index
+    if request.confirm is not None:
+        payload["confirm"] = request.confirm
     return payload
 
 
@@ -227,6 +233,45 @@ _TELEMETRY_TYPE_ALIASES = {
     "local_stats": "local_stats",
 }
 
+_REQUEST_CONFIG_TYPE_ALIASES = {
+    "device": "DEVICE_CONFIG",
+    "device_config": "DEVICE_CONFIG",
+    "position": "POSITION_CONFIG",
+    "position_config": "POSITION_CONFIG",
+    "power": "POWER_CONFIG",
+    "power_config": "POWER_CONFIG",
+    "network": "NETWORK_CONFIG",
+    "network_config": "NETWORK_CONFIG",
+    "display": "DISPLAY_CONFIG",
+    "display_config": "DISPLAY_CONFIG",
+    "lora": "LORA_CONFIG",
+    "lora_config": "LORA_CONFIG",
+    "bluetooth": "BLUETOOTH_CONFIG",
+    "bluetooth_config": "BLUETOOTH_CONFIG",
+    "security": "SECURITY_CONFIG",
+    "security_config": "SECURITY_CONFIG",
+    "sessionkey": "SESSIONKEY_CONFIG",
+    "session_key": "SESSIONKEY_CONFIG",
+    "sessionkey_config": "SESSIONKEY_CONFIG",
+    "deviceui": "DEVICEUI_CONFIG",
+    "device_ui": "DEVICEUI_CONFIG",
+    "deviceui_config": "DEVICEUI_CONFIG",
+    "ui": "DEVICEUI_CONFIG",
+}
+
+_REQUEST_CONFIG_TYPE_ENUM_VALUES = {
+    "DEVICE_CONFIG": 0,
+    "POSITION_CONFIG": 1,
+    "POWER_CONFIG": 2,
+    "NETWORK_CONFIG": 3,
+    "DISPLAY_CONFIG": 4,
+    "LORA_CONFIG": 5,
+    "BLUETOOTH_CONFIG": 6,
+    "SECURITY_CONFIG": 7,
+    "SESSIONKEY_CONFIG": 8,
+    "DEVICEUI_CONFIG": 9,
+}
+
 
 def _normalize_telemetry_type(value: object) -> str:
     clean = str(value or "").strip().lower()
@@ -236,6 +281,22 @@ def _normalize_telemetry_type(value: object) -> str:
     if not normalized:
         raise ValueError(f"Unsupported telemetry type: {clean}")
     return normalized
+
+
+def _normalize_request_config_type(value: object) -> str:
+    clean = str(value or "").strip().lower().replace("-", "_")
+    if not clean:
+        return "DEVICE_CONFIG"
+    normalized = _REQUEST_CONFIG_TYPE_ALIASES.get(clean)
+    if normalized:
+        return normalized
+    if clean.endswith("_config"):
+        candidate = clean.upper()
+    else:
+        candidate = f"{clean.upper()}_CONFIG"
+    if candidate in _REQUEST_CONFIG_TYPE_ALIASES.values():
+        return candidate
+    raise ValueError(f"Unsupported config type: {clean}")
 
 
 def _build_telemetry_request_message(telemetry_pb2_module: object, telemetry_type: str) -> object:
@@ -750,6 +811,90 @@ def _preview_console_text(value: object, *, max_len: int = 80) -> str:
     return f"{text[:max_len - 3]}..."
 
 
+def _run_send_text(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    text = str(request.text or "").strip()
+    if not text:
+        return _error_response(
+            request,
+            summary_label="sendtext",
+            detail="Missing message text",
+        )
+
+    channel_pb2, _mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
+    channel_index = request.channel_index if request.channel_index is not None else 0
+    if not _channel_is_enabled(iface, channel_index, channel_pb2):
+        return _error_response(
+            request,
+            summary_label="sendtext",
+            detail=f"Channel {channel_index} is not enabled on the local node",
+        )
+
+    send_text = getattr(iface, "sendText", None)
+    if not callable(send_text):
+        return _error_response(
+            request,
+            summary_label="sendtext",
+            detail="Connected interface does not support sendText()",
+        )
+
+    try:
+        kwargs: dict[str, object] = {
+            "destinationId": destination,
+            "channelIndex": channel_index,
+            "wantAck": False,
+            "wantResponse": False,
+        }
+        if request.hop_limit is not None:
+            kwargs["hopLimit"] = request.hop_limit
+        with send_lock:
+            sent_packet = send_text(text, **kwargs)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="sendtext",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="sendtext",
+            detail=f"Text send failed: {exc}",
+        )
+
+    preview = _preview_console_text(text).replace('"', "'")
+    console_parts = [
+        f"[sendtext] {destination}",
+        f'text="{preview}"',
+        f"ch={channel_index}",
+    ]
+    if request.hop_limit is not None:
+        console_parts.append(f"hop={request.hop_limit}")
+
+    return {
+        "ok": True,
+        "command": "send_text",
+        "destination": destination,
+        "channel_index": channel_index,
+        "hop_limit": request.hop_limit,
+        "sent_packet_id": sent_packet_id,
+        "result": {
+            "text": text,
+        },
+        "console_lines": [" | ".join(console_parts)],
+    }
+
+
 def _resolve_remote_node(
     iface: object,
     destination: str,
@@ -769,6 +914,297 @@ def _resolve_remote_node(
             return get_node(destination, False, 0, 15)
         except TypeError:
             return get_node(destination)
+
+
+def _run_request_config(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    try:
+        config_type_name = _normalize_request_config_type(request.config_type)
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="config",
+            detail=str(exc),
+        )
+
+    config_value = _REQUEST_CONFIG_TYPE_ENUM_VALUES.get(config_type_name)
+    if config_value is None:
+        return _error_response(
+            request,
+            summary_label="config",
+            detail=f"Unsupported config type: {config_type_name}",
+        )
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        request_config = getattr(node, "requestConfig", None)
+        if not callable(request_config):
+            raise ValueError("Target node does not support requestConfig()")
+        with send_lock:
+            request_config(config_value)
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="config",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="config",
+            detail=f"Config request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "request_config",
+        "destination": destination,
+        "config_type": config_type_name,
+        "console_lines": [f"[config] {destination} | requested {config_type_name}"],
+    }
+
+
+def _run_request_channels(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    starting_index = request.starting_index if request.starting_index is not None else 0
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        request_channels = getattr(node, "requestChannels", None)
+        if not callable(request_channels):
+            raise ValueError("Target node does not support requestChannels()")
+        with send_lock:
+            try:
+                request_channels(startingIndex=starting_index)
+            except TypeError:
+                request_channels(starting_index)
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="channels",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="channels",
+            detail=f"Channel request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "request_channels",
+        "destination": destination,
+        "starting_index": starting_index,
+        "console_lines": [f"[channels] {destination} | requested from index {starting_index}"],
+    }
+
+
+def _run_device_metadata(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        get_metadata = getattr(node, "getMetadata", None)
+        if not callable(get_metadata):
+            raise ValueError("Target node does not support getMetadata()")
+        with send_lock:
+            get_metadata()
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="metadata",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="metadata",
+            detail=f"Metadata request failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "device_metadata",
+        "destination": destination,
+        "console_lines": [f"[device-metadata] {destination} | request sent"],
+    }
+
+
+def _require_dangerous_confirm(
+    request: NetworkToolRequest,
+    *,
+    summary_label: str,
+    command_name: str,
+) -> dict[str, object] | None:
+    if request.confirm is True:
+        return None
+    return _error_response(
+        request,
+        summary_label=summary_label,
+        detail=f'Refusing to run dangerous command without confirmation (use "{command_name} ... --confirm")',
+    )
+
+
+def _run_reset_nodedb(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    confirm_error = _require_dangerous_confirm(
+        request,
+        summary_label="reset-nodedb",
+        command_name="reset-nodedb",
+    )
+    if confirm_error is not None:
+        return confirm_error
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        reset_nodedb = getattr(node, "resetNodeDb", None)
+        if not callable(reset_nodedb):
+            raise ValueError("Target node does not support resetNodeDb()")
+        with send_lock:
+            sent_packet = reset_nodedb()
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="reset-nodedb",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="reset-nodedb",
+            detail=f"Reset NodeDB failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "reset_nodedb",
+        "destination": destination,
+        "confirm": True,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[reset-nodedb] {destination} | request sent"],
+    }
+
+
+def _run_factory_reset_common(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    full_device: bool,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    destination = str(request.destination or "").strip()
+    if not destination:
+        raise ValueError("Missing destination")
+
+    command_label = "factory-reset-device" if full_device else "factory-reset"
+    confirm_error = _require_dangerous_confirm(
+        request,
+        summary_label=command_label,
+        command_name=command_label,
+    )
+    if confirm_error is not None:
+        return confirm_error
+
+    try:
+        node = _resolve_remote_node(iface, destination)
+        factory_reset = getattr(node, "factoryReset", None)
+        if not callable(factory_reset):
+            raise ValueError("Target node does not support factoryReset()")
+        with send_lock:
+            sent_packet = factory_reset(full=full_device)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label=command_label,
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label=command_label,
+            detail=f"Factory reset failed: {exc}",
+        )
+
+    command_name = "factory_reset_device" if full_device else "factory_reset"
+    return {
+        "ok": True,
+        "command": command_name,
+        "destination": destination,
+        "confirm": True,
+        "sent_packet_id": sent_packet_id,
+        "result": {
+            "full_device": bool(full_device),
+        },
+        "console_lines": [f"[{command_label}] {destination} | request sent"],
+    }
+
+
+def _run_factory_reset(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    return _run_factory_reset_common(
+        request,
+        iface=iface,
+        send_lock=send_lock,
+        full_device=False,
+        to_int_fn=to_int_fn,
+    )
+
+
+def _run_factory_reset_device(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    return _run_factory_reset_common(
+        request,
+        iface=iface,
+        send_lock=send_lock,
+        full_device=True,
+        to_int_fn=to_int_fn,
+    )
 
 
 def _run_send_alert(
@@ -799,24 +1235,36 @@ def _run_send_alert(
             detail=f"Channel {channel_index} is not enabled on the local node",
         )
 
-    send_alert = getattr(iface, "sendAlert", None)
-    if not callable(send_alert):
-        return _error_response(
-            request,
-            summary_label="alert",
-            detail="Connected interface does not support sendAlert()",
-        )
-
     try:
-        kwargs: dict[str, object] = {
-            "destinationId": destination,
-            "channelIndex": channel_index,
-        }
-        if request.hop_limit is not None:
-            kwargs["hopLimit"] = request.hop_limit
-        with send_lock:
-            sent_packet = send_alert(alert_text, **kwargs)
-        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+        alert_port = getattr(getattr(_portnums_pb2, "PortNum", None), "ALERT_APP", None)
+        if alert_port is not None:
+            sent_packet_id = _send_mesh_packet(
+                iface=iface,
+                send_lock=send_lock,
+                message=alert_text.encode("utf-8"),
+                destination=destination,
+                port_num=alert_port,
+                channel_index=channel_index,
+                hop_limit=request.hop_limit,
+                to_int_fn=to_int_fn,
+            )
+        else:
+            send_alert = getattr(iface, "sendAlert", None)
+            if not callable(send_alert):
+                return _error_response(
+                    request,
+                    summary_label="alert",
+                    detail="Connected interface does not support ALERT_APP send",
+                )
+            kwargs: dict[str, object] = {
+                "destinationId": destination,
+                "channelIndex": channel_index,
+            }
+            if request.hop_limit is not None:
+                kwargs["hopLimit"] = request.hop_limit
+            with send_lock:
+                sent_packet = send_alert(alert_text, **kwargs)
+            sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
     except ValueError as exc:
         return _error_response(
             request,
@@ -1448,6 +1896,13 @@ def run_network_tool(
             send_lock=send_lock,
             to_int_fn=to_int_fn,
         )
+    if request.command == "send_text":
+        return _run_send_text(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
     if request.command == "ping":
         return _run_ping(
             request,
@@ -1471,6 +1926,45 @@ def run_network_tool(
         )
     if request.command == "send_alert":
         return _run_send_alert(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "request_config":
+        return _run_request_config(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+        )
+    if request.command == "request_channels":
+        return _run_request_channels(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+        )
+    if request.command == "device_metadata":
+        return _run_device_metadata(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+        )
+    if request.command == "reset_nodedb":
+        return _run_reset_nodedb(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "factory_reset":
+        return _run_factory_reset(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "factory_reset_device":
+        return _run_factory_reset_device(
             request,
             iface=iface,
             send_lock=send_lock,

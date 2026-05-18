@@ -41,6 +41,27 @@ _COMMAND_ALIASES = {
     "set_time": "set_time",
     "time": "set_time",
     "--time": "set_time",
+    "sendtext": "send_text",
+    "--sendtext": "send_text",
+    "send_text": "send_text",
+    "request-config": "request_config",
+    "--request-config": "request_config",
+    "request_config": "request_config",
+    "request-channels": "request_channels",
+    "--request-channels": "request_channels",
+    "request_channels": "request_channels",
+    "device-metadata": "device_metadata",
+    "--device-metadata": "device_metadata",
+    "device_metadata": "device_metadata",
+    "reset-nodedb": "reset_nodedb",
+    "--reset-nodedb": "reset_nodedb",
+    "reset_nodedb": "reset_nodedb",
+    "factory-reset": "factory_reset",
+    "--factory-reset": "factory_reset",
+    "factory_reset": "factory_reset",
+    "factory-reset-device": "factory_reset_device",
+    "--factory-reset-device": "factory_reset_device",
+    "factory_reset_device": "factory_reset_device",
 }
 
 _DESTINATION_OPTIONAL_COMMANDS = {
@@ -74,6 +95,9 @@ class NetworkToolRequest:
     text: object = None
     delay_seconds: int | None = None
     time_sec: int | None = None
+    config_type: object = None
+    starting_index: int | None = None
+    confirm: bool | None = None
 
 
 def _normalize_command(value: object) -> str:
@@ -98,6 +122,26 @@ def _normalize_optional_text(value: object) -> str | None:
         return None
     clean = str(value).strip()
     return clean or None
+
+
+def _normalize_optional_config_type(value: object) -> str | None:
+    if value is None:
+        return None
+    clean = str(value).strip().lower().replace("-", "_")
+    return clean or None
+
+
+def _parse_optional_bool(value: object, *, label: str) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    clean = str(value).strip().lower()
+    if clean in {"1", "true", "yes", "y", "on"}:
+        return True
+    if clean in {"0", "false", "no", "n", "off"}:
+        return False
+    raise ValueError(f"Invalid {label}")
 
 
 def _parse_optional_int(
@@ -191,6 +235,22 @@ def parse_network_tool_request(
         to_int_fn=to_int_fn,
         min_value=1,
     )
+    config_type = _normalize_optional_config_type(
+        body.get("config_type", body.get("config"))
+    )
+    starting_index = _parse_optional_int(
+        body.get(
+            "starting_index",
+            body.get("start_index", body.get("start")),
+        ),
+        label="starting_index",
+        to_int_fn=to_int_fn,
+        min_value=0,
+    )
+    confirm = _parse_optional_bool(
+        body.get("confirm", body.get("force")),
+        label="confirm",
+    )
 
     return NetworkToolRequest(
         command=command,
@@ -202,6 +262,9 @@ def parse_network_tool_request(
         text=text,
         delay_seconds=delay_seconds,
         time_sec=time_sec,
+        config_type=config_type,
+        starting_index=starting_index,
+        confirm=confirm,
     )
 
 

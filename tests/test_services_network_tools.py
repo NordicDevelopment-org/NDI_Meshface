@@ -24,6 +24,7 @@ class _FakePortNum:
     POSITION_APP = 3
     TELEMETRY_APP = 67
     TRACEROUTE_APP = 70
+    ALERT_APP = 89
 
 
 class _FakePortnumsPb2:
@@ -200,6 +201,11 @@ class _FakeRemoteNode:
         self.reboot_calls: list[int] = []
         self.shutdown_calls: list[int] = []
         self.set_time_calls: list[int] = []
+        self.request_config_calls: list[int] = []
+        self.request_channels_calls: list[int] = []
+        self.get_metadata_calls: int = 0
+        self.reset_nodedb_calls: int = 0
+        self.factory_reset_calls: list[bool] = []
 
     def reboot(self, secs: int = 10):
         self.reboot_calls.append(secs)
@@ -212,6 +218,23 @@ class _FakeRemoteNode:
     def setTime(self, timeSec: int = 0):
         self.set_time_calls.append(timeSec)
         return _FakeSentPacket(7890)
+
+    def requestConfig(self, configType):
+        self.request_config_calls.append(int(configType))
+
+    def requestChannels(self, startingIndex: int = 0):
+        self.request_channels_calls.append(int(startingIndex))
+
+    def getMetadata(self):
+        self.get_metadata_calls += 1
+
+    def resetNodeDb(self):
+        self.reset_nodedb_calls += 1
+        return _FakeSentPacket(8800)
+
+    def factoryReset(self, full: bool = False):
+        self.factory_reset_calls.append(bool(full))
+        return _FakeSentPacket(8900 if full else 8890)
 
 
 class _FakeChannel:
@@ -276,6 +299,7 @@ class _FakeIface:
         )
         self.send_calls: list[dict[str, object]] = []
         self.alert_calls: list[dict[str, object]] = []
+        self.text_calls: list[dict[str, object]] = []
         self.nodes_by_num = {
             0x11223344: "!11223344",
             0x55667788: "!55667788",
@@ -314,6 +338,10 @@ class _FakeIface:
     def sendAlert(self, text: str, **kwargs):
         self.alert_calls.append({"text": text, **kwargs})
         return _FakeSentPacket(4321)
+
+    def sendText(self, text: str, **kwargs):
+        self.text_calls.append({"text": text, **kwargs})
+        return _FakeSentPacket(2468)
 
     def getNode(
         self,
@@ -492,14 +520,256 @@ def test_run_network_tool_send_alert_success(monkeypatch: pytest.MonkeyPatch) ->
     assert response["destination"] == "!abcd1234"
     assert response["channel_index"] == 0
     assert response["hop_limit"] == 2
-    assert response["sent_packet_id"] == 4321
+    assert response["sent_packet_id"] == 1234
     assert response["result"]["text"] == "Weather warning"
     assert response["console_lines"] == [
         '[alert] !abcd1234 | text="Weather warning" | ch=0 | hop=2'
     ]
+    assert iface.send_calls[0]["destinationId"] == "!abcd1234"
+    assert iface.send_calls[0]["channelIndex"] == 0
+    assert iface.send_calls[0]["hopLimit"] == 2
+    assert iface.send_calls[0]["portNum"] == _FakePortNum.ALERT_APP
+    assert iface.send_calls[0]["message"] == b"Weather warning"
+    assert iface.alert_calls == []
+
+
+def test_run_network_tool_send_alert_falls_back_when_alert_port_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _PortNumNoAlert:
+        NODEINFO_APP = 4
+        POSITION_APP = 3
+        TELEMETRY_APP = 67
+        TRACEROUTE_APP = 70
+
+    class _PortnumsNoAlert:
+        PortNum = _PortNumNoAlert
+
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _PortnumsNoAlert, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="send_alert",
+            destination="!abcd1234",
+            text="Weather warning",
+            channel_index=0,
+            hop_limit=2,
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["sent_packet_id"] == 4321
+    assert iface.send_calls == []
     assert iface.alert_calls[0]["destinationId"] == "!abcd1234"
     assert iface.alert_calls[0]["channelIndex"] == 0
     assert iface.alert_calls[0]["hopLimit"] == 2
+
+
+def test_run_network_tool_send_text_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="send_text",
+            destination="!abcd1234",
+            text="hello mesh",
+            channel_index=0,
+            hop_limit=3,
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "send_text"
+    assert response["destination"] == "!abcd1234"
+    assert response["channel_index"] == 0
+    assert response["hop_limit"] == 3
+    assert response["sent_packet_id"] == 2468
+    assert response["result"]["text"] == "hello mesh"
+    assert response["console_lines"] == ['[sendtext] !abcd1234 | text="hello mesh" | ch=0 | hop=3']
+    assert iface.text_calls[0]["destinationId"] == "!abcd1234"
+    assert iface.text_calls[0]["channelIndex"] == 0
+    assert iface.text_calls[0]["hopLimit"] == 3
+
+
+def test_run_network_tool_request_config_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="request_config",
+            destination="!abcd1234",
+            config_type="lora",
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "request_config"
+    assert response["destination"] == "!abcd1234"
+    assert response["config_type"] == "LORA_CONFIG"
+    assert response["console_lines"] == ["[config] !abcd1234 | requested LORA_CONFIG"]
+    assert iface.remote_nodes["!abcd1234"].request_config_calls == [5]
+
+
+def test_run_network_tool_request_channels_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(
+            command="request_channels",
+            destination="!abcd1234",
+            starting_index=2,
+        ),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "request_channels"
+    assert response["destination"] == "!abcd1234"
+    assert response["starting_index"] == 2
+    assert response["console_lines"] == ["[channels] !abcd1234 | requested from index 2"]
+    assert iface.remote_nodes["!abcd1234"].request_channels_calls == [2]
+
+
+def test_run_network_tool_device_metadata_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="device_metadata", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "device_metadata"
+    assert response["destination"] == "!abcd1234"
+    assert response["console_lines"] == ["[device-metadata] !abcd1234 | request sent"]
+    assert iface.remote_nodes["!abcd1234"].get_metadata_calls == 1
+
+
+def test_run_network_tool_reset_nodedb_requires_confirm(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="reset_nodedb", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is False
+    assert "without confirmation" in str(response.get("error") or "")
+    assert iface.remote_nodes["!abcd1234"].reset_nodedb_calls == 0
+
+
+def test_run_network_tool_reset_nodedb_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="reset_nodedb", destination="!abcd1234", confirm=True),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "reset_nodedb"
+    assert response["destination"] == "!abcd1234"
+    assert response["sent_packet_id"] == 8800
+    assert response["console_lines"] == ["[reset-nodedb] !abcd1234 | request sent"]
+    assert iface.remote_nodes["!abcd1234"].reset_nodedb_calls == 1
+
+
+def test_run_network_tool_factory_reset_requires_confirm(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="factory_reset", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is False
+    assert "without confirmation" in str(response.get("error") or "")
+    assert iface.remote_nodes["!abcd1234"].factory_reset_calls == []
+
+
+def test_run_network_tool_factory_reset_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="factory_reset", destination="!abcd1234", confirm=True),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "factory_reset"
+    assert response["destination"] == "!abcd1234"
+    assert response["sent_packet_id"] == 8890
+    assert response["result"]["full_device"] is False
+    assert response["console_lines"] == ["[factory-reset] !abcd1234 | request sent"]
+    assert iface.remote_nodes["!abcd1234"].factory_reset_calls == [False]
+
+
+def test_run_network_tool_factory_reset_device_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="factory_reset_device", destination="!abcd1234", confirm=True),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "factory_reset_device"
+    assert response["destination"] == "!abcd1234"
+    assert response["sent_packet_id"] == 8900
+    assert response["result"]["full_device"] is True
+    assert response["console_lines"] == ["[factory-reset-device] !abcd1234 | request sent"]
+    assert iface.remote_nodes["!abcd1234"].factory_reset_calls == [True]
 
 
 def test_run_network_tool_reboot_success(monkeypatch: pytest.MonkeyPatch) -> None:
