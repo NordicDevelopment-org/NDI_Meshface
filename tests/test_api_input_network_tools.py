@@ -70,6 +70,18 @@ def test_parse_network_tool_request_allows_nodes_without_destination() -> None:
     assert request.destination is None
 
 
+def test_parse_network_tool_request_allows_send_node_info_without_destination() -> None:
+    request = parse_network_tool_request(
+        b'{"command":"--send-node-info","channel_index":"2","hop_limit":"3"}',
+        to_int_fn=to_int,
+    )
+
+    assert request.command == "send_node_info"
+    assert request.destination is None
+    assert request.channel_index == 2
+    assert request.hop_limit == 3
+
+
 def test_parse_network_tool_request_rejects_missing_destination_for_radio_commands() -> None:
     with pytest.raises(ValueError, match="Missing destination"):
         parse_network_tool_request(b'{"command":"traceroute"}', to_int_fn=to_int)

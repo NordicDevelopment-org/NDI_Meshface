@@ -60,11 +60,15 @@ def test_dashboard_js_registers_console_ping_and_position_commands() -> None:
     assert 'name: "ping"' in js
     assert 'usage: "ping <id|name|num>' in js
     assert 'name: "--ping"' in js
+    assert 'name: "send-node-info"' in js
+    assert 'usage: "send-node-info [--ch-index=<n>] [--hop-limit=<n>]"' in js
+    assert 'name: "--send-node-info"' in js
     assert 'name: "request-position"' in js
     assert 'usage: "request-position <id|name|num>' in js
     assert 'name: "--request-position"' in js
     assert 'name: "where"' in js
     assert "runConsolePingCommand" in js
+    assert "runConsoleSendNodeInfoCommand" in js
     assert "runConsoleRequestPositionCommand" in js
     assert "runConsoleNetworkNodeCommand" in js
 

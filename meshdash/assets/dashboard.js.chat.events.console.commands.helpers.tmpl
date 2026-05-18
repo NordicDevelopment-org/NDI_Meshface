@@ -965,6 +965,67 @@
       }});
     }}
 
+    async function runConsoleSendNodeInfoCommand(ctx) {{
+      const options = (ctx && ctx.options && typeof ctx.options === "object")
+        ? ctx.options
+        : {{}};
+      const args = Array.isArray(ctx && ctx.args) ? ctx.args : [];
+      const commandLabel = "nodeinfo";
+
+      const channelIndexParsed = parseConsoleNetworkIntOption(
+        options,
+        ["ch-index", "ch_index", "channel-index", "channel_index"],
+        "ch-index",
+        0,
+        commandLabel,
+      );
+      if (!channelIndexParsed.ok) return channelIndexParsed.error;
+      const hopLimitParsed = parseConsoleNetworkIntOption(
+        options,
+        ["hop-limit", "hop_limit"],
+        "hop-limit",
+        1,
+        commandLabel,
+      );
+      if (!hopLimitParsed.ok) return hopLimitParsed.error;
+
+      const explicitDest = String(options.dest ?? options.destination ?? "").trim();
+      if (args.length || explicitDest) {{
+        return `[${{commandLabel}}] this command broadcasts local node info and does not take a target.`;
+      }}
+
+      const body = {{
+        command: "send-node-info",
+      }};
+      if (channelIndexParsed.value != null) {{
+        body.channel_index = channelIndexParsed.value;
+      }}
+      if (hopLimitParsed.value != null) {{
+        body.hop_limit = hopLimitParsed.value;
+      }}
+
+      try {{
+        const payload = await postNetworkToolCommand(body);
+        const lines = Array.isArray(payload && payload.console_lines)
+          ? payload.console_lines
+              .map((line) => String(line == null ? "" : line).trimEnd())
+              .filter((line) => !!line)
+          : [];
+        return lines.length ? lines : [`[${{commandLabel}}] broadcast sent`];
+      }} catch (err) {{
+        const payload = (err && typeof err === "object") ? err.payload : null;
+        const lines = Array.isArray(payload && payload.console_lines)
+          ? payload.console_lines
+              .map((line) => String(line == null ? "" : line).trimEnd())
+              .filter((line) => !!line)
+          : [];
+        if (lines.length) {{
+          return lines;
+        }}
+        throw err;
+      }}
+    }}
+
     async function runConsoleRequestPositionCommand(ctx) {{
       return runConsoleNetworkNodeCommand(ctx, {{
         command: "request-position",

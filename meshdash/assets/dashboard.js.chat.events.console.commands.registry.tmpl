@@ -528,6 +528,20 @@
         run: runConsolePingCommand,
       }});
       registerConsoleCommand({{
+        name: "send-node-info",
+        usage: "send-node-info [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Broadcast this radio's node info on the mesh.",
+        supportsVerbosity: false,
+        run: runConsoleSendNodeInfoCommand,
+      }});
+      registerConsoleCommand({{
+        name: "--send-node-info",
+        usage: "--send-node-info [--ch-index=<n>] [--hop-limit=<n>]",
+        description: "Meshtastic-style alias for send-node-info.",
+        supportsVerbosity: false,
+        run: runConsoleSendNodeInfoCommand,
+      }});
+      registerConsoleCommand({{
         name: "request-position",
         usage: "request-position <id|name|num> [--dest=<id>] [--ch-index=<n>] [timeout=<ms>]",
         description: "Ask one node to reply with its position.",

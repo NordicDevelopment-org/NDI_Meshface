@@ -7,6 +7,11 @@ from .helpers import to_int
 _COMMAND_ALIASES = {
     "nodes": "nodes",
     "--nodes": "nodes",
+    "send-node-info": "send_node_info",
+    "--send-node-info": "send_node_info",
+    "send_node_info": "send_node_info",
+    "send-nodeinfo": "send_node_info",
+    "--send-nodeinfo": "send_node_info",
     "ping": "ping",
     "--ping": "ping",
     "nodeinfo": "ping",
@@ -22,6 +27,11 @@ _COMMAND_ALIASES = {
     "request-telemetry": "request_telemetry",
     "--request-telemetry": "request_telemetry",
     "request_telemetry": "request_telemetry",
+}
+
+_DESTINATION_OPTIONAL_COMMANDS = {
+    "nodes",
+    "send_node_info",
 }
 
 _TELEMETRY_TYPE_ALIASES = {
@@ -112,7 +122,7 @@ def parse_network_tool_request(
     destination = _normalize_destination(
         body.get("destination", body.get("dest"))
     )
-    if command != "nodes" and not destination:
+    if command not in _DESTINATION_OPTIONAL_COMMANDS and not destination:
         raise ValueError("Missing destination")
 
     channel_index = _parse_optional_int(

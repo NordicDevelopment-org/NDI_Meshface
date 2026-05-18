@@ -89,6 +89,35 @@ def _send_mesh_request(
     return sent_packet_id, response_box.get("packet")
 
 
+def _send_mesh_packet(
+    *,
+    iface: object,
+    send_lock,
+    message: object,
+    destination: str,
+    port_num: object,
+    channel_index: int,
+    hop_limit: int | None = None,
+    to_int_fn=to_int,
+) -> int | None:
+    send_data = getattr(iface, "sendData", None)
+    if not callable(send_data):
+        raise ValueError("Connected interface does not support sendData()")
+
+    kwargs: dict[str, object] = {
+        "destinationId": destination,
+        "portNum": port_num,
+        "wantResponse": False,
+        "channelIndex": channel_index,
+    }
+    if hop_limit is not None:
+        kwargs["hopLimit"] = hop_limit
+
+    with send_lock:
+        sent_packet = send_data(message, **kwargs)
+    return to_int_fn(getattr(sent_packet, "id", None))
+
+
 def _error_response(
     request: NetworkToolRequest,
     *,
@@ -135,6 +164,87 @@ def _nodeinfo_field(user: object, field_name: str) -> object:
         camel_name = pieces[0] + "".join(piece[:1].upper() + piece[1:] for piece in pieces[1:])
         return user.get(camel_name)
     return getattr(user, field_name, None)
+
+
+def _find_local_user_record(iface: object, *, to_int_fn=to_int) -> object | None:
+    local_node = getattr(iface, "localNode", None)
+    local_num = to_int_fn(getattr(local_node, "nodeNum", None))
+
+    nodes_by_num = getattr(iface, "nodesByNum", None)
+    if isinstance(nodes_by_num, dict):
+        lookup_keys: list[object] = []
+        if local_num is not None:
+            lookup_keys.extend((local_num, str(local_num)))
+        for key in lookup_keys:
+            candidate = nodes_by_num.get(key)
+            if not candidate:
+                continue
+            user_obj = _nodeinfo_field(candidate, "user")
+            if user_obj:
+                return user_obj
+            return candidate
+
+    local_user = _nodeinfo_field(local_node, "user")
+    if local_user:
+        return local_user
+    return local_node
+
+
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        clean = value.strip().lower()
+        if clean in {"1", "true", "yes", "y", "on"}:
+            return True
+        if clean in {"0", "false", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
+def _build_local_nodeinfo_payload(
+    iface: object,
+    *,
+    mesh_pb2_module: object,
+    to_int_fn=to_int,
+) -> object:
+    user_message = mesh_pb2_module.User()
+    source = _find_local_user_record(iface, to_int_fn=to_int_fn)
+
+    node_id = str(_nodeinfo_field(source, "id") or "").strip()
+    if not node_id:
+        local_node = getattr(iface, "localNode", None)
+        local_num = to_int_fn(getattr(local_node, "nodeNum", None))
+        if local_num is not None and local_num >= 0:
+            node_id = f"!{local_num & 0xFFFFFFFF:08x}"
+    if not node_id:
+        raise ValueError("Local node ID is unavailable; cannot send node info")
+    user_message.id = node_id
+
+    long_name = str(_nodeinfo_field(source, "long_name") or "").strip()
+    if long_name:
+        user_message.long_name = long_name
+    short_name = str(_nodeinfo_field(source, "short_name") or "").strip()
+    if short_name:
+        user_message.short_name = short_name
+
+    hw_model = to_int_fn(_nodeinfo_field(source, "hw_model"))
+    if hw_model is not None and hw_model >= 0:
+        user_message.hw_model = hw_model
+
+    role = to_int_fn(_nodeinfo_field(source, "role"))
+    if role is not None and role >= 0:
+        user_message.role = role
+
+    is_licensed_raw = _nodeinfo_field(source, "is_licensed")
+    if is_licensed_raw is not None:
+        user_message.is_licensed = _coerce_bool(is_licensed_raw)
+
+    is_unmessagable_raw = _nodeinfo_field(source, "is_unmessagable")
+    if is_unmessagable_raw is not None:
+        user_message.is_unmessagable = _coerce_bool(is_unmessagable_raw)
+
+    return user_message
 
 
 def _run_ping(
@@ -295,6 +405,90 @@ def _run_ping(
             "short_name": short_name or None,
             "hw_model": hw_model,
             "role": role,
+        },
+        "console_lines": [" | ".join(console_parts)],
+    }
+
+
+def _run_send_node_info(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    channel_pb2, mesh_pb2, portnums_pb2 = _load_meshtastic_modules()
+    channel_index = request.channel_index if request.channel_index is not None else 0
+    if not _channel_is_enabled(iface, channel_index, channel_pb2):
+        return _error_response(
+            request,
+            summary_label="nodeinfo",
+            detail=f"Channel {channel_index} is not enabled on the local node",
+        )
+
+    try:
+        user_payload = _build_local_nodeinfo_payload(
+            iface,
+            mesh_pb2_module=mesh_pb2,
+            to_int_fn=to_int_fn,
+        )
+        sent_packet_id = _send_mesh_packet(
+            iface=iface,
+            send_lock=send_lock,
+            message=user_payload,
+            destination="^all",
+            port_num=portnums_pb2.PortNum.NODEINFO_APP,
+            channel_index=channel_index,
+            hop_limit=request.hop_limit,
+            to_int_fn=to_int_fn,
+        )
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="nodeinfo",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="nodeinfo",
+            detail=f"Node info broadcast failed: {exc}",
+        )
+
+    node_id = str(getattr(user_payload, "id", "") or "").strip()
+    long_name = str(getattr(user_payload, "long_name", "") or "").strip()
+    short_name = str(getattr(user_payload, "short_name", "") or "").strip()
+    hw_model = to_int_fn(getattr(user_payload, "hw_model", None))
+    role = to_int_fn(getattr(user_payload, "role", None))
+    is_licensed = bool(getattr(user_payload, "is_licensed", False))
+    is_unmessagable = bool(getattr(user_payload, "is_unmessagable", False))
+
+    console_parts = [f"[nodeinfo] broadcast", f"id={node_id}"]
+    if long_name:
+        console_parts.append(f"long={long_name}")
+    if short_name:
+        console_parts.append(f"short={short_name}")
+    if hw_model is not None:
+        console_parts.append(f"hw={hw_model}")
+    if role is not None:
+        console_parts.append(f"role={role}")
+    console_parts.append(f"ch={channel_index}")
+
+    return {
+        "ok": True,
+        "command": "send_node_info",
+        "destination": "^all",
+        "channel_index": channel_index,
+        "hop_limit": request.hop_limit,
+        "sent_packet_id": sent_packet_id,
+        "result": {
+            "id": node_id,
+            "long_name": long_name or None,
+            "short_name": short_name or None,
+            "hw_model": hw_model,
+            "role": role,
+            "is_licensed": is_licensed,
+            "is_unmessagable": is_unmessagable,
         },
         "console_lines": [" | ".join(console_parts)],
     }
@@ -738,6 +932,13 @@ def run_network_tool(
                 "[nodes] handled frontend-only in v1. Use the console nodes aliases instead.",
             ],
         }
+    if request.command == "send_node_info":
+        return _run_send_node_info(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
     if request.command == "ping":
         return _run_ping(
             request,

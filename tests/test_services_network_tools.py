@@ -124,8 +124,18 @@ class _FakeChannel:
 
 
 class _FakeLocalNode:
-    def __init__(self, channel_role: int = 1, hop_limit: int = 4) -> None:
+    def __init__(self, channel_role: int = 1, hop_limit: int = 4, node_num: int = 0x01020304) -> None:
         self._channel_role = channel_role
+        self.nodeNum = node_num
+        self.user = {
+            "id": f"!{node_num:08x}",
+            "longName": "Local Ridge",
+            "shortName": "LCL",
+            "hwModel": 9,
+            "role": 1,
+            "isLicensed": True,
+            "isUnmessagable": False,
+        }
         self.localConfig = type(
             "_FakeLocalConfig",
             (),
@@ -147,13 +157,32 @@ class _FakeIface:
         hop_limit: int = 4,
     ) -> None:
         self.response_packet = response_packet
-        self.localNode = _FakeLocalNode(channel_role=channel_role, hop_limit=hop_limit)
+        local_node_num = 0x01020304
+        self.localNode = _FakeLocalNode(
+            channel_role=channel_role,
+            hop_limit=hop_limit,
+            node_num=local_node_num,
+        )
         self.send_calls: list[dict[str, object]] = []
         self.nodes_by_num = {
             0x11223344: "!11223344",
             0x55667788: "!55667788",
             0xABCD1234: "!abcd1234",
-            0x01020304: "!01020304",
+            local_node_num: "!01020304",
+        }
+        self.nodesByNum = {
+            local_node_num: {
+                "num": local_node_num,
+                "user": {
+                    "id": "!01020304",
+                    "longName": "Local Ridge",
+                    "shortName": "LCL",
+                    "hwModel": 9,
+                    "role": 1,
+                    "isLicensed": True,
+                    "isUnmessagable": False,
+                },
+            },
         }
 
     def sendData(self, message, **kwargs):
@@ -233,6 +262,38 @@ def test_run_network_tool_ping_success(monkeypatch: pytest.MonkeyPatch) -> None:
     ]
     assert iface.send_calls[0]["portNum"] == _FakePortNum.NODEINFO_APP
     assert iface.send_calls[0]["hopLimit"] == 3
+
+
+def test_run_network_tool_send_node_info_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="send_node_info", channel_index=0, hop_limit=2),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "send_node_info"
+    assert response["destination"] == "^all"
+    assert response["channel_index"] == 0
+    assert response["hop_limit"] == 2
+    assert response["sent_packet_id"] == 1234
+    assert response["result"]["id"] == "!01020304"
+    assert response["result"]["long_name"] == "Local Ridge"
+    assert response["result"]["short_name"] == "LCL"
+    assert response["result"]["hw_model"] == 9
+    assert response["result"]["role"] == 1
+    assert response["result"]["is_licensed"] is True
+    assert response["result"]["is_unmessagable"] is False
+    assert iface.send_calls[0]["destinationId"] == "^all"
+    assert iface.send_calls[0]["portNum"] == _FakePortNum.NODEINFO_APP
+    assert iface.send_calls[0]["wantResponse"] is False
+    assert iface.send_calls[0]["hopLimit"] == 2
 
 
 def test_run_network_tool_ping_handles_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
