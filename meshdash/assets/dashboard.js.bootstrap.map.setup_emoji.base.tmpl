@@ -512,18 +512,21 @@
     const weeklySummaryNodesCompareLegacyStorageKey = "meshDashboardWeeklySummaryNodesCompareV1";
     const weeklySummaryNodeSeriesOrder = [
       "online_nodes",
+      "new_nodes",
       "known_nodes",
       "saved_nodes",
       "position_nodes",
     ];
     const weeklySummaryNodeSeriesControlIds = {{
       online_nodes: "weekly-summary-node-line-online",
+      new_nodes: "weekly-summary-node-line-new",
       known_nodes: "weekly-summary-node-line-known",
       saved_nodes: "weekly-summary-node-line-saved",
       position_nodes: "weekly-summary-node-line-position",
     }};
     const networkOverviewNodeSeriesControlIds = {{
       online_nodes: "network-overview-node-line-online",
+      new_nodes: "network-overview-node-line-new",
       known_nodes: "network-overview-node-line-known",
       saved_nodes: "network-overview-node-line-saved",
       position_nodes: "network-overview-node-line-position",
@@ -570,24 +573,28 @@
     }};
     const weeklySummaryNodeSeriesLabels = {{
       online_nodes: "Online Nodes",
+      new_nodes: "New Nodes (24h)",
       known_nodes: "Known Nodes (Radio)",
       saved_nodes: "Saved Nodes (DB)",
       position_nodes: "Nodes With Position",
     }};
     const weeklySummaryNodeSeriesStyles = {{
       online_nodes: {{ tone: "line", dashed: false, width: 2.4 }},
+      new_nodes: {{ tone: "aux3", dashed: false, width: 2.1 }},
       known_nodes: {{ tone: "compare", dashed: true, width: 2.1 }},
       saved_nodes: {{ tone: "aux1", dashed: false, width: 2.0 }},
       position_nodes: {{ tone: "aux2", dashed: true, width: 1.9 }},
     }};
     const weeklySummaryNodeSeriesPaletteNames = {{
       online_nodes: "bluish green",
+      new_nodes: "vermillion",
       known_nodes: "sky blue",
       saved_nodes: "orange",
       position_nodes: "reddish purple",
     }};
     const weeklySummaryNodeSeriesDefaults = {{
       online_nodes: true,
+      new_nodes: true,
       known_nodes: true,
       saved_nodes: true,
       position_nodes: true,

@@ -186,6 +186,38 @@ def test_render_html_exposes_auto_new_nodes_ticker() -> None:
     assert 'id="ticker-chart-new-nodes"' in html
 
 
+def test_dashboard_nodes_plots_expose_new_nodes_series_controls() -> None:
+    html = render_html(
+        refresh_ms=1000,
+        packet_limit=200,
+        show_secrets=False,
+        history_enabled=True,
+        history_max_rows=200,
+        history_retention_days=7,
+        node_history_hours=24,
+        node_history_max_points=240,
+        revision_label="test",
+        revision_title="test",
+    )
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'id="network-overview-node-line-new"' in html
+    assert 'id="weekly-summary-node-line-new"' in html
+    assert "Show new nodes (24h) line" in html
+    assert re.search(
+        r'const weeklySummaryNodeSeriesOrder = \[\s*"online_nodes",\s*"new_nodes",\s*"known_nodes",\s*"saved_nodes",\s*"position_nodes",\s*\];',
+        js,
+    )
+    assert 'new_nodes: "weekly-summary-node-line-new",' in js
+    assert 'new_nodes: "network-overview-node-line-new",' in js
+    assert 'new_nodes: "New Nodes (24h)",' in js
+    assert 'new_nodes: { tone: "aux3", dashed: false, width: 2.1 },' in js
+
+
 def test_dashboard_exposes_mesh_links_ticker() -> None:
     html = render_html(
         refresh_ms=1000,

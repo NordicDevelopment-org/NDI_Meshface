@@ -31,6 +31,22 @@
       let packetPendingBreak = false;
       const continuitySeries = new Set(["real_edge_count"]);
       const continuityStateBySeries = new Map();
+      const newNodesWindowSeconds = 24 * 60 * 60;
+      const newNodeEvents = [];
+      let rollingNewNodeCount = 0;
+      let prevSavedAdjusted = null;
+      const pruneNewNodeEvents = (bucketUnixValue) => {{
+        const bucketUnixNumber = Number(bucketUnixValue);
+        if (!Number.isFinite(bucketUnixNumber) || bucketUnixNumber <= 0) return;
+        const windowStartUnix = bucketUnixNumber - newNodesWindowSeconds;
+        while (newNodeEvents.length > 0 && Number(newNodeEvents[0].bucketUnix) < windowStartUnix) {{
+          const removed = newNodeEvents.shift();
+          const removedDelta = Number(removed && removed.delta);
+          if (Number.isFinite(removedDelta) && removedDelta > 0) {{
+            rollingNewNodeCount = Math.max(0, rollingNewNodeCount - removedDelta);
+          }}
+        }}
+      }};
       const continuityAdjustedValue = (seriesKey, rawValue, resetBreak) => {{
         const numeric = Number(rawValue);
         if (!Number.isFinite(numeric)) return null;
@@ -125,16 +141,35 @@
         const knownValue = continuityAdjustedValue("known_nodes", knownRawValue, resetBreak);
         const savedValue = continuityAdjustedValue("saved_nodes", savedRawValue, resetBreak);
         const positionValue = continuityAdjustedValue("position_nodes", positionRawValue, resetBreak);
+        const bucketUnixForNew = Number.isFinite(bucketUnix) && bucketUnix > 0 ? bucketUnix : null;
+        if (Number.isFinite(savedValue)) {{
+          if (Number.isFinite(prevSavedAdjusted) && bucketUnixForNew !== null) {{
+            const savedDelta = Number(savedValue) - Number(prevSavedAdjusted);
+            if (Number.isFinite(savedDelta) && savedDelta > 0) {{
+              rollingNewNodeCount += savedDelta;
+              newNodeEvents.push({{ bucketUnix: bucketUnixForNew, delta: savedDelta }});
+            }}
+          }}
+          prevSavedAdjusted = Number(savedValue);
+        }}
+        if (bucketUnixForNew !== null) {{
+          pruneNewNodeEvents(bucketUnixForNew);
+        }}
+        const newNodesValue = Number.isFinite(rollingNewNodeCount)
+          ? Math.max(0, rollingNewNodeCount)
+          : null;
         const primaryValue = Number.isFinite(onlineValue) ? onlineValue : knownValue;
         if (!Number.isFinite(primaryValue)) continue;
         const seriesValues = {{}};
         if (Number.isFinite(onlineValue)) seriesValues.online_nodes = onlineValue;
+        if (Number.isFinite(newNodesValue)) seriesValues.new_nodes = newNodesValue;
         if (Number.isFinite(knownValue)) seriesValues.known_nodes = knownValue;
         if (Number.isFinite(savedValue)) seriesValues.saved_nodes = savedValue;
         if (Number.isFinite(positionValue)) seriesValues.position_nodes = positionValue;
         rows.push({{
           value: primaryValue,
           series: seriesValues,
+          newNodeCount: Number.isFinite(newNodesValue) ? newNodesValue : null,
           knownNodeCount: Number.isFinite(knownRawValue) ? knownRawValue : null,
           savedNodeCount: Number.isFinite(savedRawValue) ? savedRawValue : null,
           positionNodeCount: Number.isFinite(positionRawValue) ? positionRawValue : null,
@@ -338,6 +373,10 @@
         const latestKnownNodes = Number(latestRow && latestRow.knownNodeCount);
         const latestSavedNodes = Number(latestRow && latestRow.savedNodeCount);
         const latestPositionNodes = Number(latestRow && latestRow.positionNodeCount);
+        const latestNewNodes = Number(latestRow && latestRow.newNodeCount);
+        if (Number.isFinite(latestNewNodes)) {{
+          items.push(["New Nodes (24h)", formatMetricValue(latestNewNodes, 0)]);
+        }}
         if (Number.isFinite(latestKnownNodes)) {{
           items.push(["Known Nodes (Radio)", formatMetricValue(latestKnownNodes, 0)]);
         }}
