@@ -8720,8 +8720,23 @@
     .node-visibility-grid {{
       display: grid;
       grid-template-columns: minmax(260px, 1.15fr) minmax(220px, 1fr) minmax(220px, 1fr);
+      grid-template-areas:
+        "tag-presets quick-add blacklist"
+        "tag-presets quick-add whitelist";
       gap: 12px;
       align-items: start;
+    }}
+    .node-visibility-section-tag-presets {{
+      grid-area: tag-presets;
+    }}
+    .node-visibility-section-quick-add {{
+      grid-area: quick-add;
+    }}
+    .node-visibility-section-blacklist {{
+      grid-area: blacklist;
+    }}
+    .node-visibility-section-whitelist {{
+      grid-area: whitelist;
     }}
     .node-visibility-section {{
       border: 1px solid #d7e5d2;
@@ -8838,6 +8853,13 @@
     @media (max-width: 1180px) {{
       .node-visibility-grid {{
         grid-template-columns: 1fr;
+        grid-template-areas: none;
+      }}
+      .node-visibility-section-tag-presets,
+      .node-visibility-section-quick-add,
+      .node-visibility-section-blacklist,
+      .node-visibility-section-whitelist {{
+        grid-area: auto;
       }}
     }}
     .settings-row {{

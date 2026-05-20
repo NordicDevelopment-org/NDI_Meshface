@@ -1949,20 +1949,14 @@
           <div class="settings-panel settings-panel-wide" data-settings-tab-panel="nodes" hidden>
             <h3>Nodes</h3>
             <div class="settings-fields">
-              <div class="settings-help-note">
-                Manage shared node tag presets and frontend-only visibility filters. If the whitelist has any entries, only those nodes appear in the dashboard. Blacklist entries are always hidden. This Nodes tab still shows the full raw node catalog so you can manage hidden entries.
-              </div>
-              <div class="settings-help-note">
-                Tip: select a node anywhere in the dashboard first, then use the quick actions below to allow or block it.
-              </div>
               <div class="node-visibility-grid">
-                <section class="node-visibility-section">
+                <section class="node-visibility-section node-visibility-section-tag-presets">
                   <div class="node-visibility-section-head">
                     <h4>Tag Presets</h4>
                   </div>
                   <div id="settings-node-tag-presets-manager"></div>
                 </section>
-                <section class="node-visibility-section">
+                <section class="node-visibility-section node-visibility-section-quick-add">
                   <div class="node-visibility-section-head">
                     <h4>Quick Add</h4>
                   </div>
@@ -1982,17 +1976,7 @@
                   </label>
                   <div id="settings-nodes-search-results" class="node-visibility-results" aria-label="Node visibility search results"></div>
                 </section>
-                <section class="node-visibility-section">
-                  <div class="node-visibility-section-head">
-                    <h4>Whitelist</h4>
-                    <button id="settings-whitelist-clear-btn" class="btn btn-secondary" type="button">Clear</button>
-                  </div>
-                  <div class="settings-help-note">
-                    When this list is non-empty, only these nodes remain visible.
-                  </div>
-                  <div id="settings-whitelist-list" class="node-visibility-list" aria-label="Node whitelist"></div>
-                </section>
-                <section class="node-visibility-section">
+                <section class="node-visibility-section node-visibility-section-blacklist">
                   <div class="node-visibility-section-head">
                     <h4>Blacklist</h4>
                     <button id="settings-blacklist-clear-btn" class="btn btn-secondary" type="button">Clear</button>
@@ -2001,6 +1985,16 @@
                     Blacklisted nodes are hidden even if they were previously allowed.
                   </div>
                   <div id="settings-blacklist-list" class="node-visibility-list" aria-label="Node blacklist"></div>
+                </section>
+                <section class="node-visibility-section node-visibility-section-whitelist">
+                  <div class="node-visibility-section-head">
+                    <h4>Whitelist</h4>
+                    <button id="settings-whitelist-clear-btn" class="btn btn-secondary" type="button">Clear</button>
+                  </div>
+                  <div class="settings-help-note">
+                    When this list is non-empty, only these nodes remain visible.
+                  </div>
+                  <div id="settings-whitelist-list" class="node-visibility-list" aria-label="Node whitelist"></div>
                 </section>
               </div>
             </div>
