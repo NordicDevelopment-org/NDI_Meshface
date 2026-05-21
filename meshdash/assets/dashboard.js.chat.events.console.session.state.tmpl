@@ -116,19 +116,13 @@
     function isStandaloneConsoleSessionExpiredMessage(value) {{
       const text = String(value == null ? "" : value).trim();
       if (!text) return false;
-      return /no active standalone (zork|adventure) session/i.test(text);
+      return /no active standalone zork session/i.test(text);
     }}
 
     function normalizeStandaloneZorkReplyText(value) {{
       const text = String(value == null ? "" : value).trim();
       if (!text) return "";
       return text.replace(/^zork:\s*session started\.\s*/i, "").trim();
-    }}
-
-    function normalizeStandaloneAdventureReplyText(value) {{
-      const text = String(value == null ? "" : value).trim();
-      if (!text) return "";
-      return text.replace(/^adventure:\s*session started\.\s*/i, "").trim();
     }}
 
     function wildcardPatternToRegExp(pattern) {{

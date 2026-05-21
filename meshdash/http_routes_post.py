@@ -8,7 +8,6 @@ from .http_route_contracts import DashboardPostRouteDependencies
 _TOKEN_PROTECTED_WRITE_PATHS = {
     "/api/chat/send",
     "/api/games/zork",
-    "/api/games/adventure",
     "/api/tools/network",
     "/api/bots/zork",
     "/api/bbs/host",
@@ -21,7 +20,6 @@ _TOKEN_PROTECTED_WRITE_PATHS = {
 _PRIVATE_MODE_BLOCKED_POST_PATHS = {
     "/api/chat/send",
     "/api/games/zork",
-    "/api/games/adventure",
     "/api/tools/network",
     "/api/bots/zork",
 }
@@ -63,10 +61,6 @@ _handle_channel_settings_post_helper = _load_optional_handler(
 _handle_standalone_zork_post_helper = _load_optional_handler(
     ".api_zork",
     "handle_standalone_zork_post",
-)
-_handle_standalone_adventure_post_helper = _load_optional_handler(
-    ".api_adventure",
-    "handle_standalone_adventure_post",
 )
 _handle_network_tool_post_helper = _load_optional_handler(
     ".api_network_tools",
@@ -193,24 +187,6 @@ def handle_dashboard_post(
             to_int_fn=deps.to_int_fn,
             validate_content_length_fn=deps.validate_content_length_fn,
             parse_standalone_zork_request_fn=deps.parse_standalone_zork_request_fn,
-            write_json_response_fn=deps.write_json_response_fn,
-        )
-        return
-
-    if path == "/api/games/adventure":
-        if not callable(_handle_standalone_adventure_post_helper):
-            deps.write_json_response_fn(
-                handler,
-                status_code=503,
-                payload_obj={"ok": False, "error": "Standalone Adventure is not enabled on this dashboard instance"},
-            )
-            return
-        _handle_standalone_adventure_post_helper(
-            handler,
-            play_standalone_adventure_fn=deps.play_standalone_adventure_fn,
-            to_int_fn=deps.to_int_fn,
-            validate_content_length_fn=deps.validate_content_length_fn,
-            parse_standalone_adventure_request_fn=deps.parse_standalone_adventure_request_fn,
             write_json_response_fn=deps.write_json_response_fn,
         )
         return

@@ -586,9 +586,11 @@ def test_chat_unread_node_click_routes_into_messages_tab(assert_tokens_present) 
     assert_tokens_present(peers_src, [
         'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));',
         'if (!isSelectableNodeId(nodeId)) return;',
-        'selectNode(nodeId, true, false);',
-        'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {',
-        'setChatNodeDetailsDrawerTab("messages", {',
+        'selectNode(nodeId, true, true);',
+        'unreadDirectCount > 0',
+        '&& selectedAfterClick === nodeId',
+        '&& typeof setChatNodeDetailsDrawerTab === "function"',
+        'setChatNodeDetailsDrawerTab("messages", {{',
         'fetchHistory: false,',
         'data-unread-direct-count="${{escAttr(unreadDirectCount)}}"',
     ])
@@ -606,8 +608,10 @@ def test_chat_click_selection_keeps_same_node_selected(assert_tokens_present) ->
     assert "chatFeedRepeatToggleMessageKey = messageSelectionKey;" in bindings_src
     assert_tokens_present(peers_src, [
         'if (!isSelectableNodeId(nodeId)) return;',
-        'selectNode(nodeId, true, false);',
-        'if (unreadDirectCount > 0 && typeof setChatNodeDetailsDrawerTab === "function") {{',
+        'selectNode(nodeId, true, true);',
+        'unreadDirectCount > 0',
+        '&& selectedAfterClick === nodeId',
+        '&& typeof setChatNodeDetailsDrawerTab === "function"',
         'setChatNodeDetailsDrawerTab("messages", {{',
         'fetchHistory: false,',
     ])

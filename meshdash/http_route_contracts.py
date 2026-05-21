@@ -370,8 +370,6 @@ class DashboardPostRouteDependencies:
     parse_channel_settings_request_fn: Optional[ParseChannelSettingsRequestFn] = None
     play_standalone_zork_fn: Optional[PlayStandaloneZorkFn] = None
     parse_standalone_zork_request_fn: Optional[ParseStandaloneZorkRequestFn] = None
-    play_standalone_adventure_fn: Optional[PlayStandaloneZorkFn] = None
-    parse_standalone_adventure_request_fn: Optional[ParseStandaloneZorkRequestFn] = None
     run_network_tool_fn: Optional[RunNetworkToolFn] = None
     parse_network_tool_request_fn: Optional[ParseNetworkToolRequestFn] = None
     api_token: Optional[str] = None

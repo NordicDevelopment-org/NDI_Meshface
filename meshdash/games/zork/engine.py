@@ -379,9 +379,9 @@ MAGNET_RANDOM_TARGETS = tuple(MAGNET_FIXED_TARGETS[direction] for direction in (
 
 
 class ZorkGame:
-    """Peer-to-peer classic-Zork-flavored adventure.
+    """Peer-to-peer classic Zork gameplay.
 
-    The transport shell remains generic, but the adventure logic lives here.
+    The transport shell remains generic, but the Zork game logic lives here.
     This implementation keeps the game isolated to the `meshdash/games/zork/`
     folder and drives the live bot from the archived upstream map + object data.
     """
@@ -389,7 +389,7 @@ class ZorkGame:
     SPEC = BotCommandSpec(
         name="zork",
         usage="zork",
-        description="start the peer-to-peer text adventure",
+        description="start a peer-to-peer Zork session",
         kind="game",
     )
 

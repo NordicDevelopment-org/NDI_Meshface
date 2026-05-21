@@ -23,11 +23,6 @@ reviewed before the repository is made public.
   Department of Distinctive Collections repository for a 1977 version of Zork.
   The source repository includes rights and license details; review them before
   public release.
-- `meshdash/games/adventure/data/77-03-31_adventure.dat` bundles Colossal Cave
-  Adventure data copied from `https://github.com/wh0am1-dev/adventure`. The
-  source repository describes the material as original Fortran source collected
-  for educational purposes, but does not document redistribution terms; confirm
-  permission or remove it before public release.
 
 ## Runtime Network Assets
 

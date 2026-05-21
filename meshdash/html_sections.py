@@ -67,8 +67,6 @@ def build_html_shell(
             if games_enabled
             else "Live replies are disabled. Enable Zork here to answer public starts and direct messages."
         ),
-        bots_adventure_state_label="Enabled" if games_enabled else "Disabled",
-        bots_adventure_state_class="is-enabled" if games_enabled else "is-disabled",
         network_diagnostics_tab_hidden_attrs=network_diagnostics_tab_hidden_attrs,
         network_diagnostics_panel_hidden_attrs=network_diagnostics_panel_hidden_attrs,
     )

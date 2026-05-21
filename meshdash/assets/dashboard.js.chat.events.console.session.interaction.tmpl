@@ -489,12 +489,9 @@
       if (!text) return "";
       if (String(session.mode || "") !== "standalone") {{
         stopConsoleInteractiveSession("unsupported mode", false);
-        return "[console] interactive session mode is no longer supported. Type \"zork\" or \"adventure\" to start a new local game.";
+        return "[console] interactive session mode is no longer supported. Type \"zork\" to start a new local game.";
       }}
-      const sessionName = String(session.name || "zork").trim().toLowerCase();
-      const payload = sessionName === "adventure"
-        ? await postStandaloneAdventureCommand(text, session.sessionId || "")
-        : await postStandaloneZorkCommand(text, session.sessionId || "");
+      const payload = await postStandaloneZorkCommand(text, session.sessionId || "");
       const nextSessionId = String(payload && payload.session_id ? payload.session_id : session.sessionId || "").trim();
       if (nextSessionId) {{
         session.sessionId = nextSessionId;
@@ -505,9 +502,7 @@
           ? (payload.reply_text ?? "")
           : ""
       );
-      const replyText = sessionName === "adventure"
-        ? normalizeStandaloneAdventureReplyText(replyTextRaw)
-        : normalizeStandaloneZorkReplyText(replyTextRaw);
+      const replyText = normalizeStandaloneZorkReplyText(replyTextRaw);
       if (replyText.trim()) {{
         const receivedAtMs = Date.now();
         appendConsoleLine(

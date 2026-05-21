@@ -56,7 +56,7 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert '{ id: "bots", defaultLabel: "Bots", metric: false }' in js
     assert 'function botTickerAvailableForState(state = latestState) {' in js
     assert 'const zorkRuntime = zorkBotRuntimeFromState(state);' in js
-    assert 'const adventureRuntime = adventureBotRuntimeFromState(state);' in js
+    assert "adventureBotRuntimeFromState" not in js
     assert 'function buildBotTickerSummary(state = latestState) {' in js
     assert 'function renderBotTickerSummary(state = latestState) {' in js
     assert 'tickerItem.classList.toggle("has-active-bot-sessions", summary.activeSessionCount > 0);' in js
@@ -68,16 +68,15 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'if (resetCutoffUnix > 0 && timeUnix > 0 && timeUnix <= resetCutoffUnix) return;' in js
     assert 'Activity stats reset at' in js
     assert 'id="bots-zork-reset-activity-btn"' in html
-    assert 'id="bots-adventure-command-item"' in html
-    assert 'data-bot-command="adventure"' in html
-    assert 'id="bots-adventure-list-state"' in html
+    assert "bots-adventure-command-item" not in html
+    assert 'data-bot-command="adventure"' not in html
+    assert "bots-adventure-list-state" not in html
     assert 'id="bots-detail-title"' in html
-    assert 'function adventureBotRuntimeFromState(state = latestState) {' in js
     assert 'let selectedBotCommand = "zork";' in js
     assert 'function selectBotCatalogCommand(command) {' in js
     assert 'renderSelectedBotDetail(state, {' in js
-    assert 'setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);' in js
-    assert 'adventureItem.classList.toggle("is-active", selectedCommand === "adventure");' in js
+    assert "bots-adventure-list-state" not in js
+    assert "selectedCommand === \"adventure\"" not in js
     assert 'function buildBotActivity(command = "zork", state = latestState, runtime = null) {' in js
     assert 'botCommand: botCommandFromActivityRow(row),' in js
     assert 'No ${escAttr(spec.title)} activity since the reset.' in js
@@ -591,8 +590,8 @@ def test_render_html_styles_node_identity_ticker() -> None:
     assert ".topbar .summary-ticker-item-self.has-node-emoji::after" in html
     assert "content: attr(data-node-emoji);" in html
     assert "--self-node-watermark-size: 82px;" in html
-    assert "--self-node-watermark-local-x: 116px;" in html
-    assert "--self-node-watermark-selected-x: calc(100% - 70px);" in html
+    assert "--self-node-watermark-local-x: calc((var(--self-node-watermark-size) / 2) + var(--self-node-watermark-edge-inset));" in html
+    assert "--self-node-watermark-selected-x: calc(100% - ((var(--self-node-watermark-size) / 2) + var(--self-node-watermark-edge-inset)));" in html
     assert "--self-node-single-watermark-size: var(--self-node-watermark-size);" in html
     assert "--self-node-watermark-single-x: var(--self-node-watermark-local-x);" in html
     assert ".summary-ticker-item-self.has-dual-node-watermarks::before" in html

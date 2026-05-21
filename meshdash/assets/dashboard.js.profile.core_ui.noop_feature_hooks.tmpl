@@ -197,7 +197,6 @@
     ]);
     const botPublicStartHeadsByCommand = {{
       zork: new Set(["zork"]),
-      adventure: new Set(["adventure", "adv"]),
     }};
     let zorkBotToggleInFlight = false;
     const botCatalogSpecs = {{
@@ -209,15 +208,6 @@
         disabledDescription: "Live replies are disabled. Enable Zork here to answer public starts and direct messages.",
         enabledRouteHtml: 'Public chat <code>zork</code> starts a private session. Gameplay commands stay in direct messages.',
         disabledRouteHtml: "Zork is not answering mesh traffic while disabled.",
-      }},
-      adventure: {{
-        command: "adventure",
-        title: "Adventure",
-        name: "Playable Colossal Cave Bot",
-        enabledDescription: "Public chat adventure starts a private session. Direct messages continue gameplay.",
-        disabledDescription: "Live replies are disabled. Enable Adventure here to answer public starts and direct messages.",
-        enabledRouteHtml: 'Public chat <code>adventure</code> or <code>adv</code> starts a private session. Gameplay commands stay in direct messages.',
-        disabledRouteHtml: "Adventure is not answering mesh traffic while disabled.",
       }},
     }};
     let selectedBotCommand = "zork";
@@ -277,37 +267,9 @@
       }};
     }}
 
-    function adventureBotRuntimeFromState(state = latestState) {{
-      const safeState = (state && typeof state === "object") ? state : {{}};
-      const summary = (safeState.summary && typeof safeState.summary === "object")
-        ? safeState.summary
-        : {{}};
-      const bots = (summary.bots && typeof summary.bots === "object")
-        ? summary.bots
-        : ((safeState.bots && typeof safeState.bots === "object") ? safeState.bots : {{}});
-      const adventure = (bots.adventure && typeof bots.adventure === "object") ? bots.adventure : {{}};
-      const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, "adventure");
-      const hasEnabled = Object.prototype.hasOwnProperty.call(adventure, "enabled");
-      const enabled = hasEnabled ? !!adventure.enabled : !!gamesFeatureEnabled;
-      const sessions = Array.isArray(adventure.sessions) ? adventure.sessions : [];
-      const rawSessions = Number(adventure.active_session_count ?? adventure.activeSessionCount ?? 0);
-      const available = Object.prototype.hasOwnProperty.call(bots, "available")
-        ? !!bots.available
-        : (hasRuntimePayload || !!gamesFeatureEnabled);
-      return {{
-        available,
-        enabled,
-        activeSessionCount: Number.isFinite(rawSessions) ? Math.max(0, Math.floor(rawSessions)) : sessions.length,
-        sessions,
-        publicStartEnabled: !!(adventure.public_start_enabled ?? adventure.publicStartEnabled ?? enabled),
-        directMessageEnabled: !!(adventure.direct_message_enabled ?? adventure.directMessageEnabled ?? enabled),
-      }};
-    }}
-
     function botRuntimeFromState(command, state = latestState) {{
-      return normalizeBotCatalogCommand(command) === "adventure"
-        ? adventureBotRuntimeFromState(state)
-        : zorkBotRuntimeFromState(state);
+      void command;
+      return zorkBotRuntimeFromState(state);
     }}
 
     function setZorkBotStatusClass(element, enabled) {{
@@ -373,7 +335,6 @@
     function botResponseCommandFromText(text) {{
       const clean = String(text || "").trim().replace(/^\[(\d+)\/(\d+)\]\s*/i, "");
       if (/^zork:/i.test(clean)) return "zork";
-      if (/^adventure:/i.test(clean)) return "adventure";
       return "";
     }}
 
@@ -545,23 +506,17 @@
 
     function botTickerAvailableForState(state = latestState) {{
       const zorkRuntime = zorkBotRuntimeFromState(state);
-      const adventureRuntime = adventureBotRuntimeFromState(state);
-      return !!(
-        (zorkRuntime && zorkRuntime.available && zorkRuntime.enabled)
-        || (adventureRuntime && adventureRuntime.available && adventureRuntime.enabled)
-      );
+      return !!(zorkRuntime && zorkRuntime.available && zorkRuntime.enabled);
     }}
 
     function buildBotTickerSummary(state = latestState) {{
       const runtimes = {{
         zork: zorkBotRuntimeFromState(state),
-        adventure: adventureBotRuntimeFromState(state),
       }};
       const activitiesByCommand = {{
         zork: buildBotActivity("zork", state, runtimes.zork),
-        adventure: buildBotActivity("adventure", state, runtimes.adventure),
       }};
-      const commands = ["zork", "adventure"];
+      const commands = ["zork"];
       const enabledCommands = commands.filter((command) => {{
         const runtime = runtimes[command];
         return !!(runtime && runtime.available && runtime.enabled);
@@ -985,7 +940,6 @@
 
     function renderBotsView(state = latestState) {{
       const runtime = zorkBotRuntimeFromState(state);
-      const adventureRuntime = adventureBotRuntimeFromState(state);
       const selectedCommand = normalizeBotCatalogCommand(selectedBotCommand);
       const item = document.getElementById("bots-zork-command-item");
       if (item instanceof HTMLElement) {{
@@ -994,19 +948,10 @@
         item.classList.toggle("is-active", selectedCommand === "zork");
         item.setAttribute("aria-selected", selectedCommand === "zork" ? "true" : "false");
       }}
-      const adventureItem = document.getElementById("bots-adventure-command-item");
-      if (adventureItem instanceof HTMLElement) {{
-        adventureItem.classList.toggle("is-enabled", adventureRuntime.enabled);
-        adventureItem.classList.toggle("is-disabled", !adventureRuntime.enabled);
-        adventureItem.classList.toggle("is-active", selectedCommand === "adventure");
-        adventureItem.setAttribute("aria-selected", selectedCommand === "adventure" ? "true" : "false");
-      }}
       setZorkBotStatusClass(document.getElementById("bots-zork-list-state"), runtime.enabled);
-      setZorkBotStatusClass(document.getElementById("bots-adventure-list-state"), adventureRuntime.enabled);
       bindZorkBotControls();
       renderSelectedBotDetail(state, {{
         zork: runtime,
-        adventure: adventureRuntime,
       }});
     }}
 

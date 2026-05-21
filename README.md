@@ -612,8 +612,8 @@ Related environment variables:
   `Authorization: Bearer <token>` or `X-API-Token`
 - `--bbs-enable` / `--no-bbs-enable`: expose or hide the BBS/profile workspace
   when `--accept-file-transfer-traffic-disclaimer` is also set
-- `--games-enable` / `--no-games-enable`: enable playable Zork and Adventure
-  console endpoints plus mesh bot replies
+- `--games-enable` / `--no-games-enable`: enable playable Zork console
+  endpoints plus mesh bot replies
 
 Related environment variables:
 
@@ -775,7 +775,6 @@ The deploy helper also accepts:
 - `/api/settings/custom_telemetry`
 - `/api/tools/network`
 - `/api/games/zork`
-- `/api/games/adventure`
 
 Write-path rules:
 

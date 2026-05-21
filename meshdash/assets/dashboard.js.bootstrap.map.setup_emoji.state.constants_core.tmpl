@@ -261,7 +261,6 @@
       "joke", "!joke", "#joke",
       "pull", "!pull", "#pull",
       "zork", "!zork", "#zork",
-      "adventure", "!adventure", "#adventure",
     ]);
     const knownBotArgumentCommands = new Set([
       "whois", "!whois", "#whois",
@@ -284,16 +283,12 @@
       "wx",
       "lheard",
       "zork",
-      "adventure",
     ];
     if (!gamesFeatureEnabled) {{
       knownBotSingleWordCommands.delete("zork");
       knownBotSingleWordCommands.delete("!zork");
       knownBotSingleWordCommands.delete("#zork");
-      knownBotSingleWordCommands.delete("adventure");
-      knownBotSingleWordCommands.delete("!adventure");
-      knownBotSingleWordCommands.delete("#adventure");
-      defaultBotTrafficSnifferCommandHeads = defaultBotTrafficSnifferCommandHeads.filter((head) => head !== "zork" && head !== "adventure");
+      defaultBotTrafficSnifferCommandHeads = defaultBotTrafficSnifferCommandHeads.filter((head) => head !== "zork");
     }}
     const roomSlugRe = /^[a-z0-9][a-z0-9_-]{0,47}$/;
     const bbsFeatureEnabled = !!Number({bbs_enabled});
