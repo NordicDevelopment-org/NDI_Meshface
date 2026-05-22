@@ -44,7 +44,7 @@ the corresponding endpoint returns `503`.
 flowchart LR
   Browser["Browser<br/>single-page UI"]
   CDN["Browser-side external assets<br/>Leaflet + leaflet-heat from unpkg"]
-  Tiles["Basemap providers<br/>OpenStreetMap / CARTO"]
+  Tiles["Basemap provider<br/>OpenStreetMap tile service"]
   Server["ThreadingHTTPServer<br/>HTML shell + JSON API"]
   Assets["Python template assembly<br/>meshdash/html* + meshdash/assets/*"]
   State["State loaders<br/>live snapshot + history readers"]
@@ -106,7 +106,7 @@ Key runtime notes:
 - Browser access to:
   - `https://unpkg.com/leaflet@1.9.4/...`
   - `https://unpkg.com/leaflet.heat@0.2.0/...`
-  - map tile providers if you want online basemaps
+  - `https://tile.openstreetmap.org/...` if you want online basemaps
 
 For a fully air-gapped deployment, plan to vendor/proxy the Leaflet assets and
 accept that the map will use the bundled offline atlas when tile servers are

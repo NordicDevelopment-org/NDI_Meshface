@@ -28,9 +28,10 @@ reviewed before the repository is made public.
 
 - The browser loads Leaflet `1.9.4` and leaflet.heat `0.2.0` from `unpkg.com`
   unless those assets are vendored or proxied.
-- Online basemaps may load from OpenStreetMap or CARTO tile providers, depending
-  on the selected map mode. Review provider attribution and tile-use terms before
-  public release or hosted deployment.
+- Online basemaps load from the OpenStreetMap tile service
+  (`tile.openstreetmap.org`) unless users force offline atlas mode. Review OSM
+  attribution and tile-usage policy requirements before public release or
+  hosted deployment.
 
 ## Python Dependencies
 
