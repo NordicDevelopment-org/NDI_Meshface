@@ -130,10 +130,12 @@ Generated report:
 - `THIRD_PARTY_PYTHON_DEPENDENCIES.md`
 
 License-risk note:
-- Current PyPI metadata for `meshtastic` reports `GPL-3.0-only`; maintainers must review compatibility before selecting the repository root license.
+- Current PyPI metadata for `meshtastic` reports `GPL-3.0-only`.
+- The repository root license is GNU GPL v3 (`GPL-3.0-only`) to align with that dependency metadata.
+- If dependency licensing changes, maintainers should re-evaluate overall license compatibility.
 
 Root-license note:
-- This file documents third-party notices only; selecting and adding a root `LICENSE` remains a maintainer decision.
+- This file documents third-party notices only; the root project license is defined in `LICENSE`.
 
 ## AI-Assisted Contributions
 
