@@ -1989,12 +1989,340 @@
       renderChatNodeNavigatorMenuControls();
     }}
 
+    const chatNodeTelemetryToolDefinitions = Object.freeze([
+      {{
+        id: "user_info",
+        label: "User Info",
+        description: "Request node info summary from this user.",
+        requestBody: {{
+          command: "ping",
+        }},
+        consoleLabel: "ping",
+      }},
+      {{
+        id: "traceroute",
+        label: "Traceroute",
+        description: "Trace mesh hops and route SNR back from this user.",
+        requestBody: {{
+          command: "traceroute",
+        }},
+        consoleLabel: "traceroute",
+      }},
+      {{
+        id: "position",
+        label: "Position",
+        description: "Request the latest position packet from this user.",
+        requestBody: {{
+          command: "request-position",
+        }},
+        consoleLabel: "position",
+      }},
+      {{
+        id: "device_metrics",
+        label: "Device Metrics",
+        description: "Battery, voltage, channel utilization, and airtime.",
+        requestBody: {{
+          command: "request-telemetry",
+          telemetry_type: "device_metrics",
+        }},
+        consoleLabel: "telemetry",
+      }},
+      {{
+        id: "environment_metrics",
+        label: "Environment Metrics",
+        description: "Temperature, humidity, pressure, and sensor readings.",
+        requestBody: {{
+          command: "request-telemetry",
+          telemetry_type: "environment_metrics",
+        }},
+        consoleLabel: "telemetry",
+      }},
+      {{
+        id: "air_quality_metrics",
+        label: "Air-Quality Metrics",
+        description: "PM, CO2, VOC, and related air-quality telemetry.",
+        requestBody: {{
+          command: "request-telemetry",
+          telemetry_type: "air_quality_metrics",
+        }},
+        consoleLabel: "telemetry",
+      }},
+      {{
+        id: "power_metrics",
+        label: "Power Metrics",
+        description: "External power telemetry reported by this user.",
+        requestBody: {{
+          command: "request-telemetry",
+          telemetry_type: "power_metrics",
+        }},
+        consoleLabel: "telemetry",
+      }},
+      {{
+        id: "host_metrics",
+        label: "Host Metrics",
+        description: "Local mesh stats (packets, utilization, memory).",
+        requestBody: {{
+          command: "request-telemetry",
+          telemetry_type: "local_stats",
+        }},
+        consoleLabel: "telemetry",
+      }},
+    ]);
+    const chatNodeTelemetryStateByNode = new Map();
+
+    function chatNodeTelemetryToolById(rawToolId) {{
+      const cleanToolId = String(rawToolId || "").trim().toLowerCase();
+      if (!cleanToolId) return null;
+      for (const tool of chatNodeTelemetryToolDefinitions) {{
+        if (String(tool && tool.id || "").trim().toLowerCase() === cleanToolId) {{
+          return tool;
+        }}
+      }}
+      return null;
+    }}
+
+    function chatNodeTelemetryStateForNode(rawNodeId, create = false) {{
+      const nodeId = normalizeNodeId(rawNodeId || "");
+      if (!isSelectableNodeId(nodeId)) return null;
+      let nodeState = chatNodeTelemetryStateByNode.get(nodeId);
+      if (!nodeState && create) {{
+        nodeState = {{
+          tools: new Map(),
+          summaryMessage: "",
+          summaryError: false,
+          summaryUpdatedMs: 0,
+        }};
+        chatNodeTelemetryStateByNode.set(nodeId, nodeState);
+      }}
+      return nodeState;
+    }}
+
+    function chatNodeTelemetryToolStateForNode(rawNodeId, rawToolId, create = false) {{
+      const nodeState = chatNodeTelemetryStateForNode(rawNodeId, create);
+      if (!nodeState) return null;
+      const toolId = String(rawToolId || "").trim().toLowerCase();
+      if (!toolId) return null;
+      let toolState = nodeState.tools.get(toolId);
+      if (!toolState && create) {{
+        toolState = {{
+          running: false,
+          ok: null,
+          updatedMs: 0,
+          statusText: "",
+          lines: [],
+        }};
+        nodeState.tools.set(toolId, toolState);
+      }}
+      return toolState;
+    }}
+
+    function chatNodeTelemetryExtractConsoleLines(payload) {{
+      if (typeof extractConsoleNetworkToolLines === "function") {{
+        return extractConsoleNetworkToolLines(payload);
+      }}
+      return Array.isArray(payload && payload.console_lines)
+        ? payload.console_lines
+            .map((line) => String(line == null ? "" : line).trimEnd())
+            .filter((line) => !!line)
+        : [];
+    }}
+
+    function chatNodeTelemetryStatusLabel(toolState) {{
+      const state = (toolState && typeof toolState === "object") ? toolState : null;
+      if (!state) return "Not run yet.";
+      if (state.running) return "Request in progress...";
+      const lastUnix = Math.floor((Number(state.updatedMs) || 0) / 1000);
+      if (lastUnix <= 0) return "Not run yet.";
+      const stamp = formatLocalChatTime(lastUnix, "n/a");
+      if (state.ok === false) return `Last error: ${{stamp}}`;
+      if (state.ok === true) return `Last success: ${{stamp}}`;
+      return `Last run: ${{stamp}}`;
+    }}
+
+    function renderChatNodeTelemetryPanel(rawNodeId = selectedNodeId, state = latestState) {{
+      const host = document.getElementById("chat-node-details-telemetry-host");
+      if (!(host instanceof HTMLElement)) return;
+      const nodeId = chatNodeDetailsDrawerTargetNodeId(rawNodeId);
+      if (!isSelectableNodeId(nodeId)) {{
+        host.dataset.nodeId = "";
+        setDrawerElementHtmlIfChanged(
+          host,
+          '<div class="chat-node-telemetry-empty">Select a node to run telemetry tools.</div>',
+          "telemetry"
+        );
+        return;
+      }}
+
+      const safeState = (state && typeof state === "object") ? state : (latestState || {{}});
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const selectedNode = nodes.find((entry) => normalizeNodeId(entry && entry.id) === nodeId) || null;
+      const resolvedName = preferredNodeName(selectedNode) || nodeNameCache.get(nodeId) || nodeId;
+      const nodeState = chatNodeTelemetryStateForNode(nodeId, true);
+      if (!nodeState) return;
+      host.dataset.nodeId = nodeId;
+
+      const summaryText = String(nodeState.summaryMessage || "").trim()
+        || "Run a tool to request live data from this node.";
+      const summaryClass = nodeState.summaryError ? " is-error" : "";
+      const rowsHtml = chatNodeTelemetryToolDefinitions.map((tool) => {{
+        const toolState = chatNodeTelemetryToolStateForNode(nodeId, tool.id, true) || {{}};
+        const running = !!toolState.running;
+        const rowClass = running
+          ? " is-running"
+          : (toolState.ok === false ? " is-error" : (toolState.ok === true ? " is-success" : ""));
+        const status = chatNodeTelemetryStatusLabel(toolState);
+        const statusDetail = String(toolState.statusText || "").trim();
+        const lines = Array.isArray(toolState.lines)
+          ? toolState.lines
+              .map((line) => String(line == null ? "" : line).trim())
+              .filter((line) => !!line)
+              .slice(0, 2)
+          : [];
+        const detailHtml = statusDetail
+          ? `<div class="chat-node-telemetry-tool-detail">${{escAttr(statusDetail)}}</div>`
+          : "";
+        const linesHtml = lines.length
+          ? `<div class="chat-node-telemetry-tool-lines">${{lines.map((line) => `<div class="chat-node-telemetry-tool-line">${{escAttr(line)}}</div>`).join("")}}</div>`
+          : "";
+        return `<article class="chat-node-telemetry-tool-row${{rowClass}}">
+          <div class="chat-node-telemetry-tool-main">
+            <div class="chat-node-telemetry-tool-label">${{escAttr(tool.label)}}</div>
+            <div class="chat-node-telemetry-tool-copy">${{escAttr(tool.description)}}</div>
+          </div>
+          <div class="chat-node-telemetry-tool-actions">
+            <button
+              class="chat-node-telemetry-tool-run-btn"
+              type="button"
+              data-drawer-telemetry-tool-id="${{escAttr(tool.id)}}"
+              ${{running ? "disabled" : ""}}
+            >${{running ? "Running..." : "Run"}}</button>
+          </div>
+          <div class="chat-node-telemetry-tool-status">${{escAttr(status)}}</div>
+          ${{detailHtml}}
+          ${{linesHtml}}
+        </article>`;
+      }}).join("");
+
+      const panelHtml = `<div class="chat-node-telemetry-head">
+        <div class="chat-node-telemetry-title">Telemetry Tools</div>
+        <div class="chat-node-telemetry-subtitle">${{escAttr(resolvedName)}} (${{escAttr(nodeId)}})</div>
+      </div>
+      <div class="chat-node-telemetry-summary${{summaryClass}}">${{escAttr(summaryText)}}</div>
+      <div class="chat-node-telemetry-tools">${{rowsHtml}}</div>`;
+      setDrawerElementHtmlIfChanged(host, panelHtml, "telemetry");
+      if (host.dataset.telemetryBound !== "1") {{
+        host.dataset.telemetryBound = "1";
+        host.addEventListener("click", (event) => {{
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const runBtn = target.closest("button[data-drawer-telemetry-tool-id]");
+          if (!(runBtn instanceof HTMLButtonElement) || runBtn.disabled) return;
+          const toolId = String(runBtn.dataset.drawerTelemetryToolId || "").trim().toLowerCase();
+          if (!toolId) return;
+          const hostNodeId = normalizeNodeId(host.dataset.nodeId || "");
+          void runChatNodeTelemetryTool(toolId, hostNodeId || selectedNodeId);
+        }});
+      }}
+    }}
+
+    async function runChatNodeTelemetryTool(rawToolId, rawNodeId = selectedNodeId) {{
+      const tool = chatNodeTelemetryToolById(rawToolId);
+      if (!tool) return;
+      const nodeId = chatNodeDetailsDrawerTargetNodeId(rawNodeId);
+      if (!isSelectableNodeId(nodeId)) {{
+        const host = document.getElementById("chat-node-details-telemetry-host");
+        if (host instanceof HTMLElement) {{
+          setDrawerElementHtmlIfChanged(
+            host,
+            '<div class="chat-node-telemetry-empty">Select a node to run telemetry tools.</div>',
+            "telemetry"
+          );
+        }}
+        return;
+      }}
+      const nodeState = chatNodeTelemetryStateForNode(nodeId, true);
+      if (!nodeState) return;
+      const existingState = chatNodeTelemetryToolStateForNode(nodeId, tool.id, true);
+      if (existingState && existingState.running) return;
+
+      nodeState.tools.set(tool.id, {{
+        running: true,
+        ok: null,
+        updatedMs: Date.now(),
+        statusText: "Request in progress...",
+        lines: [],
+      }});
+      nodeState.summaryMessage = `Running ${{tool.label}} for ${{nodeId}}...`;
+      nodeState.summaryError = false;
+      nodeState.summaryUpdatedMs = Date.now();
+      if (
+        isChatNodeDetailsDrawerExpanded()
+        && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "telemetry"
+      ) {{
+        renderChatNodeTelemetryPanel(nodeId, latestState);
+      }}
+
+      const body = Object.assign({{ destination: nodeId }}, tool.requestBody || {{}});
+      try {{
+        const payload = await postNetworkToolCommand(body);
+        const lines = chatNodeTelemetryExtractConsoleLines(payload);
+        const summaryLine = lines[0] || `[${{tool.consoleLabel}}] ${{nodeId}} | request completed`;
+        nodeState.tools.set(tool.id, {{
+          running: false,
+          ok: true,
+          updatedMs: Date.now(),
+          statusText: summaryLine,
+          lines,
+        }});
+        nodeState.summaryMessage = summaryLine;
+        nodeState.summaryError = false;
+        nodeState.summaryUpdatedMs = Date.now();
+        if (typeof appendConsoleLine === "function" && lines.length) {{
+          const baseKey = `telemetry_tool|${{Date.now()}}|${{tool.id}}|${{nodeId}}`;
+          lines.forEach((line, idx) => appendConsoleLine(`${{baseKey}}|${{idx}}`, line));
+        }}
+      }} catch (err) {{
+        const payload = (err && typeof err === "object") ? err.payload : null;
+        const lines = chatNodeTelemetryExtractConsoleLines(payload);
+        const fallbackMessage = err instanceof Error
+          ? (err.message || String(err))
+          : String(err || "request failed");
+        const summaryLine = lines[0] || fallbackMessage;
+        nodeState.tools.set(tool.id, {{
+          running: false,
+          ok: false,
+          updatedMs: Date.now(),
+          statusText: summaryLine,
+          lines,
+        }});
+        nodeState.summaryMessage = summaryLine;
+        nodeState.summaryError = true;
+        nodeState.summaryUpdatedMs = Date.now();
+        if (typeof appendConsoleLine === "function" && lines.length) {{
+          const baseKey = `telemetry_tool|${{Date.now()}}|${{tool.id}}|${{nodeId}}|error`;
+          lines.forEach((line, idx) => appendConsoleLine(`${{baseKey}}|${{idx}}`, line));
+        }}
+      }} finally {{
+        if (
+          isChatNodeDetailsDrawerExpanded()
+          && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "telemetry"
+          && chatNodeDetailsDrawerTargetNodeId(selectedNodeId) === nodeId
+        ) {{
+          renderChatNodeTelemetryPanel(nodeId, latestState);
+        }}
+        if (typeof requestImmediatePoll === "function") {{
+          requestImmediatePoll(120);
+        }}
+      }}
+    }}
+
     function normalizeChatNodeDetailsDrawerTab(value) {{
       const clean = String(value || "").trim().toLowerCase();
       if (clean === "history") return "history";
       if (clean === "location") return "location";
       if (clean === "chat") return "chat";
       if (clean === "links") return "links";
+      if (clean === "telemetry") return "telemetry";
       if (clean === "notes") return "notes";
       if (clean === "messages") return "messages";
       if (clean === "tag") return "tag";
@@ -2085,6 +2413,7 @@
       const locationTabBtn = document.getElementById("chat-node-details-tab-location");
       const chatTabBtn = document.getElementById("chat-node-details-tab-chat");
       const linksTabBtn = document.getElementById("chat-node-details-tab-links");
+      const telemetryTabBtn = document.getElementById("chat-node-details-tab-telemetry");
       const notesTabBtn = document.getElementById("chat-node-details-tab-notes");
       const messagesTabBtn = document.getElementById("chat-node-details-tab-messages");
       const historyTabBtn = document.getElementById("chat-node-details-tab-history");
@@ -2097,6 +2426,7 @@
       const locationPanel = document.getElementById("chat-node-details-panel-location");
       const chatPanel = document.getElementById("chat-node-details-panel-chat");
       const linksPanel = document.getElementById("chat-node-details-panel-links");
+      const telemetryPanel = document.getElementById("chat-node-details-panel-telemetry");
       const notesPanel = document.getElementById("chat-node-details-panel-notes");
       const messagesPanel = document.getElementById("chat-node-details-panel-messages");
       const historyPanel = document.getElementById("chat-node-details-panel-history");
@@ -2104,6 +2434,7 @@
       const locationHost = document.getElementById("chat-node-details-location-host");
       const chatHost = document.getElementById("chat-node-details-chat-host");
       const linksHost = document.getElementById("chat-node-details-links-host");
+      const telemetryHost = document.getElementById("chat-node-details-telemetry-host");
       const notesHost = document.getElementById("chat-node-details-notes-host");
       const messagesHost = document.getElementById("chat-node-details-messages-host");
       const tagHost = document.getElementById("chat-node-details-tag-host");
@@ -2178,6 +2509,7 @@
         setDrawerElementHtmlIfChanged(locationHost, "", "location");
         setDrawerElementHtmlIfChanged(chatHost, "", "chat");
         setDrawerElementHtmlIfChanged(linksHost, "", "links");
+        setDrawerElementHtmlIfChanged(telemetryHost, "", "telemetry");
         setDrawerElementHtmlIfChanged(notesHost, "", "notes");
         setDrawerElementHtmlIfChanged(messagesHost, "", "messages");
         setDrawerElementHtmlIfChanged(tagHost, "", "tag");
@@ -2196,6 +2528,7 @@
       syncDrawerTabButtonState(locationTabBtn, activeTab === "location");
       syncDrawerTabButtonState(chatTabBtn, activeTab === "chat");
       syncDrawerTabButtonState(linksTabBtn, activeTab === "links");
+      syncDrawerTabButtonState(telemetryTabBtn, activeTab === "telemetry");
       syncDrawerTabButtonState(notesTabBtn, activeTab === "notes");
       syncDrawerTabButtonState(messagesTabBtn, activeTab === "messages");
       syncDrawerTabButtonState(historyTabBtn, activeTab === "history");
@@ -2204,6 +2537,7 @@
       syncDrawerPanelHiddenState(locationPanel, activeTab === "location");
       syncDrawerPanelHiddenState(chatPanel, activeTab === "chat");
       syncDrawerPanelHiddenState(linksPanel, activeTab === "links");
+      syncDrawerPanelHiddenState(telemetryPanel, activeTab === "telemetry");
       syncDrawerPanelHiddenState(notesPanel, activeTab === "notes");
       syncDrawerPanelHiddenState(messagesPanel, activeTab === "messages");
       syncDrawerPanelHiddenState(historyPanel, activeTab === "history");
@@ -2423,6 +2757,9 @@
         }} else {{
           renderNodeHistoryLoading(selectedId);
         }}
+      }} else if (activeTab === "telemetry") {{
+        syncNodeHistoryDock();
+        renderChatNodeTelemetryPanel(selectedId, safeState);
       }} else {{
         syncNodeHistoryDock();
       }}

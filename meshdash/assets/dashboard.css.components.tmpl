@@ -4338,9 +4338,21 @@
     [data-theme="dark"] .chat-node-details-location-host,
     [data-theme="dark"] .chat-node-details-chat-host,
     [data-theme="dark"] .chat-node-details-links-host,
+    [data-theme="dark"] .chat-node-details-telemetry-host,
     [data-theme="dark"] .chat-node-details-notes-host,
     [data-theme="dark"] .chat-node-details-messages-host {{
       background: transparent;
+    }}
+    [data-theme="dark"] .chat-node-details-telemetry-host {{
+      --telemetry-surface-bg: color-mix(in srgb, var(--workspace-shell-bg) 86%, var(--ui-panel) 14%);
+      --telemetry-surface-bg-alt: color-mix(in srgb, var(--workspace-shell-bg-alt) 82%, var(--ui-panel-alt) 18%);
+      --telemetry-surface-border: color-mix(in srgb, var(--workspace-shell-border) 76%, var(--ui-border) 24%);
+      --telemetry-surface-border-strong: color-mix(in srgb, var(--workspace-shell-border-strong) 78%, var(--ui-accent) 22%);
+      --telemetry-surface-text: var(--workspace-shell-text);
+      --telemetry-surface-text-soft: var(--workspace-shell-text-soft);
+      --telemetry-success-accent: color-mix(in srgb, var(--ui-accent) 72%, #6fe5a0 28%);
+      --telemetry-running-accent: color-mix(in srgb, var(--ui-accent) 26%, #7ea0d8 74%);
+      --telemetry-error-accent: color-mix(in srgb, var(--ui-accent) 20%, #da7c7c 80%);
     }}
     [data-theme="dark"] .chat-node-details-drawer .saved-node-details {{
       border-color: var(--workspace-shell-border);
