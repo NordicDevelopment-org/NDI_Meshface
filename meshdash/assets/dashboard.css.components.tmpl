@@ -5027,6 +5027,36 @@
       background: color-mix(in srgb, var(--workspace-shell-bg-alt) 70%, var(--ui-accent) 30%);
       color: var(--ui-text);
     }}
+    [data-theme="dark"] #chat-room-pinned-shell {{
+      border-left-color: color-mix(in srgb, var(--workspace-shell-border-strong) 52%, var(--ui-accent) 48%);
+    }}
+    [data-theme="dark"] #chat-room-pinned-list .chat-member-item::before {{
+      background: color-mix(in srgb, var(--ui-accent) 54%, var(--workspace-shell-border-strong) 46%);
+    }}
+    [data-theme="dark"] #chat-room-pinned-list .chat-member-item:not(.muted-node) {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(88, 142, 116, 0.26) 0%,
+          rgba(88, 142, 116, 0.12) 40%,
+          rgba(88, 142, 116, 0.04) 72%,
+          rgba(88, 142, 116, 0.00) 100%
+        ),
+        var(--chat-member-node-gradient),
+        var(--chat-member-node-bg);
+    }}
+    [data-theme="dark"] #chat-room-pinned-list .chat-member-item:not(.muted-node):hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(88, 142, 116, 0.34) 0%,
+          rgba(88, 142, 116, 0.16) 42%,
+          rgba(88, 142, 116, 0.06) 76%,
+          rgba(88, 142, 116, 0.00) 100%
+        ),
+        var(--chat-member-node-gradient-hover),
+        var(--chat-member-node-bg-hover);
+    }}
     [data-theme="dark"] .chat-member-item {{
       --chat-member-node-dark-sat-mult: 0;
       --chat-member-node-dark-light-shift: 2%;

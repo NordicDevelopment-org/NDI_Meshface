@@ -4917,6 +4917,47 @@
         inset 2px 0 0 var(--node-tag-color, #2aa85a),
         inset 0 0 0 1px hsl(var(--chat-member-node-outline-hue) calc(34% * var(--chat-member-node-outline-sat-mult, 1)) calc(63% + var(--chat-member-node-outline-light-shift, 0%)) / 0.26);
     }}
+    #chat-room-pinned-shell {{
+      border-left: 2px solid color-mix(in srgb, var(--line) 62%, #5f8872 38%);
+    }}
+    #chat-room-pinned-list .chat-member-item {{
+      position: relative;
+    }}
+    #chat-room-pinned-list .chat-member-item::before {{
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 1px;
+      bottom: 1px;
+      width: 2px;
+      border-radius: 2px;
+      background: rgba(86, 132, 110, 0.72);
+      pointer-events: none;
+    }}
+    #chat-room-pinned-list .chat-member-item:not(.muted-node) {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(89, 131, 109, 0.24) 0%,
+          rgba(89, 131, 109, 0.10) 38%,
+          rgba(89, 131, 109, 0.03) 72%,
+          rgba(89, 131, 109, 0.00) 100%
+        ),
+        var(--chat-member-node-gradient),
+        var(--chat-member-node-bg);
+    }}
+    #chat-room-pinned-list .chat-member-item:not(.muted-node):hover {{
+      background:
+        linear-gradient(
+          90deg,
+          rgba(89, 131, 109, 0.30) 0%,
+          rgba(89, 131, 109, 0.14) 40%,
+          rgba(89, 131, 109, 0.05) 76%,
+          rgba(89, 131, 109, 0.00) 100%
+        ),
+        var(--chat-member-node-gradient-hover),
+        var(--chat-member-node-bg-hover);
+    }}
     .chat-member-status {{
       position: relative;
       width: 18px;
