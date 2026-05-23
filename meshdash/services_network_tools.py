@@ -399,7 +399,9 @@ def _run_ping(
 
     channel_pb2, mesh_pb2, portnums_pb2, _telemetry_pb2 = _load_meshtastic_modules()
     channel_index = request.channel_index if request.channel_index is not None else 0
-    timeout_ms = request.timeout_ms if request.timeout_ms is not None else 8000
+    # NodeInfo replies are often slower/less consistent across mixed firmware and
+    # multi-hop paths, so default to a longer window than legacy ping timing.
+    timeout_ms = request.timeout_ms if request.timeout_ms is not None else 12000
     if not _channel_is_enabled(iface, channel_index, channel_pb2):
         return _error_response(
             request,
