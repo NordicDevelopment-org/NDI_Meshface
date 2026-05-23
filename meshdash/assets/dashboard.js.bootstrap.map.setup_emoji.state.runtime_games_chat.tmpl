@@ -198,6 +198,17 @@
     let networkRoutesFromNodeId = "";
     let networkRoutesToNodeId = "";
     let networkRoutesWindow = "7d";
+    let networkRoutesLiveTraceState = {
+      running: false,
+      ok: null,
+      updatedMs: 0,
+      sourceId: "",
+      targetId: "",
+      error: "",
+      lines: [],
+      result: null,
+    };
+    let networkRoutesLiveTraceRequestNonce = 0;
     let nodeCityHintCache = new Map();
     let nodeCityHintPending = new Map();
     let nodePacketSeriesEnabled = {{ ...nodePacketSeriesDefaults }};

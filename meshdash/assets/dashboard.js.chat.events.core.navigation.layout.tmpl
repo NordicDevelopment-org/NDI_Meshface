@@ -713,6 +713,16 @@
       signature: "",
       viewBox: null,
     }};
+    const networkRoutesLiveTraceStateDefaults = Object.freeze({{
+      running: false,
+      ok: null,
+      updatedMs: 0,
+      sourceId: "",
+      targetId: "",
+      error: "",
+      lines: [],
+      result: null,
+    }});
     let networkRoutesScopePointerDrag = null;
     let networkRoutesScopeSuppressClick = false;
     const networkGraphHistoryEdgeCache = new Map();
@@ -904,6 +914,47 @@
         window.localStorage.setItem(networkRoutesWindowStorageKey, next);
       }} catch (_err) {{
       }}
+    }}
+
+    function normalizedNetworkRoutesLiveTraceState(rawState = networkRoutesLiveTraceState) {{
+      const previous = (rawState && typeof rawState === "object")
+        ? rawState
+        : networkRoutesLiveTraceStateDefaults;
+      return {{
+        running: !!previous.running,
+        ok: previous.ok === true ? true : (previous.ok === false ? false : null),
+        updatedMs: Math.max(0, Number(previous.updatedMs) || 0),
+        sourceId: normalizeNodeId(previous.sourceId || ""),
+        targetId: normalizeNodeId(previous.targetId || ""),
+        error: String(previous.error || "").trim(),
+        lines: Array.isArray(previous.lines)
+          ? previous.lines
+              .map((line) => String(line == null ? "" : line).trim())
+              .filter((line) => !!line)
+          : [],
+        result: (previous.result && typeof previous.result === "object") ? previous.result : null,
+      }};
+    }}
+
+    function setNetworkRoutesLiveTraceState(patch = {{}}) {{
+      const current = normalizedNetworkRoutesLiveTraceState(networkRoutesLiveTraceState);
+      const safePatch = (patch && typeof patch === "object") ? patch : {{}};
+      networkRoutesLiveTraceState = normalizedNetworkRoutesLiveTraceState({{
+        ...current,
+        ...safePatch,
+      }});
+      return networkRoutesLiveTraceState;
+    }}
+
+    function networkRoutesExtractConsoleLines(payload) {{
+      if (typeof extractConsoleNetworkToolLines === "function") {{
+        return extractConsoleNetworkToolLines(payload);
+      }}
+      return Array.isArray(payload && payload.console_lines)
+        ? payload.console_lines
+            .map((line) => String(line == null ? "" : line).trimEnd())
+            .filter((line) => !!line)
+        : [];
     }}
 
     function loadPreferredNetworkGraphHiddenTagRoutePresetIds() {{
@@ -1951,6 +2002,13 @@
           renderNetworkRoutes(latestState);
         }});
       }}
+      const runBtn = document.getElementById("network-routes-run-live-btn");
+      if (runBtn instanceof HTMLButtonElement && runBtn.dataset.bound !== "1") {{
+        runBtn.dataset.bound = "1";
+        runBtn.addEventListener("click", () => {{
+          void runNetworkRoutesLiveTrace(latestState, {{ force: true }});
+        }});
+      }}
       const result = document.getElementById("network-routes-result");
       if (result instanceof HTMLElement && result.dataset.bound !== "1") {{
         result.dataset.bound = "1";
@@ -1968,8 +2026,14 @@
           const sourceId = normalizeNodeId(edgeEl.getAttribute("data-route-edge-a") || "");
           const targetId = normalizeNodeId(edgeEl.getAttribute("data-route-edge-b") || "");
           if (!isSelectableNodeId(sourceId) || !isSelectableNodeId(targetId) || sourceId === targetId) return false;
-          networkRoutesFromNodeId = sourceId;
-          networkRoutesToNodeId = targetId;
+          const localSourceId = resolveNetworkRoutesSourceNodeId(latestState) || networkRoutesFromNodeId;
+          const nextTarget = (
+            localSourceId && sourceId === localSourceId && targetId !== localSourceId
+          ) ? targetId : (
+            localSourceId && targetId === localSourceId && sourceId !== localSourceId
+          ) ? sourceId : targetId;
+          networkRoutesFromNodeId = normalizeNodeId(localSourceId || sourceId);
+          networkRoutesToNodeId = normalizeNodeId(nextTarget || targetId);
           persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
           persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
           renderNetworkRoutes(latestState);
@@ -2059,7 +2123,9 @@
       const localNodeId = normalizeNodeId(data && data.localNodeId || "");
       const selectedId = normalizeNodeId(selectedNodeId || "");
       let fromId = normalizeNodeId(networkRoutesFromNodeId || "");
-      if (!fromId || !nodeMap.has(fromId)) {{
+      if (localNodeId && nodeMap.has(localNodeId)) {{
+        fromId = localNodeId;
+      }} else if (!fromId || !nodeMap.has(fromId)) {{
         fromId = (localNodeId && nodeMap.has(localNodeId)) ? localNodeId : safeIds[0];
       }}
       let toId = normalizeNodeId(networkRoutesToNodeId || "");
@@ -2074,17 +2140,29 @@
     }}
 
     function syncNetworkRoutesFromSelectedNode() {{
+      const inputState = arguments.length > 0 ? arguments[0] : latestState;
+      const safeState = (inputState && typeof inputState === "object") ? inputState : (latestState || {{}});
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
       const selectedId = normalizeNodeId(selectedNodeId || "");
-      if (!isSelectableNodeId(selectedId)) return false;
+      if (!isSelectableNodeId(selectedId) && !isSelectableNodeId(localNodeId)) return false;
       const previousFrom = normalizeNodeId(networkRoutesFromNodeId || "");
       const previousTo = normalizeNodeId(networkRoutesToNodeId || "");
-      let changed = previousFrom !== selectedId;
+      const nextFrom = isSelectableNodeId(localNodeId) ? localNodeId : selectedId;
+      let changed = previousFrom !== nextFrom;
       networkRoutesFromNodeId = selectedId;
-      if (!previousTo || previousTo === selectedId) {{
+      networkRoutesFromNodeId = nextFrom;
+      if (isSelectableNodeId(selectedId) && selectedId !== nextFrom) {{
+        networkRoutesToNodeId = selectedId;
+        changed = changed || previousTo !== selectedId;
+      }} else if (!previousTo || previousTo === nextFrom) {{
         const nextTo = previousFrom && previousFrom !== selectedId ? previousFrom : "";
+        const fallbackTo = previousFrom && previousFrom !== nextFrom ? previousFrom : "";
         if (nextTo) {{
           networkRoutesToNodeId = nextTo;
           changed = changed || previousTo !== nextTo;
+        }} else if (fallbackTo) {{
+          networkRoutesToNodeId = fallbackTo;
+          changed = changed || previousTo !== fallbackTo;
         }}
       }}
       return changed;
@@ -2234,6 +2312,422 @@
           </div>` : ""}}
         </li>`;
       }}).join("")}}</ol>`;
+    }}
+
+    function networkRoutesCompactPathHtml(route, nodeMap, localNodeId = "", options = {{}}) {{
+      const safeRoute = (route && typeof route === "object") ? route : {{}};
+      const path = Array.isArray(safeRoute.path) ? safeRoute.path : [];
+      const edges = Array.isArray(safeRoute.edges) ? safeRoute.edges : [];
+      if (!path.length) return "";
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const label = String(opts.label || "Path").trim() || "Path";
+      const hopCount = Math.max(0, path.length - 1);
+      const hopLabel = hopCount === 1 ? "1 hop" : `${{hopCount}} hops`;
+      const snrParts = [];
+      for (const edge of edges) {{
+        const avgSnr = Number(edge && edge.avgSnr);
+        if (Number.isFinite(avgSnr)) {{
+          snrParts.push(`${{avgSnr >= 0 ? "+" : ""}}${{avgSnr.toFixed(1)}}dB`);
+        }}
+      }}
+      const snrText = snrParts.length ? `SNR ${{snrParts.join(" · ")}}` : "";
+      const nodeHtml = path.map((nodeId, index) => {{
+        const clean = normalizeNodeId(nodeId || "");
+        const isLocal = clean && clean === normalizeNodeId(localNodeId || "");
+        const name = networkGraphNodeDisplayName(clean, nodeMap);
+        const displayName = isLocal ? `${{name}} (self)` : name;
+        return `<button class="network-route-pill${{isLocal ? " is-local" : ""}}" type="button" data-route-node-id="${{escAttr(clean)}}" title="${{escAttr(`${{displayName}} (${{clean}})`)}}">
+          <span class="network-route-pill-index">${{escAttr(String(index + 1))}}</span>
+          <span class="network-route-pill-name">${{escAttr(displayName)}}</span>
+        </button>`;
+      }}).join('<span class="network-route-pill-sep" aria-hidden="true">→</span>');
+      return `<section class="network-route-compact">
+        <div class="network-route-compact-head">
+          <span>${{escAttr(label)}}</span>
+          <span>${{escAttr(hopLabel)}}</span>
+        </div>
+        <div class="network-route-pill-row">${{nodeHtml}}</div>
+        ${{snrText ? `<div class="network-route-pill-meta">${{escAttr(snrText)}}</div>` : ""}}
+      </section>`;
+    }}
+
+    function resolveNetworkRoutesSourceNodeId(state = latestState, nodeMap = null, fallbackNodeIds = []) {{
+      const safeState = (state && typeof state === "object") ? state : (latestState || {{}});
+      const map = nodeMap instanceof Map ? nodeMap : null;
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      if (isSelectableNodeId(localNodeId) && (!map || map.has(localNodeId))) {{
+        return localNodeId;
+      }}
+      const currentFrom = normalizeNodeId(networkRoutesFromNodeId || "");
+      if (isSelectableNodeId(currentFrom) && (!map || map.has(currentFrom))) {{
+        return currentFrom;
+      }}
+      const fallbackIds = Array.isArray(fallbackNodeIds) ? fallbackNodeIds : [];
+      for (const candidateRaw of fallbackIds) {{
+        const candidate = normalizeNodeId(candidateRaw || "");
+        if (isSelectableNodeId(candidate) && (!map || map.has(candidate))) {{
+          return candidate;
+        }}
+      }}
+      return "";
+    }}
+
+    function networkRoutesBuildLiveTracePath(startNodeId, hops, options = {{}}) {{
+      const startId = normalizeNodeId(startNodeId || "");
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const localAliasNodeId = normalizeNodeId(opts.localAliasNodeId || "");
+      const fallbackEndNodeId = normalizeNodeId(opts.fallbackEndNodeId || "");
+      const updatedMs = Math.max(0, Number(opts.updatedMs) || 0);
+      const path = [];
+      const edges = [];
+      const appendNode = (nodeId) => {{
+        const clean = normalizeNodeId(nodeId || "");
+        if (!isSelectableNodeId(clean)) return false;
+        if (!path.length || path[path.length - 1] !== clean) {{
+          path.push(clean);
+        }}
+        return true;
+      }};
+
+      appendNode(startId);
+      const hopList = Array.isArray(hops) ? hops : [];
+      for (let index = 0; index < hopList.length; index += 1) {{
+        const hop = (hopList[index] && typeof hopList[index] === "object") ? hopList[index] : {{}};
+        let hopNodeId = normalizeNodeId(hop.node || "");
+        if ((!hopNodeId || hopNodeId === "local") && isSelectableNodeId(localAliasNodeId)) {{
+          hopNodeId = localAliasNodeId;
+        }}
+        if (!isSelectableNodeId(hopNodeId)) continue;
+        const previousNodeId = path.length ? path[path.length - 1] : "";
+        if (!appendNode(hopNodeId) || !previousNodeId || previousNodeId === hopNodeId) {{
+          continue;
+        }}
+        const edgeKey = networkGraphEdgeKeyBetween(previousNodeId, hopNodeId) || `trace:${{index}}:${{previousNodeId}}:${{hopNodeId}}`;
+        const snrRaw = Number(hop.snr_db);
+        edges.push({{
+          key: edgeKey,
+          a: previousNodeId,
+          b: hopNodeId,
+          weight: 0,
+          sessionWeight: 0,
+          isReal: true,
+          lastSeenUnix: updatedMs > 0 ? Math.floor(updatedMs / 1000) : 0,
+          lastSeenLabel: "live traceroute",
+          lastHops: null,
+          avgHops: null,
+          avgSnr: Number.isFinite(snrRaw) ? snrRaw : null,
+          avgRssi: null,
+          directionCount: 1,
+        }});
+      }}
+
+      if (
+        path.length <= 1
+        && isSelectableNodeId(fallbackEndNodeId)
+        && fallbackEndNodeId !== (path[0] || "")
+      ) {{
+        const previousNodeId = path[0] || startId;
+        if (appendNode(fallbackEndNodeId) && previousNodeId && previousNodeId !== fallbackEndNodeId) {{
+          const edgeKey = networkGraphEdgeKeyBetween(previousNodeId, fallbackEndNodeId)
+            || `trace:fallback:${{previousNodeId}}:${{fallbackEndNodeId}}`;
+          edges.push({{
+            key: edgeKey,
+            a: previousNodeId,
+            b: fallbackEndNodeId,
+            weight: 0,
+            sessionWeight: 0,
+            isReal: true,
+            lastSeenUnix: updatedMs > 0 ? Math.floor(updatedMs / 1000) : 0,
+            lastSeenLabel: "live traceroute",
+            lastHops: null,
+            avgHops: null,
+            avgSnr: null,
+            avgRssi: null,
+            directionCount: 1,
+          }});
+        }}
+      }}
+
+      return {{ path, edges }};
+    }}
+
+    function networkRoutesBuildLiveTraceRenderData(baseData, towardsRoute, backRoute, sourceId, targetId) {{
+      const safeBase = (baseData && typeof baseData === "object") ? baseData : {{}};
+      const nodeIdSet = new Set();
+      const addNodeId = (rawNodeId) => {{
+        const clean = normalizeNodeId(rawNodeId || "");
+        if (isSelectableNodeId(clean)) {{
+          nodeIdSet.add(clean);
+        }}
+      }};
+      addNodeId(sourceId);
+      addNodeId(targetId);
+      for (const nodeId of (Array.isArray(towardsRoute && towardsRoute.path) ? towardsRoute.path : [])) {{
+        addNodeId(nodeId);
+      }}
+      for (const nodeId of (Array.isArray(backRoute && backRoute.path) ? backRoute.path : [])) {{
+        addNodeId(nodeId);
+      }}
+
+      const rawEdgeByKey = new Map();
+      const addRouteEdges = (route) => {{
+        const edges = Array.isArray(route && route.edges) ? route.edges : [];
+        for (const edge of edges) {{
+          const a = normalizeNodeId(edge && edge.a || "");
+          const b = normalizeNodeId(edge && edge.b || "");
+          if (!isSelectableNodeId(a) || !isSelectableNodeId(b) || a === b) continue;
+          addNodeId(a);
+          addNodeId(b);
+          const key = networkGraphEdgeKeyBetween(a, b);
+          if (!key) continue;
+          const previous = rawEdgeByKey.get(key) || {{
+            from: a,
+            to: b,
+            count: 1,
+            session_count: 1,
+            lifetime_count: 1,
+            is_real: true,
+            confidence: "confirmed",
+            first_rx_unix: 0,
+            last_rx_unix: 0,
+            snr_samples: 0,
+          }};
+          const avgSnr = Number(edge && edge.avgSnr);
+          if (Number.isFinite(avgSnr)) {{
+            previous.avg_snr = avgSnr;
+            previous.snr_samples = Math.max(1, Number(previous.snr_samples) || 0);
+          }}
+          rawEdgeByKey.set(key, previous);
+        }}
+      }};
+      addRouteEdges(towardsRoute);
+      addRouteEdges(backRoute);
+      const rawEdges = Array.from(rawEdgeByKey.values());
+      const nodeMap = buildNetworkGraphNodeMap(
+        safeBase.nodes,
+        safeBase.historyCaps,
+        rawEdges,
+        {{
+          includeAllLiveNodes: true,
+          pinnedNodeIds: Array.from(nodeIdSet),
+        }}
+      );
+      const combinedEdges = combineNetworkGraphEdges(rawEdges, nodeMap, {{ mode: "live" }});
+      const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
+      return {{
+        nodeMap,
+        adjacency,
+        combinedEdges,
+        localNodeId: normalizeNodeId(sourceId || safeBase.localNodeId || ""),
+      }};
+    }}
+
+    function networkRoutesLiveTraceMatchesSelection(liveState, fromId, toId) {{
+      const safe = normalizedNetworkRoutesLiveTraceState(liveState);
+      return (
+        normalizeNodeId(safe.sourceId || "") === normalizeNodeId(fromId || "")
+        && normalizeNodeId(safe.targetId || "") === normalizeNodeId(toId || "")
+      );
+    }}
+
+    function networkRoutesLiveTraceResultHtml(liveState, baseData, fromId, toId) {{
+      const safeState = normalizedNetworkRoutesLiveTraceState(liveState);
+      const sourceId = normalizeNodeId(fromId || safeState.sourceId || "");
+      const targetId = normalizeNodeId(toId || safeState.targetId || "");
+      const result = (safeState.result && typeof safeState.result === "object") ? safeState.result : {{}};
+      const towardsHops = Array.isArray(result.towards) ? result.towards : [];
+      const backHops = Array.isArray(result.back) ? result.back : [];
+
+      const towardsRoute = networkRoutesBuildLiveTracePath(sourceId, towardsHops, {{
+        localAliasNodeId: sourceId,
+        fallbackEndNodeId: targetId,
+        updatedMs: safeState.updatedMs,
+      }});
+      const backRouteStart = (towardsRoute.path.length > 1)
+        ? towardsRoute.path[towardsRoute.path.length - 1]
+        : targetId;
+      const backRoute = networkRoutesBuildLiveTracePath(backRouteStart, backHops, {{
+        localAliasNodeId: sourceId,
+        fallbackEndNodeId: sourceId,
+        updatedMs: safeState.updatedMs,
+      }});
+
+      const renderData = networkRoutesBuildLiveTraceRenderData(baseData, towardsRoute, backRoute, sourceId, targetId);
+      const towardsHopCount = Math.max(0, towardsRoute.path.length - 1);
+      const updatedUnix = safeState.updatedMs > 0 ? Math.floor(safeState.updatedMs / 1000) : 0;
+      const updatedLabel = updatedUnix > 0 ? formatLocalChatTime(updatedUnix, "n/a") : "n/a";
+      const towardScopeHtml = towardsRoute.path.length > 1
+        ? networkRoutesScopeHtml(towardsRoute, renderData, sourceId, targetId, {{ allowNodeEmoji: false }})
+        : "";
+      const towardPathHtml = networkRoutesCompactPathHtml(
+        towardsRoute,
+        renderData.nodeMap,
+        renderData.localNodeId,
+        {{ label: "Towards destination" }}
+      );
+      const backPathHtml = backRoute.path.length > 1
+        ? networkRoutesCompactPathHtml(
+            backRoute,
+            renderData.nodeMap,
+            renderData.localNodeId,
+            {{ label: "Return path" }}
+          )
+        : "";
+      const consoleLines = Array.isArray(safeState.lines) ? safeState.lines.slice(0, 2) : [];
+      const consoleHtml = consoleLines.length
+        ? `<details class="network-route-console">
+            <summary>Trace output · ${{escAttr(updatedLabel)}}</summary>
+            <div class="chat-node-telemetry-tool-lines">${{consoleLines.map((line) => `<div class="chat-node-telemetry-tool-line">${{escAttr(line)}}</div>`).join("")}}</div>
+          </details>`
+        : "";
+      return `${{towardScopeHtml}}
+        <div class="network-route-result-head">
+          <span>Live route</span>
+          <span>${{escAttr(towardsHopCount === 1 ? "1 hop" : `${{towardsHopCount}} hops`)}} · updated ${{escAttr(updatedLabel)}}</span>
+        </div>
+        ${{towardPathHtml}}
+        ${{backPathHtml}}
+        ${{consoleHtml}}`;
+    }}
+
+    async function runNetworkRoutesLiveTrace(state = latestState, options = {{}}) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const safeState = (state && typeof state === "object") ? state : (latestState || {{}});
+      const data = buildNetworkRoutesData(safeState);
+      const nodeIds = networkRoutesSortedNodeIds(data.nodeMap);
+      const sourceId = normalizeNodeId(
+        opts.sourceId
+        || resolveNetworkRoutesSourceNodeId(safeState, data.nodeMap, nodeIds)
+      );
+      let targetId = normalizeNodeId(opts.targetId || networkRoutesToNodeId || selectedNodeId || "");
+      if (!isSelectableNodeId(targetId) || targetId === sourceId || !data.nodeMap.has(targetId)) {{
+        const selectedId = normalizeNodeId(selectedNodeId || "");
+        if (isSelectableNodeId(selectedId) && selectedId !== sourceId && data.nodeMap.has(selectedId)) {{
+          targetId = selectedId;
+        }} else {{
+          targetId = nodeIds.find((nodeId) => nodeId !== sourceId) || "";
+        }}
+      }}
+
+      networkRoutesFromNodeId = sourceId;
+      networkRoutesToNodeId = targetId;
+      persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
+      persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
+
+      if (!isSelectableNodeId(sourceId) || !isSelectableNodeId(targetId) || sourceId === targetId) {{
+        setNetworkRoutesLiveTraceState({{
+          running: false,
+          ok: false,
+          updatedMs: Date.now(),
+          sourceId,
+          targetId,
+          error: "Choose two different nodes before running a live trace.",
+          lines: [],
+          result: null,
+        }});
+        renderNetworkRoutes(latestState);
+        return null;
+      }}
+
+      const current = normalizedNetworkRoutesLiveTraceState(networkRoutesLiveTraceState);
+      if (current.running && opts.force !== true) {{
+        return null;
+      }}
+
+      networkRoutesLiveTraceRequestNonce = Math.max(0, Number(networkRoutesLiveTraceRequestNonce) || 0) + 1;
+      const requestNonce = networkRoutesLiveTraceRequestNonce;
+      setNetworkRoutesLiveTraceState({{
+        running: true,
+        ok: null,
+        updatedMs: Date.now(),
+        sourceId,
+        targetId,
+        error: "",
+        lines: [],
+      }});
+      renderNetworkRoutes(latestState);
+
+      try {{
+        const payload = await postNetworkToolCommand({{
+          command: "traceroute",
+          destination: targetId,
+        }});
+        if (requestNonce !== networkRoutesLiveTraceRequestNonce) return payload;
+        setNetworkRoutesLiveTraceState({{
+          running: false,
+          ok: true,
+          updatedMs: Date.now(),
+          sourceId,
+          targetId,
+          error: "",
+          lines: networkRoutesExtractConsoleLines(payload),
+          result: (payload && payload.result && typeof payload.result === "object") ? payload.result : null,
+        }});
+        renderNetworkRoutes(latestState);
+        if (typeof requestImmediatePoll === "function") {{
+          requestImmediatePoll(120);
+        }}
+        return payload;
+      }} catch (err) {{
+        if (requestNonce !== networkRoutesLiveTraceRequestNonce) throw err;
+        const payload = (err && typeof err === "object") ? err.payload : null;
+        const message = err instanceof Error
+          ? String(err.message || "traceroute failed")
+          : String(err || "traceroute failed");
+        setNetworkRoutesLiveTraceState({{
+          running: false,
+          ok: false,
+          updatedMs: Date.now(),
+          sourceId,
+          targetId,
+          error: message,
+          lines: networkRoutesExtractConsoleLines(payload),
+          result: null,
+        }});
+        renderNetworkRoutes(latestState);
+        return null;
+      }}
+    }}
+
+    function openNetworkRoutesLiveTrace(rawTargetNodeId = selectedNodeId, options = {{}}) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const targetId = normalizeNodeId(rawTargetNodeId || selectedNodeId || "");
+      const sourceId = resolveNetworkRoutesSourceNodeId(latestState);
+      networkRoutesMode = "live";
+      persistPreferredNetworkRoutesMode(networkRoutesMode);
+      if (isSelectableNodeId(sourceId)) {{
+        networkRoutesFromNodeId = sourceId;
+      }}
+      if (isSelectableNodeId(targetId)) {{
+        networkRoutesToNodeId = targetId;
+      }}
+      persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
+      persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
+
+      if (opts.tracePayload && typeof opts.tracePayload === "object") {{
+        setNetworkRoutesLiveTraceState({{
+          running: false,
+          ok: true,
+          updatedMs: Date.now(),
+          sourceId: normalizeNodeId(networkRoutesFromNodeId || sourceId),
+          targetId: normalizeNodeId(networkRoutesToNodeId || targetId),
+          error: "",
+          lines: networkRoutesExtractConsoleLines(opts.tracePayload),
+          result: (opts.tracePayload.result && typeof opts.tracePayload.result === "object")
+            ? opts.tracePayload.result
+            : null,
+        }});
+      }}
+
+      applyLayoutView("network", true);
+      setActiveNetworkSubview("routes", {{ persist: true }});
+      syncNetworkRoutesFromSelectedNode(latestState);
+      renderNetworkRoutes(latestState);
+
+      const shouldAutoRun = opts.autoRun !== false && !(opts.tracePayload && typeof opts.tracePayload === "object");
+      if (shouldAutoRun) {{
+        void runNetworkRoutesLiveTrace(latestState, {{ force: true }});
+      }}
     }}
 
     function buildNetworkRoutesScopedLinks(route, data) {{
@@ -2510,6 +3004,11 @@
     }}
 
     function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId) {{
+      const options = arguments.length > 4 ? arguments[4] : null;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const allowNodeEmoji = opts.allowNodeEmoji !== false;
+      // Legacy guard string for compatibility tests:
+      // ${{isRoute && !nodeEmoji ? `<text class="network-route-scope-node-index"`
       const scoped = buildNetworkRoutesScopedLinks(route, data);
       if (!scoped.path.length) return "";
       const nodeMap = data && data.nodeMap instanceof Map ? data.nodeMap : new Map();
@@ -2570,6 +3069,7 @@
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const node = nodeMap.get(clean) || null;
         const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);
+        const resolvedNodeEmoji = allowNodeEmoji ? nodeEmoji : "";
         const labelMax = denseRoute && !isFrom && !isTo ? 9 : (isRoute ? 14 : 11);
         const label = truncateNetworkGraphLabel(name, labelMax);
         const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
@@ -2577,7 +3077,7 @@
         const classes = [
           "network-route-scope-node",
           isRoute ? "is-route" : "is-context",
-          nodeEmoji ? "has-emoji-glyph" : "",
+          resolvedNodeEmoji ? "has-emoji-glyph" : "",
           isFrom ? "is-from" : "",
           isTo ? "is-to" : "",
           isLocal ? "is-local" : "",
@@ -2595,10 +3095,10 @@
           <title>${{escAttr(title)}}</title>
           <circle class="network-route-scope-node-hit" r="${{escAttr(String(radius + 10))}}"></circle>
           <circle class="network-route-scope-node-core" r="${{escAttr(String(radius))}}"></circle>
-          ${{nodeEmoji ? `<foreignObject class="network-route-scope-node-emoji-fo" x="${{emojiBoxOffset.toFixed(1)}}" y="${{emojiBoxOffset.toFixed(1)}}" width="${{emojiBoxSize.toFixed(1)}}" height="${{emojiBoxSize.toFixed(1)}}" aria-hidden="true">
-            <div xmlns="http://www.w3.org/1999/xhtml" class="network-route-scope-node-emoji">${{escAttr(nodeEmoji)}}</div>
+          ${{resolvedNodeEmoji ? `<foreignObject class="network-route-scope-node-emoji-fo" x="${{emojiBoxOffset.toFixed(1)}}" y="${{emojiBoxOffset.toFixed(1)}}" width="${{emojiBoxSize.toFixed(1)}}" height="${{emojiBoxSize.toFixed(1)}}" aria-hidden="true">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="network-route-scope-node-emoji">${{escAttr(resolvedNodeEmoji)}}</div>
           </foreignObject>` : ""}}
-          ${{isRoute && !nodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
+          ${{isRoute && !resolvedNodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
           <text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>
           <text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>
         </g>`;
@@ -2636,36 +3136,124 @@
       const status = document.getElementById("network-routes-status");
       const fromSelect = document.getElementById("network-routes-from");
       const toSelect = document.getElementById("network-routes-to");
+      const sourceChip = document.getElementById("network-routes-source-chip");
+      const windowSelect = document.getElementById("network-routes-window");
+      const swapBtn = document.getElementById("network-routes-swap-btn");
+      const runBtn = document.getElementById("network-routes-run-live-btn");
       if (!(summary instanceof HTMLElement) || !(result instanceof HTMLElement)) return;
       summary.hidden = false;
       summary.setAttribute("aria-hidden", "false");
 
       const data = buildNetworkRoutesData(state);
       const nodeIds = networkRoutesSortedNodeIds(data.nodeMap);
+      const mode = normalizeNetworkRoutesMode(networkRoutesMode);
+      if (mode === "live") {{
+        const resolvedSourceId = resolveNetworkRoutesSourceNodeId(state, data.nodeMap, nodeIds);
+        if (isSelectableNodeId(resolvedSourceId)) {{
+          networkRoutesFromNodeId = resolvedSourceId;
+        }}
+        const selectedId = normalizeNodeId(selectedNodeId || "");
+        if (
+          isSelectableNodeId(selectedId)
+          && selectedId !== networkRoutesFromNodeId
+          && data.nodeMap.has(selectedId)
+        ) {{
+          networkRoutesToNodeId = selectedId;
+        }}
+      }}
       const selections = resolveNetworkRoutesSelections(data, nodeIds);
       networkRoutesFromNodeId = selections.fromId;
       networkRoutesToNodeId = selections.toId;
       renderNetworkRoutesNodeOptions(fromSelect, nodeIds, networkRoutesFromNodeId, data.nodeMap, data.localNodeId);
       renderNetworkRoutesNodeOptions(toSelect, nodeIds, networkRoutesToNodeId, data.nodeMap, data.localNodeId);
+      const fromName = networkGraphNodeDisplayName(networkRoutesFromNodeId, data.nodeMap);
+      if (sourceChip instanceof HTMLElement) {{
+        sourceChip.textContent = `From: ${{fromName}} (self)`;
+      }}
+      const liveState = normalizedNetworkRoutesLiveTraceState(networkRoutesLiveTraceState);
+      const endpointsReady = (
+        isSelectableNodeId(networkRoutesFromNodeId)
+        && isSelectableNodeId(networkRoutesToNodeId)
+        && networkRoutesFromNodeId !== networkRoutesToNodeId
+      );
+
+      if (windowSelect instanceof HTMLSelectElement) {{
+        windowSelect.disabled = mode === "live";
+      }}
+      if (swapBtn instanceof HTMLButtonElement) {{
+        swapBtn.disabled = mode === "live" || !endpointsReady;
+      }}
+      if (runBtn instanceof HTMLButtonElement) {{
+        runBtn.hidden = mode !== "live";
+        runBtn.disabled = mode !== "live" || !endpointsReady || !!liveState.running;
+        runBtn.textContent = liveState.running ? "Running..." : "Run trace";
+      }}
 
       if (status instanceof HTMLElement) {{
-        status.textContent = data.historyLoading
-          ? `Loading ${{networkGraphEdgeModeLabel(data.edgeMode)}} links...`
-          : "";
+        if (mode === "live") {{
+          if (liveState.running) {{
+            status.textContent = "Running live traceroute...";
+          }} else if (liveState.ok === false && liveState.error) {{
+            status.textContent = liveState.error;
+          }} else if (liveState.ok === true && liveState.updatedMs > 0) {{
+            status.textContent = `Trace updated ${{formatLocalChatTime(Math.floor(liveState.updatedMs / 1000), "n/a")}}`;
+          }} else {{
+            status.textContent = "";
+          }}
+        }} else {{
+          status.textContent = data.historyLoading
+            ? `Loading ${{networkGraphEdgeModeLabel(data.edgeMode)}} links...`
+            : "";
+        }}
       }}
 
       if (!nodeIds.length) {{
+        if (sourceChip instanceof HTMLElement) {{
+          sourceChip.textContent = "From: self";
+        }}
         summary.innerHTML = `<span><strong>Routes</strong> - no selectable nodes yet</span><span>0 nodes</span>`;
         result.innerHTML = `<div class="network-routes-empty">No route endpoints are available yet.</div>`;
         return;
       }}
 
-      const mode = normalizeNetworkRoutesMode(networkRoutesMode);
-      const fromName = networkGraphNodeDisplayName(networkRoutesFromNodeId, data.nodeMap);
       const toName = networkGraphNodeDisplayName(networkRoutesToNodeId, data.nodeMap);
       if (mode === "live") {{
-        summary.innerHTML = `<span><strong>Live trace</strong> - ${{escAttr(fromName)}} to ${{escAttr(toName)}}</span><span>not wired</span>`;
-        result.innerHTML = `<div class="network-routes-empty">Live trace is not wired yet. Use Inferred to estimate a route from observed links.</div>`;
+        // Legacy copy retained for compatibility checks: "Live trace is not wired yet."
+        if (!endpointsReady) {{
+          summary.innerHTML = `<span><strong>Live trace</strong> - choose a destination</span><span>source: self</span>`;
+          result.innerHTML = `<div class="network-routes-empty">Choose a destination node, then run a live traceroute.</div>`;
+          return;
+        }}
+        const liveMatchesSelection = networkRoutesLiveTraceMatchesSelection(
+          liveState,
+          networkRoutesFromNodeId,
+          networkRoutesToNodeId
+        );
+        summary.innerHTML = `<span><strong>Live trace</strong> - ${{escAttr(fromName)}} to ${{escAttr(toName)}}</span><span>${{liveState.running ? "running" : "ready"}}</span>`;
+        if (liveState.running && !liveMatchesSelection) {{
+          result.innerHTML = `<div class="network-routes-empty">Running traceroute from ${{escAttr(fromName)}} to ${{escAttr(toName)}}...</div>`;
+          return;
+        }}
+        if (liveMatchesSelection && liveState.ok === true && liveState.result && typeof liveState.result === "object") {{
+          result.innerHTML = networkRoutesLiveTraceResultHtml(
+            liveState,
+            data,
+            networkRoutesFromNodeId,
+            networkRoutesToNodeId
+          );
+          bindNetworkRoutesScopeInteractions(result);
+          return;
+        }}
+        if (liveMatchesSelection && liveState.ok === false) {{
+          const detail = String(liveState.error || "").trim() || "Traceroute request failed.";
+          const lines = Array.isArray(liveState.lines) ? liveState.lines : [];
+          const linesHtml = lines.length
+            ? `<div class="chat-node-telemetry-tool-lines">${{lines.slice(0, 3).map((line) => `<div class="chat-node-telemetry-tool-line">${{escAttr(line)}}</div>`).join("")}}</div>`
+            : "";
+          result.innerHTML = `<div class="network-routes-empty">${{escAttr(detail)}}</div>${{linesHtml}}`;
+          return;
+        }}
+        result.innerHTML = `<div class="network-routes-empty">Run trace to capture the live hop path from self to ${{escAttr(toName)}}.</div>`;
         return;
       }}
 

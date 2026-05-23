@@ -3401,20 +3401,18 @@ Ready.
                     <span id="network-routes-status" class="network-routes-status" aria-live="polite"></span>
                   </div>
                   <div class="network-routes-picker">
-                    <label class="network-routes-node-control" for="network-routes-from">
-                      <span>From</span>
-                      <select id="network-routes-from" class="network-routes-node-select" aria-label="Route source node"></select>
-                    </label>
-                    <button
-                      id="network-routes-swap-btn"
-                      class="network-routes-swap-btn"
-                      type="button"
-                      title="Swap route endpoints"
-                    >Swap</button>
+                    <select id="network-routes-from" class="network-routes-node-select" aria-label="Route source node" hidden tabindex="-1"></select>
+                    <div id="network-routes-source-chip" class="network-routes-source-chip" aria-live="polite"></div>
                     <label class="network-routes-node-control" for="network-routes-to">
                       <span>To</span>
                       <select id="network-routes-to" class="network-routes-node-select" aria-label="Route target node"></select>
                     </label>
+                    <button
+                      id="network-routes-run-live-btn"
+                      class="network-routes-swap-btn network-routes-run-btn"
+                      type="button"
+                      title="Run live traceroute from self to selected destination"
+                    >Run trace</button>
                   </div>
                   <div id="network-routes-summary" class="network-routes-summary"></div>
                   <div id="network-routes-result" class="network-routes-result"></div>
