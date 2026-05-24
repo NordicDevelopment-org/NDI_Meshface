@@ -992,7 +992,7 @@
         && typeof syncNetworkRoutesFromSelectedNode === "function"
         && typeof renderNetworkRoutes === "function"
       ) {{
-        syncNetworkRoutesFromSelectedNode();
+        syncNetworkRoutesFromSelectedNode(latestState, {{ preferSelectedTarget: true }});
         renderNetworkRoutes(latestState);
       }}
       markNodeSelectionPerf(perfToken, "selection.dispatch", dispatchStartedAtMs, {{

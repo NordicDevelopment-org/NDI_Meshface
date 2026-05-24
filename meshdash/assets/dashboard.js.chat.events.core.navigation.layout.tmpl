@@ -2224,7 +2224,10 @@
 
     function syncNetworkRoutesFromSelectedNode() {{
       const inputState = arguments.length > 0 ? arguments[0] : latestState;
+      const rawOptions = arguments.length > 1 ? arguments[1] : null;
       const safeState = (inputState && typeof inputState === "object") ? inputState : (latestState || {{}});
+      const opts = (rawOptions && typeof rawOptions === "object") ? rawOptions : {{}};
+      const preferSelectedTarget = opts.preferSelectedTarget === true;
       const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
       const selectedId = normalizeNodeId(selectedNodeId || "");
       if (!isSelectableNodeId(selectedId) && !isSelectableNodeId(localNodeId)) return false;
@@ -2233,7 +2236,11 @@
       const nextFrom = isSelectableNodeId(localNodeId) ? localNodeId : selectedId;
       const mode = normalizeNetworkRoutesMode(networkRoutesMode);
       const pinnedTargetId = getNetworkRoutesPinnedTargetId();
-      const lockLiveTarget = mode === "live" && isSelectableNodeId(pinnedTargetId);
+      const lockLiveTarget = (
+        mode === "live"
+        && isSelectableNodeId(pinnedTargetId)
+        && !preferSelectedTarget
+      );
       let changed = previousFrom !== nextFrom;
       networkRoutesFromNodeId = selectedId;
       networkRoutesFromNodeId = nextFrom;
@@ -2242,6 +2249,9 @@
         changed = changed || previousTo !== pinnedTargetId;
       }} else if (isSelectableNodeId(selectedId) && selectedId !== nextFrom) {{
         networkRoutesToNodeId = selectedId;
+        if (mode === "live" && preferSelectedTarget) {{
+          setNetworkRoutesPinnedTargetId(selectedId);
+        }}
         changed = changed || previousTo !== selectedId;
       }} else if (!previousTo || previousTo === nextFrom) {{
         const nextTo = previousFrom && previousFrom !== selectedId ? previousFrom : "";
@@ -2252,6 +2262,12 @@
         }} else if (fallbackTo) {{
           networkRoutesToNodeId = fallbackTo;
           changed = changed || previousTo !== fallbackTo;
+        }}
+      }}
+      if (mode === "live" && preferSelectedTarget) {{
+        const nextPinnedTargetId = normalizeNodeId(networkRoutesToNodeId || "");
+        if (isSelectableNodeId(nextPinnedTargetId) && nextPinnedTargetId !== nextFrom) {{
+          setNetworkRoutesPinnedTargetId(nextPinnedTargetId);
         }}
       }}
       return changed;
@@ -3933,7 +3949,7 @@
         }}
       }}
       if (normalizedView === "network" && next === "routes") {{
-        syncNetworkRoutesFromSelectedNode();
+        syncNetworkRoutesFromSelectedNode(latestState, {{ preferSelectedTarget: true }});
         renderNetworkRoutes(latestState);
       }}
       if (normalizedView === "network" && next === "top10") {{
