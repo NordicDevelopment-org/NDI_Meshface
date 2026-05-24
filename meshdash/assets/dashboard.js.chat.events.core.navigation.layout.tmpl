@@ -2778,6 +2778,33 @@
         error: "",
         lines: [],
       }});
+      if (
+        typeof chatNodeTelemetryStateForNode === "function"
+        && typeof chatNodeTelemetryToolStateForNode === "function"
+      ) {{
+        const telemetryNodeState = chatNodeTelemetryStateForNode(targetId, true);
+        if (telemetryNodeState && telemetryNodeState.tools instanceof Map) {{
+          const tracerouteState = chatNodeTelemetryToolStateForNode(targetId, "traceroute", true) || {{}};
+          telemetryNodeState.tools.set("traceroute", {{
+            ...tracerouteState,
+            running: true,
+            ok: null,
+            updatedMs: Date.now(),
+            statusText: "Request in progress...",
+            lines: [],
+          }});
+          telemetryNodeState.summaryMessage = `Running Traceroute for ${{targetId}}...`;
+          telemetryNodeState.summaryError = false;
+          telemetryNodeState.summaryUpdatedMs = Date.now();
+          if (
+            isChatNodeDetailsDrawerExpanded()
+            && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "telemetry"
+            && chatNodeDetailsDrawerTargetNodeId(selectedNodeId) === targetId
+          ) {{
+            renderChatNodeTelemetryPanel(targetId, latestState);
+          }}
+        }}
+      }}
       renderNetworkRoutes(latestState);
 
       try {{

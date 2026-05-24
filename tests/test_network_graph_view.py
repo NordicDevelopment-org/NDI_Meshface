@@ -298,7 +298,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'selectNode(row.dataset.nodeId || "", true, false);' in js
     assert 'selectNode(nodeId, true, false);' in js
     assert 'activeLayoutView === "network"\n        && activeNetworkSubviewName === "routes"' in js
-    assert 'syncNetworkRoutesFromSelectedNode();\n        renderNetworkRoutes(latestState);' in js
+    assert 'syncNetworkRoutesFromSelectedNode(latestState, { preferSelectedTarget: true });\n        renderNetworkRoutes(latestState);' in js
+    assert 'const liveTraceRunningForNode = !!(liveTraceState && liveTraceState.running' in js
+    assert 'if (tool.id === "traceroute" && typeof setNetworkRoutesLiveTraceState === "function") {' in js
+    assert 'telemetryNodeState.summaryMessage = `Running Traceroute for ${targetId}...`;' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
     assert 'const componentMeta = buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta);' in js

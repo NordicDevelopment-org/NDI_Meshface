@@ -2207,14 +2207,27 @@
       const summaryClass = nodeState.summaryError ? " is-error" : "";
       const rowsHtml = chatNodeTelemetryToolDefinitions.map((tool) => {{
         const toolState = chatNodeTelemetryToolStateForNode(nodeId, tool.id, true) || {{}};
-        const running = !!toolState.running;
+        const liveTraceState = (tool.id === "traceroute" && typeof normalizedNetworkRoutesLiveTraceState === "function")
+          ? normalizedNetworkRoutesLiveTraceState(networkRoutesLiveTraceState)
+          : null;
+        const liveTraceRunningForNode = !!(liveTraceState && liveTraceState.running
+          && normalizeNodeId(liveTraceState.targetId || "") === nodeId);
+        const running = !!toolState.running || liveTraceRunningForNode;
+        const effectiveToolState = (!toolState.running && liveTraceRunningForNode)
+          ? {{
+              ...toolState,
+              running: true,
+              ok: null,
+              statusText: "Request in progress...",
+            }}
+          : toolState;
         const rowClass = running
           ? " is-running"
-          : (toolState.ok === false ? " is-error" : (toolState.ok === true ? " is-success" : ""));
-        const status = chatNodeTelemetryStatusLabel(toolState);
-        const statusDetail = String(toolState.statusText || "").trim();
-        const lines = Array.isArray(toolState.lines)
-          ? toolState.lines
+          : (effectiveToolState.ok === false ? " is-error" : (effectiveToolState.ok === true ? " is-success" : ""));
+        const status = chatNodeTelemetryStatusLabel(effectiveToolState);
+        const statusDetail = String(effectiveToolState.statusText || "").trim();
+        const lines = Array.isArray(effectiveToolState.lines)
+          ? effectiveToolState.lines
               .map((line) => String(line == null ? "" : line).trim())
               .filter((line) => !!line)
               .slice(0, 2)
@@ -2296,6 +2309,32 @@
       nodeState.summaryMessage = `Running ${{tool.label}} for ${{nodeId}}...`;
       nodeState.summaryError = false;
       nodeState.summaryUpdatedMs = Date.now();
+      if (tool.id === "traceroute" && typeof setNetworkRoutesLiveTraceState === "function") {{
+        const safeState = (latestState && typeof latestState === "object") ? latestState : {{}};
+        const preferredSourceId = normalizeNodeId(resolveNetworkRoutesSourceNodeId(safeState) || "");
+        const localSourceId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+        const sourceId = isSelectableNodeId(preferredSourceId) ? preferredSourceId : localSourceId;
+        if (typeof setNetworkRoutesPinnedTargetId === "function") {{
+          setNetworkRoutesPinnedTargetId(nodeId);
+        }}
+        setNetworkRoutesLiveTraceState({{
+          running: true,
+          ok: null,
+          updatedMs: Date.now(),
+          sourceId,
+          targetId: nodeId,
+          error: "",
+          lines: [],
+          result: null,
+        }});
+        if (
+          typeof renderNetworkRoutes === "function"
+          && normalizeLayoutView(activeLayoutView) === "network"
+          && normalizeNetworkSubview(activeNetworkSubview) === "routes"
+        ) {{
+          renderNetworkRoutes(latestState);
+        }}
+      }}
       if (
         isChatNodeDetailsDrawerExpanded()
         && normalizeChatNodeDetailsDrawerTab(chatNodeDetailsDrawerTab) === "telemetry"
