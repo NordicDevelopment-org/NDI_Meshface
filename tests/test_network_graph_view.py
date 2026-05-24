@@ -302,6 +302,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const liveTraceRunningForNode = !!(liveTraceState && liveTraceState.running' in js
     assert 'if (tool.id === "traceroute" && typeof setNetworkRoutesLiveTraceState === "function") {' in js
     assert 'telemetryNodeState.summaryMessage = `Running Traceroute for ${targetId}...`;' in js
+    assert 'data-drawer-telemetry-shortcut-id="${escAttr(shortcutId)}"' in js
+    assert 'runChatNodeTelemetryShortcut(shortcutId, hostNodeId || selectedNodeId);' in js
+    assert 'openNetworkRoutesLiveTrace(targetNodeId, { autoRun: false });' in js
+    assert 'setActiveNetworkSubview("map", { persist: true });' in js
+    assert 'setActiveNetworkSubview("sensors", { persist: true });' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
     assert 'const componentMeta = buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta);' in js

@@ -2007,6 +2007,11 @@
           command: "traceroute",
         }},
         consoleLabel: "traceroute",
+        shortcut: {{
+          id: "routes",
+          label: "Routes",
+          title: "Open the live Routes view for this node.",
+        }},
       }},
       {{
         id: "position",
@@ -2016,6 +2021,11 @@
           command: "request-position",
         }},
         consoleLabel: "position",
+        shortcut: {{
+          id: "map",
+          label: "Map",
+          title: "Open the map location view for this node.",
+        }},
       }},
       {{
         id: "device_metrics",
@@ -2026,6 +2036,11 @@
           telemetry_type: "device_metrics",
         }},
         consoleLabel: "telemetry",
+        shortcut: {{
+          id: "sensors",
+          label: "Sensors",
+          title: "Open sensor data view.",
+        }},
       }},
       {{
         id: "environment_metrics",
@@ -2036,6 +2051,11 @@
           telemetry_type: "environment_metrics",
         }},
         consoleLabel: "telemetry",
+        shortcut: {{
+          id: "sensors",
+          label: "Sensors",
+          title: "Open sensor data view.",
+        }},
       }},
       {{
         id: "air_quality_metrics",
@@ -2046,6 +2066,11 @@
           telemetry_type: "air_quality_metrics",
         }},
         consoleLabel: "telemetry",
+        shortcut: {{
+          id: "sensors",
+          label: "Sensors",
+          title: "Open sensor data view.",
+        }},
       }},
       {{
         id: "power_metrics",
@@ -2056,6 +2081,11 @@
           telemetry_type: "power_metrics",
         }},
         consoleLabel: "telemetry",
+        shortcut: {{
+          id: "sensors",
+          label: "Sensors",
+          title: "Open sensor data view.",
+        }},
       }},
       {{
         id: "host_metrics",
@@ -2066,6 +2096,11 @@
           telemetry_type: "local_stats",
         }},
         consoleLabel: "telemetry",
+        shortcut: {{
+          id: "sensors",
+          label: "Sensors",
+          title: "Open sensor data view.",
+        }},
       }},
     ]);
     const chatNodeTelemetryStateByNode = new Map();
@@ -2137,6 +2172,52 @@
       if (state.ok === false) return `Last error: ${{stamp}}`;
       if (state.ok === true) return `Last success: ${{stamp}}`;
       return `Last run: ${{stamp}}`;
+    }}
+
+    function runChatNodeTelemetryShortcut(rawShortcutId, rawNodeId = selectedNodeId) {{
+      const shortcutId = String(rawShortcutId || "").trim().toLowerCase();
+      if (!shortcutId) return false;
+      const nodeId = chatNodeDetailsDrawerTargetNodeId(rawNodeId);
+      const targetNodeId = isSelectableNodeId(nodeId) ? nodeId : normalizeNodeId(selectedNodeId || "");
+
+      if (shortcutId === "routes") {{
+        if (typeof openNetworkRoutesLiveTrace === "function") {{
+          openNetworkRoutesLiveTrace(targetNodeId, {{ autoRun: false }});
+          return true;
+        }}
+        if (typeof applyLayoutView === "function") {{
+          applyLayoutView("network", true);
+        }}
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("routes", {{ persist: true }});
+        }}
+        return true;
+      }}
+
+      if (shortcutId === "map") {{
+        if (isSelectableNodeId(targetNodeId) && typeof selectNode === "function") {{
+          selectNode(targetNodeId, true, false);
+        }}
+        if (typeof applyLayoutView === "function") {{
+          applyLayoutView("network", true);
+        }}
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("map", {{ persist: true }});
+        }}
+        return true;
+      }}
+
+      if (shortcutId === "sensors") {{
+        if (typeof applyLayoutView === "function") {{
+          applyLayoutView("network", true);
+        }}
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("sensors", {{ persist: true }});
+        }}
+        return true;
+      }}
+
+      return false;
     }}
 
     function syncChatNodeTelemetryTracerouteFromPayload(rawNodeId, payload, options = null) {{
@@ -2238,12 +2319,25 @@
         const linesHtml = lines.length
           ? `<div class="chat-node-telemetry-tool-lines">${{lines.map((line) => `<div class="chat-node-telemetry-tool-line">${{escAttr(line)}}</div>`).join("")}}</div>`
           : "";
+        const shortcut = (tool && tool.shortcut && typeof tool.shortcut === "object") ? tool.shortcut : null;
+        const shortcutId = shortcut ? String(shortcut.id || "").trim().toLowerCase() : "";
+        const shortcutLabel = shortcut ? String(shortcut.label || "View").trim() : "";
+        const shortcutTitle = shortcut ? String(shortcut.title || "").trim() : "";
+        const shortcutBtnHtml = (shortcutId && shortcutLabel)
+          ? `<button
+              class="chat-node-telemetry-tool-shortcut-btn"
+              type="button"
+              data-drawer-telemetry-shortcut-id="${{escAttr(shortcutId)}}"
+              title="${{escAttr(shortcutTitle || shortcutLabel)}}"
+            >${{escAttr(shortcutLabel)}}</button>`
+          : "";
         return `<article class="chat-node-telemetry-tool-row${{rowClass}}">
           <div class="chat-node-telemetry-tool-main">
             <div class="chat-node-telemetry-tool-label">${{escAttr(tool.label)}}</div>
             <div class="chat-node-telemetry-tool-copy">${{escAttr(tool.description)}}</div>
           </div>
           <div class="chat-node-telemetry-tool-actions">
+            ${{shortcutBtnHtml}}
             <button
               class="chat-node-telemetry-tool-run-btn"
               type="button"
@@ -2269,6 +2363,14 @@
         host.addEventListener("click", (event) => {{
           const target = event.target;
           if (!(target instanceof Element)) return;
+          const shortcutBtn = target.closest("button[data-drawer-telemetry-shortcut-id]");
+          if (shortcutBtn instanceof HTMLButtonElement && !shortcutBtn.disabled) {{
+            const shortcutId = String(shortcutBtn.dataset.drawerTelemetryShortcutId || "").trim().toLowerCase();
+            if (!shortcutId) return;
+            const hostNodeId = normalizeNodeId(host.dataset.nodeId || "");
+            runChatNodeTelemetryShortcut(shortcutId, hostNodeId || selectedNodeId);
+            return;
+          }}
           const runBtn = target.closest("button[data-drawer-telemetry-tool-id]");
           if (!(runBtn instanceof HTMLButtonElement) || runBtn.disabled) return;
           const toolId = String(runBtn.dataset.drawerTelemetryToolId || "").trim().toLowerCase();

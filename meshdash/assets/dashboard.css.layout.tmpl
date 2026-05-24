@@ -4862,7 +4862,10 @@
       display: flex;
       align-items: center;
       justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
     }}
+    .chat-node-telemetry-tool-shortcut-btn,
     .chat-node-telemetry-tool-run-btn {{
       border: 1px solid color-mix(in srgb, var(--telemetry-surface-border) 72%, var(--telemetry-success-accent) 28%);
       background: linear-gradient(
@@ -4879,6 +4882,11 @@
       cursor: pointer;
       white-space: nowrap;
     }}
+    .chat-node-telemetry-tool-shortcut-btn {{
+      border-color: color-mix(in srgb, var(--telemetry-surface-border) 78%, var(--telemetry-running-accent) 22%);
+      color: color-mix(in srgb, var(--telemetry-surface-text) 80%, var(--telemetry-running-accent) 20%);
+    }}
+    .chat-node-telemetry-tool-shortcut-btn:hover,
     .chat-node-telemetry-tool-run-btn:hover {{
       background: linear-gradient(
         150deg,
@@ -4887,6 +4895,10 @@
       );
       border-color: color-mix(in srgb, var(--telemetry-success-accent) 58%, var(--telemetry-surface-border-strong) 42%);
       color: color-mix(in srgb, var(--telemetry-surface-text) 68%, var(--telemetry-success-accent) 32%);
+    }}
+    .chat-node-telemetry-tool-shortcut-btn:hover {{
+      border-color: color-mix(in srgb, var(--telemetry-running-accent) 56%, var(--telemetry-surface-border-strong) 44%);
+      color: color-mix(in srgb, var(--telemetry-surface-text) 66%, var(--telemetry-running-accent) 34%);
     }}
     .chat-node-telemetry-tool-run-btn:disabled {{
       opacity: 0.72;
