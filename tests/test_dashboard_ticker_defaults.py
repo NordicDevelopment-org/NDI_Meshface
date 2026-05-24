@@ -55,7 +55,10 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'id="m-bots-ticker"' in html
     assert '{ id: "bots", defaultLabel: "Bots", metric: false }' in js
     assert 'function botTickerAvailableForState(state = latestState) {' in js
-    assert 'const zorkRuntime = zorkBotRuntimeFromState(state);' in js
+    assert 'const zorkRuntime = botRuntimeFromState("zork", state);' in js
+    assert 'const pingRuntime = botRuntimeFromState("ping", state);' in js
+    assert 'id="bots-ping-command-item"' in html
+    assert 'data-bot-command="ping"' in html
     assert "adventureBotRuntimeFromState" not in js
     assert 'function buildBotTickerSummary(state = latestState) {' in js
     assert 'function renderBotTickerSummary(state = latestState) {' in js
@@ -82,7 +85,7 @@ def test_dashboard_exposes_bot_ticker_gated_by_runtime() -> None:
     assert 'No ${escAttr(spec.title)} activity since the reset.' in js
     assert 'function isZorkBotPublicStartText(text) {' in js
     assert 'return isBotPublicStartText("zork", text);' in js
-    assert 'const isPublicStart = item.toAll && isBotPublicStartText(selectedCommand, item.text);' in js
+    assert 'const isPublicStart = publicStartEnabled && item.toAll && isBotPublicStartText(selectedCommand, item.text);' in js
     assert 'const isDirectStart = item.toLocal && isBotPublicStartText(selectedCommand, item.text);' in js
     assert 'const isDirectSessionCommand = item.toLocal && (linkedReplies.length > 0 || sessionPeers.has(item.from));' in js
     assert 'const isCommand = isPublicStart || isDirectStart || isDirectSessionCommand;' in js

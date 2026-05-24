@@ -1,0 +1,178 @@
+from types import SimpleNamespace
+
+from meshdash.tracker_runtime_impl import DashboardTracker
+
+
+class _FakeInterface:
+    def __init__(self) -> None:
+        self.myInfo = {"my_node_num": 0x12345678}
+        self.nodesByNum = {
+            0x12345678: {"user": {"id": "!12345678", "shortName": "mesh"}},
+            0x01020304: {"user": {"id": "!01020304"}, "hopsAway": 3},
+        }
+        self.sent: list[dict[str, object]] = []
+
+    def sendText(self, text: str, **kwargs: object) -> object:
+        packet = SimpleNamespace(id=1700 + len(self.sent))
+        self.sent.append({"text": text, "kwargs": dict(kwargs), "packet": packet})
+        return packet
+
+
+def _text_packet(
+    text: str,
+    *,
+    to: int = 0x12345678,
+    packet_id: int = 901,
+    hop_start: int | None = None,
+    hop_limit: int | None = None,
+    rx_snr: float | None = None,
+    rx_rssi: float | None = None,
+) -> dict[str, object]:
+    packet: dict[str, object] = {
+        "from": 0x01020304,
+        "to": to,
+        "id": packet_id,
+        "channel": 1,
+        "decoded": {
+            "portnum": "TEXT_MESSAGE_APP",
+            "text": text,
+        },
+    }
+    if hop_start is not None:
+        packet["hopStart"] = hop_start
+    if hop_limit is not None:
+        packet["hopLimit"] = hop_limit
+    if rx_snr is not None:
+        packet["rxSnr"] = rx_snr
+    if rx_rssi is not None:
+        packet["rxRssi"] = rx_rssi
+    return packet
+
+
+def test_dashboard_tracker_does_not_answer_ping_when_bot_runtime_disabled() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+
+    tracker.on_receive(_text_packet("ping"), iface)
+
+    assert iface.sent == []
+
+
+def test_dashboard_tracker_answers_direct_ping_when_enabled() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("ping", hop_start=7, hop_limit=4), iface)
+
+    assert iface.sent
+    assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
+    assert iface.sent[0]["kwargs"]["replyId"] == 901
+    assert iface.sent[0]["kwargs"]["channelIndex"] == 1
+    assert str(iface.sent[0]["text"]).strip() == "3 hops."
+
+
+def test_dashboard_tracker_answers_public_ping_with_direct_reply() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("test", to=0xFFFFFFFF), iface)
+
+    assert iface.sent
+    assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
+    assert str(iface.sent[0]["text"]).strip() == "3 hops."
+
+
+def test_dashboard_tracker_reports_zero_hops_when_packet_hops_are_zero() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("ping", hop_start=0, hop_limit=0), iface)
+
+    assert iface.sent
+    assert str(iface.sent[0]["text"]).strip() == "0 hops."
+
+
+def test_dashboard_tracker_includes_signal_levels_in_ping_reply() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("ping", hop_start=1, hop_limit=1, rx_snr=11.0, rx_rssi=-46), iface)
+
+    assert iface.sent
+    assert str(iface.sent[0]["text"]).strip() == "0 hops. SNR 11.00dB RSSI -46dBm"
+
+
+def test_dashboard_tracker_ping_message_only_blocks_public_ping() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    enabled = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert enabled["ok"] is True
+    mode = tracker.set_ping_bot_message_only(True)
+    assert mode["ok"] is True
+    assert mode["ping"]["message_only"] is True
+    assert mode["ping"]["public_start_enabled"] is False
+
+    tracker.on_receive(_text_packet("ping", to=0xFFFFFFFF), iface)
+
+    assert iface.sent == []
+
+
+def test_dashboard_tracker_ping_message_only_keeps_direct_ping_active() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    enabled = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert enabled["ok"] is True
+    mode = tracker.set_ping_bot_message_only(True)
+    assert mode["ok"] is True
+
+    tracker.on_receive(_text_packet("ping", hop_start=7, hop_limit=4), iface)
+
+    assert iface.sent
+    assert str(iface.sent[0]["text"]).strip() == "3 hops."
+
+
+def test_dashboard_tracker_accepts_nodename_prefixed_natural_ping_trigger() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("mesh can you see this?"), iface)
+
+    assert iface.sent
+    assert iface.sent[0]["kwargs"]["destinationId"] == "!01020304"
+    assert str(iface.sent[0]["text"]).strip() == "3 hops."
+
+
+def test_dashboard_tracker_ignores_ping_targeted_to_different_suffix() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("ping dead"), iface)
+
+    assert iface.sent == []
+
+
+def test_dashboard_tracker_keeps_ping_off_when_only_zork_enabled() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    runtime = tracker.set_zork_bot_enabled(True, send_lock=None)
+
+    assert runtime["ok"] is True
+    assert runtime["zork"]["enabled"] is True
+    assert runtime["ping"]["enabled"] is False

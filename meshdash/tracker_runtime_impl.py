@@ -70,6 +70,8 @@ class DashboardTracker:
         self.radio_link_changed_unix: Optional[int] = None
         self.radio_link_error: Optional[str] = None
         self._zork_bot_service = None
+        self._ping_bot_service = None
+        self._ping_public_start_enabled = True
 
     def _bump_state_revision_unlocked(self) -> None:
         self.state_revision = int(getattr(self, "state_revision", 0) or 0) + 1
@@ -102,9 +104,9 @@ class DashboardTracker:
             kwargs["reply_async"] = reply_async
         if callable(sleep_fn):
             kwargs["sleep_fn"] = sleep_fn
-        service = build_zork_bot_service(**kwargs)
+        zork_service = build_zork_bot_service(**kwargs)
         with self._lock:
-            self._zork_bot_service = service
+            self._zork_bot_service = zork_service
             self._bump_state_revision_unlocked()
         return True
 
@@ -113,6 +115,34 @@ class DashboardTracker:
             if self._zork_bot_service is None:
                 return True
             self._zork_bot_service = None
+            self._bump_state_revision_unlocked()
+        return True
+
+    def enable_ping_bot(
+        self,
+        *,
+        send_lock: object | None = None,
+    ) -> bool:
+        try:
+            from .services_ping_bot import build_ping_bot_service
+        except Exception:
+            return False
+        with self._lock:
+            public_start_enabled = bool(self._ping_public_start_enabled)
+        ping_service = build_ping_bot_service(
+            send_lock=send_lock,
+            public_start_enabled=public_start_enabled,
+        )
+        with self._lock:
+            self._ping_bot_service = ping_service
+            self._bump_state_revision_unlocked()
+        return True
+
+    def disable_ping_bot(self) -> bool:
+        with self._lock:
+            if self._ping_bot_service is None:
+                return True
+            self._ping_bot_service = None
             self._bump_state_revision_unlocked()
         return True
 
@@ -134,19 +164,62 @@ class DashboardTracker:
         runtime["ok"] = bool(ok)
         return runtime
 
+    def set_ping_bot_enabled(
+        self,
+        enabled: object,
+        *,
+        send_lock: object | None = None,
+    ) -> dict[str, object]:
+        if bool(enabled):
+            with self._lock:
+                already_enabled = self._ping_bot_service is not None
+            ping_ok = True if already_enabled else self.enable_ping_bot(send_lock=send_lock)
+            ok = bool(ping_ok)
+        else:
+            ping_ok = self.disable_ping_bot()
+            ok = bool(ping_ok)
+        runtime = self.get_zork_bot_runtime()
+        runtime["ok"] = bool(ok)
+        return runtime
+
+    def set_ping_bot_message_only(self, message_only: object) -> dict[str, object]:
+        # "message only" means direct peer-to-peer chats only (no public ^all replies).
+        public_start_enabled = not bool(message_only)
+        changed = False
+        with self._lock:
+            if self._ping_public_start_enabled != public_start_enabled:
+                self._ping_public_start_enabled = public_start_enabled
+                changed = True
+            service = self._ping_bot_service
+        if service is not None:
+            set_public_start_enabled = getattr(service, "set_public_start_enabled", None)
+            if callable(set_public_start_enabled):
+                try:
+                    changed = bool(set_public_start_enabled(public_start_enabled)) or changed
+                except Exception:
+                    pass
+        if changed:
+            with self._lock:
+                self._bump_state_revision_unlocked()
+        runtime = self.get_zork_bot_runtime()
+        runtime["ok"] = True
+        runtime["changed"] = changed
+        return runtime
+
     def get_zork_bot_runtime(self) -> dict[str, object]:
         with self._lock:
-            service = self._zork_bot_service
+            zork_service = self._zork_bot_service
+            ping_service = self._ping_bot_service
         active_session_count = 0
         sessions: list[dict[str, object]] = []
-        if service is not None:
-            active_session_count_fn = getattr(service, "active_session_count", None)
+        if zork_service is not None:
+            active_session_count_fn = getattr(zork_service, "active_session_count", None)
             if callable(active_session_count_fn):
                 try:
                     active_session_count = max(0, int(active_session_count_fn()))
                 except Exception:
                     active_session_count = 0
-            session_summaries_fn = getattr(service, "session_summaries", None)
+            session_summaries_fn = getattr(zork_service, "session_summaries", None)
             if callable(session_summaries_fn):
                 try:
                     session_summaries = session_summaries_fn()
@@ -158,15 +231,32 @@ class DashboardTracker:
                         ]
                 except Exception:
                     sessions = []
-        enabled = service is not None
+        zork_enabled = zork_service is not None
+        ping_enabled = ping_service is not None
+        ping_public_start_enabled = bool(self._ping_public_start_enabled)
+        if ping_service is not None:
+            public_start_enabled_fn = getattr(ping_service, "public_start_enabled", None)
+            if callable(public_start_enabled_fn):
+                try:
+                    ping_public_start_enabled = bool(public_start_enabled_fn())
+                except Exception:
+                    pass
         return {
             "available": True,
             "zork": {
-                "enabled": enabled,
+                "enabled": zork_enabled,
                 "active_session_count": active_session_count,
                 "sessions": sessions,
-                "public_start_enabled": enabled,
-                "direct_message_enabled": enabled,
+                "public_start_enabled": zork_enabled,
+                "direct_message_enabled": zork_enabled,
+            },
+            "ping": {
+                "enabled": ping_enabled,
+                "active_session_count": 0,
+                "sessions": [],
+                "public_start_enabled": ping_public_start_enabled,
+                "direct_message_enabled": ping_enabled,
+                "message_only": not ping_public_start_enabled,
             },
         }
 
@@ -241,7 +331,7 @@ class DashboardTracker:
             self._bump_state_revision_unlocked()
             bot_services = [
                 service
-                for service in (self._zork_bot_service,)
+                for service in (self._ping_bot_service, self._zork_bot_service)
                 if service is not None
             ]
         for bot_service in bot_services:
@@ -327,7 +417,7 @@ class DashboardTracker:
                 self._bump_state_revision_unlocked()
                 bot_services = [
                     service
-                    for service in (self._zork_bot_service,)
+                    for service in (self._ping_bot_service, self._zork_bot_service)
                     if service is not None
                 ]
                 should_offer_to_zork = not bool(is_reaction)

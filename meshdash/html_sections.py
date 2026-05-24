@@ -62,6 +62,8 @@ def build_html_shell(
         bots_section_hidden_attrs=bots_section_hidden_attrs,
         bots_zork_state_label="Enabled" if games_enabled else "Disabled",
         bots_zork_state_class="is-enabled" if games_enabled else "is-disabled",
+        bots_ping_state_label="Disabled",
+        bots_ping_state_class="is-disabled",
         bots_zork_hint=(
             "Public chat zork starts a private session. Direct messages continue gameplay."
             if games_enabled

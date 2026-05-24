@@ -2,6 +2,8 @@ from .http_handler_contracts import DashboardHttpHandler
 from .http_route_contracts import (
     ManageZorkBotFn,
     ParseZorkBotToggleRequestFn,
+    SetPingBotEnabledFn,
+    SetPingBotMessageOnlyFn,
     SetZorkBotEnabledFn,
     ToIntFn,
     ValidateContentLengthFn,
@@ -15,7 +17,10 @@ def handle_zork_bot_toggle_post(
     handler: DashboardHttpHandler,
     *,
     set_zork_bot_enabled_fn: SetZorkBotEnabledFn | None,
+    set_ping_bot_enabled_fn: SetPingBotEnabledFn | None,
+    set_ping_bot_message_only_fn: SetPingBotMessageOnlyFn | None,
     manage_zork_bot_fn: ManageZorkBotFn | None,
+    default_command: str = "zork",
     to_int_fn: ToIntFn,
     validate_content_length_fn: ValidateContentLengthFn,
     parse_zork_bot_toggle_request_fn: ParseZorkBotToggleRequestFn | None,
@@ -56,11 +61,31 @@ def handle_zork_bot_toggle_post(
 
     try:
         action = str(getattr(request, "action", "") or "").strip().lower().replace("-", "_")
-        if action in {"enable", "disable"}:
-            if set_zork_bot_enabled_fn is None:
-                raise ValueError("Zork bot runtime toggle is unavailable")
-            response_obj = set_zork_bot_enabled_fn(action == "enable")
+        command = str(getattr(request, "command", "") or "").strip().lower().replace("-", "_")
+        message_only = getattr(request, "message_only", None)
+        if not command:
+            command = str(default_command or "zork").strip().lower().replace("-", "_") or "zork"
+        if command == "ping" and message_only is not None and action in {"", "set_mode", "configure"}:
+            if set_ping_bot_message_only_fn is None:
+                raise ValueError("Ping bot mode update is unavailable")
+            response_obj = set_ping_bot_message_only_fn(bool(message_only))
+        elif action in {"enable", "disable"}:
+            enabled_flag = action == "enable"
+            if command == "ping":
+                if set_ping_bot_enabled_fn is None:
+                    raise ValueError("Ping bot runtime toggle is unavailable")
+                response_obj = set_ping_bot_enabled_fn(enabled_flag)
+                if message_only is not None:
+                    if set_ping_bot_message_only_fn is None:
+                        raise ValueError("Ping bot mode update is unavailable")
+                    response_obj = set_ping_bot_message_only_fn(bool(message_only))
+            else:
+                if set_zork_bot_enabled_fn is None:
+                    raise ValueError("Zork bot runtime toggle is unavailable")
+                response_obj = set_zork_bot_enabled_fn(enabled_flag)
         elif action in {"end_session", "clear_sessions"}:
+            if command != "zork":
+                raise ValueError("Session management is only available for zork")
             if manage_zork_bot_fn is None:
                 raise ValueError("Zork bot session management is unavailable")
             response_obj = manage_zork_bot_fn(action, peer_id=getattr(request, "peer_id", None))

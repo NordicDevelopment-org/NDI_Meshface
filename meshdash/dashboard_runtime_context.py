@@ -229,6 +229,8 @@ def build_dashboard_runtime_context(
 
     games_runtime_enabled = bool(getattr(args, "games_enable", False))
     set_zork_bot_enabled = getattr(tracker, "set_zork_bot_enabled", None) if games_runtime_enabled else None
+    set_ping_bot_enabled = getattr(tracker, "set_ping_bot_enabled", None) if games_runtime_enabled else None
+    set_ping_bot_message_only = getattr(tracker, "set_ping_bot_message_only", None) if games_runtime_enabled else None
     manage_zork_bot = getattr(tracker, "manage_zork_bot", None) if games_runtime_enabled else None
     if callable(set_zork_bot_enabled):
         def _set_zork_bot_enabled_fn(enabled):  # type: ignore[no-redef]
@@ -242,6 +244,36 @@ def build_dashboard_runtime_context(
         if callable(state_lite_fn):
             try:
                 setattr(state_lite_fn, "set_zork_bot_enabled_fn", _set_zork_bot_enabled_fn)
+            except Exception:
+                pass
+
+    if callable(set_ping_bot_enabled):
+        def _set_ping_bot_enabled_fn(enabled):  # type: ignore[no-redef]
+            return set_ping_bot_enabled(bool(enabled), send_lock=send_lock)
+
+        try:
+            setattr(loaders.state_fn, "set_ping_bot_enabled_fn", _set_ping_bot_enabled_fn)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "set_ping_bot_enabled_fn", _set_ping_bot_enabled_fn)
+            except Exception:
+                pass
+
+    if callable(set_ping_bot_message_only):
+        def _set_ping_bot_message_only_fn(message_only):  # type: ignore[no-redef]
+            return set_ping_bot_message_only(bool(message_only))
+
+        try:
+            setattr(loaders.state_fn, "set_ping_bot_message_only_fn", _set_ping_bot_message_only_fn)
+        except Exception:
+            pass
+        state_lite_fn = getattr(loaders.state_fn, "lite", None)
+        if callable(state_lite_fn):
+            try:
+                setattr(state_lite_fn, "set_ping_bot_message_only_fn", _set_ping_bot_message_only_fn)
             except Exception:
                 pass
 

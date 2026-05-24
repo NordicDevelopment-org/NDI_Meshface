@@ -188,6 +188,7 @@
     }}
 
     const zorkBotEndpoint = "/api/bots/zork";
+    const pingBotEndpoint = "/api/bots/ping";
     const zorkBotActivityResetStorageKey = "meshDashboardZorkActivityResetCutoffUnixV1";
     const zorkBotCommandHeads = new Set([
       "zork", "look", "l", "inventory", "inv", "i", "n", "s", "e", "w", "u", "d",
@@ -197,6 +198,7 @@
     ]);
     const botPublicStartHeadsByCommand = {{
       zork: new Set(["zork"]),
+      ping: new Set(["ping", "test", "can you see this", "can you see this?"]),
     }};
     let zorkBotToggleInFlight = false;
     const botCatalogSpecs = {{
@@ -208,6 +210,15 @@
         disabledDescription: "Live replies are disabled. Enable Zork here to answer public starts and direct messages.",
         enabledRouteHtml: 'Public chat <code>zork</code> starts a private session. Gameplay commands stay in direct messages.',
         disabledRouteHtml: "Zork is not answering mesh traffic while disabled.",
+      }},
+      ping: {{
+        command: "ping",
+        title: "Ping",
+        name: "Ping Reply Bot",
+        enabledDescription: "Replies to ping/test messages with hop count.",
+        disabledDescription: "Ping auto-replies are disabled.",
+        enabledRouteHtml: 'Direct or public <code>ping</code>/<code>test</code> gets a direct hop-count reply.',
+        disabledRouteHtml: "Ping bot is not answering mesh traffic while disabled.",
       }},
     }};
     let selectedBotCommand = "zork";
@@ -240,7 +251,8 @@
       return clean;
     }}
 
-    function zorkBotRuntimeFromState(state = latestState) {{
+    function botRuntimeFromState(command, state = latestState) {{
+      const selectedCommand = normalizeBotCatalogCommand(command);
       const safeState = (state && typeof state === "object") ? state : {{}};
       const summary = (safeState.summary && typeof safeState.summary === "object")
         ? safeState.summary
@@ -248,28 +260,42 @@
       const bots = (summary.bots && typeof summary.bots === "object")
         ? summary.bots
         : ((safeState.bots && typeof safeState.bots === "object") ? safeState.bots : {{}});
-      const zork = (bots.zork && typeof bots.zork === "object") ? bots.zork : {{}};
-      const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, "zork");
-      const hasEnabled = Object.prototype.hasOwnProperty.call(zork, "enabled");
-      const enabled = hasEnabled ? !!zork.enabled : !!gamesFeatureEnabled;
-      const sessions = Array.isArray(zork.sessions) ? zork.sessions : [];
-      const rawSessions = Number(zork.active_session_count ?? zork.activeSessionCount ?? 0);
+      const runtimePayload = (bots[selectedCommand] && typeof bots[selectedCommand] === "object")
+        ? bots[selectedCommand]
+        : {{}};
+      const hasRuntimePayload = Object.prototype.hasOwnProperty.call(bots, selectedCommand);
+      const hasEnabled = Object.prototype.hasOwnProperty.call(runtimePayload, "enabled");
+      const defaultEnabled = selectedCommand === "zork" ? !!gamesFeatureEnabled : false;
+      const enabled = hasEnabled ? !!runtimePayload.enabled : defaultEnabled;
+      const explicitPublicStart = runtimePayload.public_start_enabled ?? runtimePayload.publicStartEnabled;
+      const explicitMessageOnly = runtimePayload.message_only ?? runtimePayload.messageOnly;
+      const computedPublicStartEnabled = explicitPublicStart != null
+        ? !!explicitPublicStart
+        : enabled;
+      const messageOnly = selectedCommand === "ping"
+        ? (explicitMessageOnly != null ? !!explicitMessageOnly : !computedPublicStartEnabled)
+        : false;
+      const publicStartEnabled = selectedCommand === "ping"
+        ? !messageOnly
+        : computedPublicStartEnabled;
+      const sessions = Array.isArray(runtimePayload.sessions) ? runtimePayload.sessions : [];
+      const rawSessions = Number(runtimePayload.active_session_count ?? runtimePayload.activeSessionCount ?? 0);
       const available = Object.prototype.hasOwnProperty.call(bots, "available")
         ? !!bots.available
-        : (hasRuntimePayload || !!gamesFeatureEnabled);
+        : (hasRuntimePayload || (selectedCommand === "zork" && !!gamesFeatureEnabled));
       return {{
         available,
         enabled,
         activeSessionCount: Number.isFinite(rawSessions) ? Math.max(0, Math.floor(rawSessions)) : sessions.length,
         sessions,
-        publicStartEnabled: !!(zork.public_start_enabled ?? zork.publicStartEnabled ?? enabled),
-        directMessageEnabled: !!(zork.direct_message_enabled ?? zork.directMessageEnabled ?? enabled),
+        publicStartEnabled: !!publicStartEnabled,
+        directMessageEnabled: !!(runtimePayload.direct_message_enabled ?? runtimePayload.directMessageEnabled ?? enabled),
+        messageOnly: !!messageOnly,
       }};
     }}
 
-    function botRuntimeFromState(command, state = latestState) {{
-      void command;
-      return zorkBotRuntimeFromState(state);
+    function zorkBotRuntimeFromState(state = latestState) {{
+      return botRuntimeFromState("zork", state);
     }}
 
     function setZorkBotStatusClass(element, enabled) {{
@@ -315,7 +341,12 @@
 
     function isBotPublicStartText(command, text) {{
       const clean = String(text || "").trim().toLowerCase();
-      return !!clean && botPublicStartHeads(command).has(clean);
+      if (!clean) return false;
+      if (normalizeBotCatalogCommand(command) === "ping") {{
+        const head = zorkBotTextHead(clean);
+        return clean === "can you see this" || clean === "can you see this?" || head === "ping" || head === "test";
+      }}
+      return botPublicStartHeads(command).has(clean);
     }}
 
     function isZorkBotCommandText(text) {{
@@ -376,6 +407,7 @@
       const selectedRuntime = (runtime && typeof runtime === "object")
         ? runtime
         : botRuntimeFromState(selectedCommand, safeState);
+      const publicStartEnabled = !!(selectedRuntime.publicStartEnabled ?? true);
       const sessionPeers = botSessionPeerSet(selectedRuntime);
       const localId = normalizeNodeId(resolveLocalNodeId(safeState) || safeState.local_node_id || "");
       const resetCutoffUnix = zorkBotActivityResetCutoffUnix();
@@ -440,7 +472,7 @@
         const linkedReplies = item.messageId !== null
           ? (repliesByRequestId.get(item.messageId) || [])
           : [];
-        const isPublicStart = item.toAll && isBotPublicStartText(selectedCommand, item.text);
+        const isPublicStart = publicStartEnabled && item.toAll && isBotPublicStartText(selectedCommand, item.text);
         const isDirectStart = item.toLocal && isBotPublicStartText(selectedCommand, item.text);
         const isDirectSessionCommand = item.toLocal && (linkedReplies.length > 0 || sessionPeers.has(item.from));
         const isCommand = isPublicStart || isDirectStart || isDirectSessionCommand;
@@ -505,18 +537,20 @@
     }}
 
     function botTickerAvailableForState(state = latestState) {{
-      const zorkRuntime = zorkBotRuntimeFromState(state);
-      return !!(zorkRuntime && zorkRuntime.available && zorkRuntime.enabled);
+      const zorkRuntime = botRuntimeFromState("zork", state);
+      const pingRuntime = botRuntimeFromState("ping", state);
+      return !!(
+        (zorkRuntime && zorkRuntime.available && zorkRuntime.enabled)
+        || (pingRuntime && pingRuntime.available && pingRuntime.enabled)
+      );
     }}
 
     function buildBotTickerSummary(state = latestState) {{
-      const runtimes = {{
-        zork: zorkBotRuntimeFromState(state),
-      }};
-      const activitiesByCommand = {{
-        zork: buildBotActivity("zork", state, runtimes.zork),
-      }};
-      const commands = ["zork"];
+      const commands = ["zork", "ping"];
+      const runtimes = Object.fromEntries(commands.map((command) => [command, botRuntimeFromState(command, state)]));
+      const activitiesByCommand = Object.fromEntries(
+        commands.map((command) => [command, buildBotActivity(command, state, runtimes[command])])
+      );
       const enabledCommands = commands.filter((command) => {{
         const runtime = runtimes[command];
         return !!(runtime && runtime.available && runtime.enabled);
@@ -787,22 +821,76 @@
       }}
     }}
 
+    function syncPingModeControls(runtime, command = "zork") {{
+      const selectedCommand = normalizeBotCatalogCommand(command);
+      const row = document.getElementById("bots-ping-mode-row");
+      const input = document.getElementById("bots-ping-message-only-checkbox");
+      if (!(row instanceof HTMLElement) || !(input instanceof HTMLInputElement)) return;
+      row.hidden = selectedCommand !== "ping";
+      if (row.hidden) return;
+      input.checked = !!runtime.messageOnly;
+      input.disabled = zorkBotToggleInFlight || !runtime.available;
+    }}
+
+    function botToggleEndpoint(command) {{
+      return normalizeBotCatalogCommand(command) === "ping" ? pingBotEndpoint : zorkBotEndpoint;
+    }}
+
     async function setZorkBotEnabledFromUi(enabled) {{
       if (zorkBotToggleInFlight) return;
+      const selectedCommand = normalizeBotCatalogCommand(selectedBotCommand);
+      const spec = botCatalogSpecs[selectedCommand] || botCatalogSpecs.zork;
       zorkBotToggleInFlight = true;
-      setZorkBotToggleStatus(enabled ? "Enabling..." : "Disabling...");
+      setZorkBotToggleStatus(enabled ? `Enabling ${{spec.title}}...` : `Disabling ${{spec.title}}...`);
       renderBotsView(latestState);
       try {{
-        const resp = await fetch(zorkBotEndpoint, {{
+        const body = {{ command: selectedCommand, enabled: !!enabled }};
+        if (selectedCommand === "ping") {{
+          const modeInput = document.getElementById("bots-ping-message-only-checkbox");
+          if (modeInput instanceof HTMLInputElement) {{
+            body.message_only = !!modeInput.checked;
+          }}
+        }}
+        const resp = await fetch(botToggleEndpoint(selectedCommand), {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ enabled: !!enabled }}),
+          body: JSON.stringify(body),
         }});
         const payload = await resp.json().catch(() => ({{}}));
         if (!resp.ok || !payload.ok) {{
           throw new Error(payload && payload.error ? payload.error : `update failed (${{resp.status}})`);
         }}
-        setZorkBotToggleStatus(enabled ? "Enabled" : "Disabled");
+        setZorkBotToggleStatus(enabled ? `${{spec.title}} enabled` : `${{spec.title}} disabled`);
+        forceStateReloadOnce = true;
+        await poll();
+      }} catch (err) {{
+        setZorkBotToggleStatus(`Update failed: ${{err.message || err}}`, true);
+      }} finally {{
+        zorkBotToggleInFlight = false;
+        renderBotsView(latestState);
+      }}
+    }}
+
+    async function setPingMessageOnlyFromUi(messageOnly) {{
+      if (zorkBotToggleInFlight) return;
+      zorkBotToggleInFlight = true;
+      setZorkBotToggleStatus(messageOnly ? "Setting Ping to message-only..." : "Allowing Ping public replies...");
+      renderBotsView(latestState);
+      try {{
+        const resp = await fetch(pingBotEndpoint, {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{
+            command: "ping",
+            action: "set_mode",
+            message_only: !!messageOnly,
+          }}),
+        }});
+        const payload = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !payload.ok) {{
+          throw new Error(payload && payload.error ? payload.error : `update failed (${{resp.status}})`);
+        }}
+        setZorkBotToggleStatus(messageOnly ? "Ping set to message-only" : "Ping public replies enabled");
         forceStateReloadOnce = true;
         await poll();
       }} catch (err) {{
@@ -823,6 +911,7 @@
         if (peerId) {{
           body.peer_id = peerId;
         }}
+        body.command = "zork";
         const resp = await fetch(zorkBotEndpoint, {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
@@ -881,6 +970,7 @@
       }}
       setZorkBotStatusClass(document.getElementById("bots-zork-detail-state"), runtime.enabled);
       syncZorkBotControls(runtime, selectedBotCommand);
+      syncPingModeControls(runtime, selectedBotCommand);
       renderZorkBotSessions(state, runtime, selectedBotCommand);
       renderBotActivity(selectedBotCommand, state, runtime);
     }}
@@ -936,22 +1026,39 @@
           }}
         }});
       }}
+      const pingModeInput = document.getElementById("bots-ping-message-only-checkbox");
+      if (pingModeInput instanceof HTMLInputElement && pingModeInput.dataset.bound !== "1") {{
+        pingModeInput.dataset.bound = "1";
+        pingModeInput.addEventListener("change", () => {{
+          void setPingMessageOnlyFromUi(!!pingModeInput.checked);
+        }});
+      }}
     }}
 
     function renderBotsView(state = latestState) {{
-      const runtime = zorkBotRuntimeFromState(state);
+      const zorkRuntime = botRuntimeFromState("zork", state);
+      const pingRuntime = botRuntimeFromState("ping", state);
       const selectedCommand = normalizeBotCatalogCommand(selectedBotCommand);
-      const item = document.getElementById("bots-zork-command-item");
-      if (item instanceof HTMLElement) {{
-        item.classList.toggle("is-enabled", runtime.enabled);
-        item.classList.toggle("is-disabled", !runtime.enabled);
-        item.classList.toggle("is-active", selectedCommand === "zork");
-        item.setAttribute("aria-selected", selectedCommand === "zork" ? "true" : "false");
+      const zorkItem = document.getElementById("bots-zork-command-item");
+      if (zorkItem instanceof HTMLElement) {{
+        zorkItem.classList.toggle("is-enabled", zorkRuntime.enabled);
+        zorkItem.classList.toggle("is-disabled", !zorkRuntime.enabled);
+        zorkItem.classList.toggle("is-active", selectedCommand === "zork");
+        zorkItem.setAttribute("aria-selected", selectedCommand === "zork" ? "true" : "false");
       }}
-      setZorkBotStatusClass(document.getElementById("bots-zork-list-state"), runtime.enabled);
+      const pingItem = document.getElementById("bots-ping-command-item");
+      if (pingItem instanceof HTMLElement) {{
+        pingItem.classList.toggle("is-enabled", pingRuntime.enabled);
+        pingItem.classList.toggle("is-disabled", !pingRuntime.enabled);
+        pingItem.classList.toggle("is-active", selectedCommand === "ping");
+        pingItem.setAttribute("aria-selected", selectedCommand === "ping" ? "true" : "false");
+      }}
+      setZorkBotStatusClass(document.getElementById("bots-zork-list-state"), zorkRuntime.enabled);
+      setZorkBotStatusClass(document.getElementById("bots-ping-list-state"), pingRuntime.enabled);
       bindZorkBotControls();
       renderSelectedBotDetail(state, {{
-        zork: runtime,
+        zork: zorkRuntime,
+        ping: pingRuntime,
       }});
     }}
 
