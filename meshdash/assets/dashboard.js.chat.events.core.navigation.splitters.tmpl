@@ -371,23 +371,33 @@
         splitter.classList.add("active");
         document.body.classList.add("resizing-panels-y");
         splitter.setPointerCapture(ev.pointerId);
+        const list = section.querySelector(".chat-member-list");
+        if (!(list instanceof HTMLElement)) {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          return;
+        }}
+        const startY = Number(ev.clientY);
+        const listRect = list.getBoundingClientRect();
+        const startListPx = Number.isFinite(Number(listRect.height)) ? Number(listRect.height) : 0;
 
         const updateFromClientY = (clientY) => {{
           const rect = section.getBoundingClientRect();
           if (rect.height < 80) return;
-          const relativeY = clientY - rect.top;
-          const pct = clampChatNodeListPct((relativeY / rect.height) * 100);
+          const nextListPx = startListPx + (Number(clientY) - startY);
+          const pct = clampChatNodeListPct((nextListPx / rect.height) * 100);
           chatNodeListPct = pct;
           applyChatNodeListSplitState();
         }};
-
-        updateFromClientY(ev.clientY);
 
         const onMove = (moveEv) => {{
           updateFromClientY(moveEv.clientY);
         }};
 
-        const onUp = () => {{
+        const onUp = (upEv) => {{
+          if (upEv && Number.isFinite(Number(upEv.clientY))) {{
+            updateFromClientY(Number(upEv.clientY));
+          }}
           splitter.classList.remove("active");
           document.body.classList.remove("resizing-panels-y");
           persistChatNodeListSplitState();

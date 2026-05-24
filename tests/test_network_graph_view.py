@@ -307,6 +307,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'openNetworkRoutesLiveTrace(targetNodeId, { autoRun: false });' in js
     assert 'setActiveNetworkSubview("map", { persist: true });' in js
     assert 'setActiveNetworkSubview("sensors", { persist: true });' in js
+    assert 'const startListPx = Number.isFinite(Number(listRect.height)) ? Number(listRect.height) : 0;' in js
+    assert 'const nextListPx = startListPx + (Number(clientY) - startY);' in js
+    assert 'if (upEv && Number.isFinite(Number(upEv.clientY))) {' in js
+    assert 'updateFromClientY(Number(upEv.clientY));' in js
     assert 'function recenterNetworkGraphView(svg, options = {})' in js
     assert 'return fitNetworkGraphViewBoxToBounds(bounds, svg);' in js
     assert 'const componentMeta = buildNetworkGraphComponentMeta(nodeMap, adjacency, degreeMeta);' in js
