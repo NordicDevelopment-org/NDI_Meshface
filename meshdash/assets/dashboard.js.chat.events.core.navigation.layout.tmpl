@@ -730,6 +730,7 @@
     let networkRoutesScopeSuppressClick = false;
     const networkGraphHistoryEdgeCache = new Map();
     const networkGraphHistoryCapsCache = new Map();
+    const networkGraphHistoryEdgeFetchedAtMs = new Map();
     const networkGraphHistoryEdgeRequests = new Map();
     const networkGraphEdgeModeDefs = Object.freeze([
       {{ id: "live", label: "Live" }},
@@ -919,6 +920,23 @@
       }}
     }}
 
+    function normalizeNetworkRoutesPinnedTargetId(rawNodeId, nodeMap = null) {{
+      const clean = normalizeNodeId(rawNodeId || "");
+      if (!isSelectableNodeId(clean)) return "";
+      if (nodeMap instanceof Map && !nodeMap.has(clean)) return "";
+      return clean;
+    }}
+
+    function setNetworkRoutesPinnedTargetId(rawNodeId, nodeMap = null) {{
+      const next = normalizeNetworkRoutesPinnedTargetId(rawNodeId, nodeMap);
+      networkRoutesLiveTracePinnedTargetId = next;
+      return next;
+    }}
+
+    function getNetworkRoutesPinnedTargetId(nodeMap = null) {{
+      return normalizeNetworkRoutesPinnedTargetId(networkRoutesLiveTracePinnedTargetId, nodeMap);
+    }}
+
     function normalizedNetworkRoutesLiveTraceState(rawState = networkRoutesLiveTraceState) {{
       const previous = (rawState && typeof rawState === "object")
         ? rawState
@@ -1003,6 +1021,7 @@
           ? safePayload.result
           : null,
       }});
+      setNetworkRoutesPinnedTargetId(targetId);
 
       if (
         opts.renderIfVisible !== false
@@ -2043,6 +2062,7 @@
         toSelect.dataset.bound = "1";
         toSelect.addEventListener("change", () => {{
           networkRoutesToNodeId = normalizeNodeId(toSelect.value || "");
+          setNetworkRoutesPinnedTargetId(networkRoutesToNodeId);
           persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
           renderNetworkRoutes(latestState);
         }});
@@ -2063,6 +2083,11 @@
       if (runBtn instanceof HTMLButtonElement && runBtn.dataset.bound !== "1") {{
         runBtn.dataset.bound = "1";
         runBtn.addEventListener("click", () => {{
+          if (normalizeNetworkRoutesMode(networkRoutesMode) !== "live") {{
+            networkRoutesMode = "live";
+            persistPreferredNetworkRoutesMode(networkRoutesMode);
+            syncNetworkRoutesModeControls();
+          }}
           void runNetworkRoutesLiveTrace(latestState, {{ force: true }});
         }});
       }}
@@ -2091,6 +2116,7 @@
           ) ? sourceId : targetId;
           networkRoutesFromNodeId = normalizeNodeId(localSourceId || sourceId);
           networkRoutesToNodeId = normalizeNodeId(nextTarget || targetId);
+          setNetworkRoutesPinnedTargetId(networkRoutesToNodeId);
           persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
           persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
           renderNetworkRoutes(latestState);
@@ -2205,10 +2231,16 @@
       const previousFrom = normalizeNodeId(networkRoutesFromNodeId || "");
       const previousTo = normalizeNodeId(networkRoutesToNodeId || "");
       const nextFrom = isSelectableNodeId(localNodeId) ? localNodeId : selectedId;
+      const mode = normalizeNetworkRoutesMode(networkRoutesMode);
+      const pinnedTargetId = getNetworkRoutesPinnedTargetId();
+      const lockLiveTarget = mode === "live" && isSelectableNodeId(pinnedTargetId);
       let changed = previousFrom !== nextFrom;
       networkRoutesFromNodeId = selectedId;
       networkRoutesFromNodeId = nextFrom;
-      if (isSelectableNodeId(selectedId) && selectedId !== nextFrom) {{
+      if (lockLiveTarget && pinnedTargetId !== nextFrom) {{
+        networkRoutesToNodeId = pinnedTargetId;
+        changed = changed || previousTo !== pinnedTargetId;
+      }} else if (isSelectableNodeId(selectedId) && selectedId !== nextFrom) {{
         networkRoutesToNodeId = selectedId;
         changed = changed || previousTo !== selectedId;
       }} else if (!previousTo || previousTo === nextFrom) {{
@@ -2694,6 +2726,7 @@
 
       networkRoutesFromNodeId = sourceId;
       networkRoutesToNodeId = targetId;
+      setNetworkRoutesPinnedTargetId(targetId, data.nodeMap);
       persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
       persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
 
@@ -2719,6 +2752,7 @@
 
       networkRoutesLiveTraceRequestNonce = Math.max(0, Number(networkRoutesLiveTraceRequestNonce) || 0) + 1;
       const requestNonce = networkRoutesLiveTraceRequestNonce;
+      setNetworkRoutesPinnedTargetId(targetId, data.nodeMap);
       setNetworkRoutesLiveTraceState({{
         running: true,
         ok: null,
@@ -2817,6 +2851,7 @@
       }}
       if (isSelectableNodeId(targetId)) {{
         networkRoutesToNodeId = targetId;
+        setNetworkRoutesPinnedTargetId(targetId);
       }}
       persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
       persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
@@ -3400,18 +3435,23 @@
       const data = buildNetworkRoutesData(state);
       const nodeIds = networkRoutesSortedNodeIds(data.nodeMap);
       const mode = normalizeNetworkRoutesMode(networkRoutesMode);
+      const pinnedTargetId = getNetworkRoutesPinnedTargetId(data.nodeMap);
       if (mode === "live") {{
         const resolvedSourceId = resolveNetworkRoutesSourceNodeId(state, data.nodeMap, nodeIds);
         if (isSelectableNodeId(resolvedSourceId)) {{
           networkRoutesFromNodeId = resolvedSourceId;
         }}
-        const selectedId = normalizeNodeId(selectedNodeId || "");
-        if (
-          isSelectableNodeId(selectedId)
-          && selectedId !== networkRoutesFromNodeId
-          && data.nodeMap.has(selectedId)
-        ) {{
-          networkRoutesToNodeId = selectedId;
+        if (isSelectableNodeId(pinnedTargetId) && pinnedTargetId !== networkRoutesFromNodeId) {{
+          networkRoutesToNodeId = pinnedTargetId;
+        }} else {{
+          const selectedId = normalizeNodeId(selectedNodeId || "");
+          if (
+            isSelectableNodeId(selectedId)
+            && selectedId !== networkRoutesFromNodeId
+            && data.nodeMap.has(selectedId)
+          ) {{
+            networkRoutesToNodeId = selectedId;
+          }}
         }}
       }}
       const selections = resolveNetworkRoutesSelections(data, nodeIds);
@@ -3437,8 +3477,8 @@
         swapBtn.disabled = mode === "live" || !endpointsReady;
       }}
       if (runBtn instanceof HTMLButtonElement) {{
-        runBtn.hidden = mode !== "live";
-        runBtn.disabled = mode !== "live" || !endpointsReady || !!liveState.running;
+        runBtn.hidden = false;
+        runBtn.disabled = !endpointsReady || !!liveState.running;
         runBtn.textContent = liveState.running ? "Running..." : "Run trace";
       }}
 
@@ -6684,6 +6724,19 @@
       return 1200;
     }}
 
+    function networkGraphHistoryEdgeCacheTtlMs() {{
+      const pollMs = Number(refreshMs) || 0;
+      return Math.max(15000, pollMs * 4);
+    }}
+
+    function networkGraphHistoryEdgeCacheIsFresh(modeName) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      if (!networkGraphHistoryEdgeCache.has(mode)) return false;
+      const fetchedAtMs = Number(networkGraphHistoryEdgeFetchedAtMs.get(mode) || 0);
+      if (!Number.isFinite(fetchedAtMs) || fetchedAtMs <= 0) return false;
+      return (Date.now() - fetchedAtMs) < networkGraphHistoryEdgeCacheTtlMs();
+    }}
+
     function invalidateNetworkGraphRenderCache() {{
       networkGraphViewState.renderSourceSignature = "";
       networkGraphViewState.cachedNodeMap = null;
@@ -6694,10 +6747,12 @@
       networkGraphViewState.renderedLayoutSnapshot = null;
     }}
 
-    function ensureNetworkGraphHistoryEdges(modeName) {{
+    function ensureNetworkGraphHistoryEdges(modeName, options = {{}}) {{
       const mode = normalizeNetworkGraphEdgeMode(modeName);
+      const force = !!(options && options.force);
       if (!networkGraphEdgeModeUsesHistoryFetch(mode)) return;
-      if (networkGraphHistoryEdgeCache.has(mode) || networkGraphHistoryEdgeRequests.has(mode)) return;
+      if (networkGraphHistoryEdgeRequests.has(mode)) return;
+      if (!force && networkGraphHistoryEdgeCacheIsFresh(mode)) return;
 
       const params = new URLSearchParams();
       params.set("window", mode);
@@ -6711,6 +6766,7 @@
             : {{}};
           networkGraphHistoryEdgeCache.set(mode, edges);
           networkGraphHistoryCapsCache.set(mode, historyCaps);
+          networkGraphHistoryEdgeFetchedAtMs.set(mode, Date.now());
           invalidateNetworkGraphRenderCache();
           if (
             activeLayoutView === "network"
@@ -6740,6 +6796,7 @@
         .catch((_err) => {{
           networkGraphHistoryEdgeCache.set(mode, []);
           networkGraphHistoryCapsCache.set(mode, {{}});
+          networkGraphHistoryEdgeFetchedAtMs.set(mode, Date.now());
           invalidateNetworkGraphRenderCache();
           if (
             activeLayoutView === "network"
