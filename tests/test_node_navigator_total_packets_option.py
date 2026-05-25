@@ -335,7 +335,8 @@ def test_dashboard_js_tracks_unread_direct_counts_and_priority_sections_in_node_
     assert "const pinnedManualRows = [];" in js
     assert "const regularRows = [];" in js
     assert "unreadShell.hidden = pinnedUnreadRows.length <= 0;" in js
-    assert "meshtasticShell.hidden = meshtasticRows.length <= 0;" in js
+    assert "meshtasticShell.hidden = false;" in js
+    assert "No Meshtastic favorites yet." in js
     assert "pinnedShell.hidden = pinnedManualRows.length <= 0;" in js
     assert 'bindChatNodeNavigatorListInteractions(unreadList);' in js
     assert 'bindChatNodeNavigatorListInteractions(meshtasticList);' in js

@@ -27,7 +27,11 @@ def test_render_html_includes_node_visibility_lists_settings_panel() -> None:
     assert 'id="settings-node-visibility-selected"' in html
     assert 'id="settings-nodes-node-search-input"' in html
     assert 'id="settings-nodes-search-results"' in html
+    assert 'id="settings-meshtastic-list"' in html
+    assert "<h4>Meshtastic</h4>" in html
+    assert "Hardware favorites sync here automatically." in html
     assert 'id="settings-whitelist-list"' in html
+    assert "<h4>Frontend Allow-list</h4>" in html
     assert 'id="settings-blacklist-list"' in html
 
 
@@ -50,3 +54,13 @@ def test_dashboard_js_includes_node_visibility_lists_runtime_and_filtering() -> 
     assert 'const state = applyNodeVisibilityFiltersToState(rawState);' in js
     assert 'renderNodeVisibilityListsUi(latestRawState || latestState || {});' in js
     assert 'includeHiddenNodes: true,' in js
+    assert "function nodeVisibilityWhitelistFilterActive(state = latestRawState || latestState)" in js
+    assert "const meshtasticFavoriteIds = meshtasticFavoriteIdsForVisibility(state);" in js
+    assert "if (nodeVisibilityWhitelistFilterActive(state)) {" in js
+    assert "const meshtasticFavoriteIds = (typeof meshtasticFavoriteNodeIdsFromState === \"function\")" in js
+    assert "const nodeIsMeshtasticFavorite = (nodeId) => {" in js
+    assert "const renderMeshtasticList = (host, ids, emptyText) => {" in js
+    assert 'data-node-visibility-action="remove-meshtastic-favorite"' in js
+    assert "action === \"favorite\"" in js
+    assert "action === \"unfavorite\"" in js
+    assert "MESHTASTIC" in js

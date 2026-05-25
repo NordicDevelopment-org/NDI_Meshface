@@ -27,6 +27,10 @@ def test_dashboard_js_includes_meshtastic_favorite_sync_state() -> None:
     assert "CLIENT_BASE safeguard" in js
     assert 'const command = targetActive ? "set-favorite" : "remove-favorite";' in js
     assert 'const meshtasticShell = document.getElementById("chat-room-meshtastic-shell");' in js
+    assert "meshtasticShell.hidden = false;" in js
+    assert "No Meshtastic favorites yet." in js
+    assert 'action === "favorite"' in js
+    assert 'action === "unfavorite"' in js
 
 
 def test_dashboard_js_boot_and_poll_wire_meshtastic_favorite_sync() -> None:

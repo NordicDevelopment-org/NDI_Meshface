@@ -1659,7 +1659,7 @@
       if (meshtasticShell instanceof HTMLElement && meshtasticList instanceof HTMLElement) {{
         const nextMeshtasticHtml = meshtasticRows.length > 0
           ? meshtasticRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
-          : "";
+          : '<div class="chat-member-empty">No Meshtastic favorites yet.</div>';
         const previousMeshtasticHtml = (typeof meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list === "string")
           ? meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list
           : null;
@@ -1667,7 +1667,7 @@
           meshtasticList.innerHTML = nextMeshtasticHtml;
           meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list = nextMeshtasticHtml;
         }}
-        meshtasticShell.hidden = meshtasticRows.length <= 0;
+        meshtasticShell.hidden = false;
         if (meshtasticCountEl instanceof HTMLElement) {{
           meshtasticCountEl.textContent = String(meshtasticRows.length);
         }}

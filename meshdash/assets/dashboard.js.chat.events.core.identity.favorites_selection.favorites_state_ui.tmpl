@@ -947,31 +947,46 @@
       }}
     }}
 
-    function nodeVisibilityListsActive() {{
-      return nodeVisibilityWhitelistIds.size > 0 || nodeVisibilityBlacklistIds.size > 0;
+    function meshtasticFavoriteIdsForVisibility(state = latestRawState || latestState) {{
+      if (typeof meshtasticFavoriteNodeIdsFromState !== "function") return new Set();
+      const ids = meshtasticFavoriteNodeIdsFromState(state);
+      return ids instanceof Set ? ids : new Set();
     }}
 
-    function isNodeVisibleByLists(nodeId) {{
+    function nodeVisibilityWhitelistFilterActive(state = latestRawState || latestState) {{
+      if (nodeVisibilityWhitelistIds.size <= 0) return false;
+      const meshtasticFavoriteIds = meshtasticFavoriteIdsForVisibility(state);
+      for (const nodeId of nodeVisibilityWhitelistIds) {{
+        if (!meshtasticFavoriteIds.has(nodeId)) return true;
+      }}
+      return false;
+    }}
+
+    function nodeVisibilityListsActive(state = latestRawState || latestState) {{
+      return nodeVisibilityBlacklistIds.size > 0 || nodeVisibilityWhitelistFilterActive(state);
+    }}
+
+    function isNodeVisibleByLists(nodeId, state = latestRawState || latestState) {{
       const clean = normalizeNodeId(nodeId || "");
       if (!clean || clean === "^all" || clean === "^local") return true;
       if (!isSelectableNodeId(clean) && !isCanonicalNodeId(clean)) return true;
       if (nodeVisibilityBlacklistIds.has(clean)) return false;
-      if (nodeVisibilityWhitelistIds.size > 0) {{
+      if (nodeVisibilityWhitelistFilterActive(state)) {{
         return nodeVisibilityWhitelistIds.has(clean);
       }}
       return true;
     }}
 
-    function visibleFavoriteNodeIds() {{
-      return Array.from(favoriteNodeIds).filter((nodeId) => isNodeVisibleByLists(nodeId));
+    function visibleFavoriteNodeIds(state = latestRawState || latestState) {{
+      return Array.from(favoriteNodeIds).filter((nodeId) => isNodeVisibleByLists(nodeId, state));
     }}
 
-    function countVisibleOnlineNodes(nodes, nowUnix = Math.floor(Date.now() / 1000)) {{
+    function countVisibleOnlineNodes(nodes, nowUnix = Math.floor(Date.now() / 1000), state = latestRawState || latestState) {{
       const entries = Array.isArray(nodes) ? nodes : [];
       let count = 0;
       for (const node of entries) {{
         const nodeId = normalizeNodeId(node && node.id);
-        if (!isSelectableNodeId(nodeId) || !isNodeVisibleByLists(nodeId)) continue;
+        if (!isSelectableNodeId(nodeId) || !isNodeVisibleByLists(nodeId, state)) continue;
         const lastHeardUnix = nodeLastHeardUnix(node);
         if (!Number.isFinite(lastHeardUnix) || lastHeardUnix <= 0) continue;
         if ((nowUnix - lastHeardUnix) <= (2 * 60 * 60)) {{
@@ -981,25 +996,25 @@
       return count;
     }}
 
-    function nodeVisibilityMessagePasses(msg) {{
-      if (!nodeVisibilityListsActive()) return true;
+    function nodeVisibilityMessagePasses(msg, state = latestRawState || latestState) {{
+      if (!nodeVisibilityListsActive(state)) return true;
       const fromId = normalizeNodeId(
         (msg && (msg.from || msg.from_id || msg.fromId || msg.source || msg.source_id || msg.sourceId)) || ""
       );
       const toId = normalizeNodeId(
         (msg && (msg.to || msg.to_id || msg.toId || msg.destination || msg.dest || msg.dest_id || msg.destId)) || ""
       );
-      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId)) {{
+      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId, state)) {{
         return false;
       }}
-      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId)) {{
+      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId, state)) {{
         return false;
       }}
       return true;
     }}
 
-    function nodeVisibilityPacketPasses(packetEntry) {{
-      if (!nodeVisibilityListsActive()) return true;
+    function nodeVisibilityPacketPasses(packetEntry, state = latestRawState || latestState) {{
+      if (!nodeVisibilityListsActive(state)) return true;
       const summary = (packetEntry && typeof packetEntry.summary === "object") ? packetEntry.summary : packetEntry;
       const packet = (packetEntry && typeof packetEntry.packet === "object") ? packetEntry.packet : packetEntry;
       const fromId = normalizeNodeId(
@@ -1012,10 +1027,10 @@
         ?? (packet && (packet.to_id ?? packet.toId ?? packet.to ?? packet.destination))
         ?? ""
       );
-      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId)) {{
+      if ((isSelectableNodeId(fromId) || isCanonicalNodeId(fromId)) && !isNodeVisibleByLists(fromId, state)) {{
         return false;
       }}
-      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId)) {{
+      if ((isSelectableNodeId(toId) || isCanonicalNodeId(toId)) && !isNodeVisibleByLists(toId, state)) {{
         return false;
       }}
       return true;
@@ -1023,29 +1038,29 @@
 
     function applyNodeVisibilityFiltersToState(rawState) {{
       const safeState = rawState && typeof rawState === "object" ? rawState : {{}};
-      if (!nodeVisibilityListsActive()) return safeState;
+      if (!nodeVisibilityListsActive(safeState)) return safeState;
 
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const filteredNodes = nodes.filter((node) => isNodeVisibleByLists(node && node.id));
+      const filteredNodes = nodes.filter((node) => isNodeVisibleByLists(node && node.id, safeState));
       const historyCapsRaw = (safeState.history_caps && typeof safeState.history_caps === "object")
         ? safeState.history_caps
         : {{}};
       const filteredHistoryCaps = Object.fromEntries(
-        Object.entries(historyCapsRaw).filter(([nodeId]) => isNodeVisibleByLists(nodeId))
+        Object.entries(historyCapsRaw).filter(([nodeId]) => isNodeVisibleByLists(nodeId, safeState))
       );
       const trafficRaw = (safeState.traffic && typeof safeState.traffic === "object")
         ? safeState.traffic
         : {{}};
       const filteredEdges = Array.isArray(trafficRaw.edges)
         ? trafficRaw.edges.filter((edge) => (
-          isNodeVisibleByLists(edge && edge.from) && isNodeVisibleByLists(edge && edge.to)
+          isNodeVisibleByLists(edge && edge.from, safeState) && isNodeVisibleByLists(edge && edge.to, safeState)
         ))
         : [];
       const filteredRecentChat = Array.isArray(trafficRaw.recent_chat)
-        ? trafficRaw.recent_chat.filter((entry) => nodeVisibilityMessagePasses(entry))
+        ? trafficRaw.recent_chat.filter((entry) => nodeVisibilityMessagePasses(entry, safeState))
         : [];
       const filteredRecentPackets = Array.isArray(trafficRaw.recent_packets)
-        ? trafficRaw.recent_packets.filter((entry) => nodeVisibilityPacketPasses(entry))
+        ? trafficRaw.recent_packets.filter((entry) => nodeVisibilityPacketPasses(entry, safeState))
         : [];
       const summaryRaw = (safeState.summary && typeof safeState.summary === "object")
         ? safeState.summary
@@ -1057,7 +1072,7 @@
       const filteredSummary = {{
         ...summaryRaw,
         node_count: filteredNodes.length,
-        online_node_count: countVisibleOnlineNodes(filteredNodes),
+        online_node_count: countVisibleOnlineNodes(filteredNodes, Math.floor(Date.now() / 1000), safeState),
         nodes_with_position: nodesWithPosition,
         edge_count: filteredEdges.length,
         real_edge_count: realEdgeCount,
@@ -1080,7 +1095,7 @@
     function syncSelectedNodeWithVisibilityFilters() {{
       const selectedId = normalizeNodeId(selectedNodeId || "");
       if (!isSelectableNodeId(selectedId)) return false;
-      if (isNodeVisibleByLists(selectedId)) return false;
+      if (isNodeVisibleByLists(selectedId, latestRawState || latestState)) return false;
       if (typeof clearNodeSelection === "function") {{
         clearNodeSelection();
         return true;
@@ -1101,7 +1116,7 @@
       const clean = normalizeNodeId(nodeId || "");
       if (!isSelectableNodeId(clean)) return "Unlisted";
       if (nodeVisibilityBlacklistIds.has(clean)) return "Blocked";
-      if (nodeVisibilityWhitelistIds.size > 0) {{
+      if (nodeVisibilityWhitelistFilterActive(latestRawState || latestState)) {{
         return nodeVisibilityWhitelistIds.has(clean) ? "Allowed" : "Hidden";
       }}
       return "Visible";
@@ -1443,10 +1458,12 @@
       const selectedHost = document.getElementById("settings-node-visibility-selected");
       const searchInput = document.getElementById("settings-nodes-node-search-input");
       const resultsHost = document.getElementById("settings-nodes-search-results");
+      const meshtasticHost = document.getElementById("settings-meshtastic-list");
       const whitelistHost = document.getElementById("settings-whitelist-list");
       const blacklistHost = document.getElementById("settings-blacklist-list");
       if (!(selectedHost instanceof HTMLElement)) return;
       if (!(resultsHost instanceof HTMLElement)) return;
+      if (!(meshtasticHost instanceof HTMLElement)) return;
       if (!(whitelistHost instanceof HTMLElement)) return;
       if (!(blacklistHost instanceof HTMLElement)) return;
       if (searchInput instanceof HTMLInputElement && searchInput.value !== nodeVisibilitySettingsSearchQuery) {{
@@ -1455,6 +1472,18 @@
 
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const meshtasticFavoriteIds = (typeof meshtasticFavoriteNodeIdsFromState === "function")
+        ? meshtasticFavoriteNodeIdsFromState(safeState)
+        : new Set();
+      const nodeIsMeshtasticFavorite = (nodeId) => {{
+        const cleanNodeId = normalizeNodeId(nodeId || "");
+        if (!isSelectableNodeId(cleanNodeId)) return false;
+        const pending = meshtasticFavoritePendingDesiredByNodeId.get(cleanNodeId);
+        if (pending && typeof pending === "object" && Object.prototype.hasOwnProperty.call(pending, "active")) {{
+          return !!pending.active;
+        }}
+        return meshtasticFavoriteIds.has(cleanNodeId);
+      }};
       const nodesById = new Map(
         nodes
           .map((node) => [normalizeNodeId(node && node.id), node])
@@ -1464,6 +1493,14 @@
       if (isSelectableNodeId(selectedId)) {{
         const selectedName = resolveNodeVisibilityEntryName(selectedId, nodesById);
         const selectedRule = nodeVisibilityRuleLabel(selectedId);
+        const selectedIsMeshtasticFavorite = nodeIsMeshtasticFavorite(selectedId);
+        const selectedCanSyncMeshtasticFavorite = isCanonicalNodeId(selectedId);
+        const selectedFavoriteSyncInFlight = !!(
+          selectedCanSyncMeshtasticFavorite
+          && meshtasticFavoriteSyncInFlightNodeIds.has(selectedId)
+        );
+        const selectedFavoriteAction = selectedIsMeshtasticFavorite ? "unfavorite" : "favorite";
+        const selectedFavoriteLabel = selectedIsMeshtasticFavorite ? "Unfavorite" : "Favorite";
         selectedHost.classList.remove("node-visibility-card-empty");
         selectedHost.innerHTML = `<div class="node-visibility-item">
           <div class="node-visibility-meta">
@@ -1476,6 +1513,9 @@
           <div class="node-visibility-actions">
             <button type="button" class="btn btn-secondary" data-node-visibility-action="allow" data-node-id="${{escAttr(selectedId)}}"${{nodeVisibilityWhitelistIds.has(selectedId) ? " disabled" : ""}}>Allow</button>
             <button type="button" class="btn btn-secondary" data-node-visibility-action="block" data-node-id="${{escAttr(selectedId)}}"${{nodeVisibilityBlacklistIds.has(selectedId) ? " disabled" : ""}}>Block</button>
+            ${{selectedCanSyncMeshtasticFavorite
+              ? `<button type="button" class="btn btn-secondary" data-node-visibility-action="${{escAttr(selectedFavoriteAction)}}" data-node-id="${{escAttr(selectedId)}}"${{selectedFavoriteSyncInFlight ? " disabled" : ""}}>${{escAttr(selectedFavoriteLabel)}}</button>`
+              : ""}}
           </div>
         </div>`;
       }} else {{
@@ -1493,17 +1533,29 @@
         resultsHost.innerHTML = searchRows.map((row) => {{
           const cleanNodeId = normalizeNodeId(row && row.nodeId);
           const ruleLabel = nodeVisibilityRuleLabel(cleanNodeId);
+          const isMeshtasticFavorite = nodeIsMeshtasticFavorite(cleanNodeId);
+          const canSyncMeshtasticFavorite = isCanonicalNodeId(cleanNodeId);
+          const favoriteSyncInFlight = !!(
+            canSyncMeshtasticFavorite
+            && meshtasticFavoriteSyncInFlightNodeIds.has(cleanNodeId)
+          );
+          const favoriteAction = isMeshtasticFavorite ? "unfavorite" : "favorite";
+          const favoriteLabel = isMeshtasticFavorite ? "Unfavorite" : "Favorite";
           return `<div class="node-visibility-item">
             <div class="node-visibility-meta">
               <div class="node-visibility-name-row">
                 <span class="node-visibility-name">${{escAttr(row && row.name ? row.name : cleanNodeId)}}</span>
                 <span class="node-visibility-badge">${{escAttr(ruleLabel)}}</span>
+                ${{isMeshtasticFavorite ? '<span class="node-visibility-badge">MESHTASTIC</span>' : ""}}
               </div>
               <div class="node-visibility-id">${{escAttr(cleanNodeId)}}</div>
             </div>
             <div class="node-visibility-actions">
               <button type="button" class="btn btn-secondary" data-node-visibility-action="allow" data-node-id="${{escAttr(cleanNodeId)}}"${{nodeVisibilityWhitelistIds.has(cleanNodeId) ? " disabled" : ""}}>Allow</button>
               <button type="button" class="btn btn-secondary" data-node-visibility-action="block" data-node-id="${{escAttr(cleanNodeId)}}"${{nodeVisibilityBlacklistIds.has(cleanNodeId) ? " disabled" : ""}}>Block</button>
+              ${{canSyncMeshtasticFavorite
+                ? `<button type="button" class="btn btn-secondary" data-node-visibility-action="${{escAttr(favoriteAction)}}" data-node-id="${{escAttr(cleanNodeId)}}"${{favoriteSyncInFlight ? " disabled" : ""}}>${{escAttr(favoriteLabel)}}</button>`
+                : ""}}
             </div>
           </div>`;
         }}).join("");
@@ -1530,6 +1582,35 @@
         }}).join("");
       }};
 
+      const renderMeshtasticList = (host, ids, emptyText) => {{
+        if (!ids.length) {{
+          host.innerHTML = `<div class="node-visibility-empty">${{escAttr(emptyText)}}</div>`;
+          return;
+        }}
+        host.innerHTML = ids.map((nodeId) => {{
+          const name = resolveNodeVisibilityEntryName(nodeId, nodesById);
+          const canSyncMeshtasticFavorite = isCanonicalNodeId(nodeId);
+          const favoriteSyncInFlight = !!(
+            canSyncMeshtasticFavorite
+            && meshtasticFavoriteSyncInFlightNodeIds.has(nodeId)
+          );
+          return `<div class="node-visibility-item">
+            <div class="node-visibility-meta">
+              <div class="node-visibility-name-row">
+                <span class="node-visibility-name">${{escAttr(name)}}</span>
+                <span class="node-visibility-badge">MESHTASTIC</span>
+              </div>
+              <div class="node-visibility-id">${{escAttr(nodeId)}}</div>
+            </div>
+            <div class="node-visibility-actions">
+              ${{canSyncMeshtasticFavorite
+                ? `<button type="button" class="btn btn-secondary" data-node-visibility-action="remove-meshtastic-favorite" data-node-id="${{escAttr(nodeId)}}"${{favoriteSyncInFlight ? " disabled" : ""}}>Remove</button>`
+                : ""}}
+            </div>
+          </div>`;
+        }}).join("");
+      }};
+
       const sortIdsByName = (ids) => ids.slice().sort((a, b) => {{
         const aName = resolveNodeVisibilityEntryName(a, nodesById);
         const bName = resolveNodeVisibilityEntryName(b, nodesById);
@@ -1537,11 +1618,16 @@
         if (nameDiff !== 0) return nameDiff;
         return String(a || "").localeCompare(String(b || ""));
       }});
+      renderMeshtasticList(
+        meshtasticHost,
+        sortIdsByName(Array.from(meshtasticFavoriteIds)),
+        "No Meshtastic favorites yet."
+      );
       renderList(
         whitelistHost,
         sortIdsByName(Array.from(nodeVisibilityWhitelistIds)),
         "remove-allow",
-        "No whitelist entries yet. Leave this empty to show all non-blacklisted nodes."
+        "No frontend allow-list entries yet."
       );
       renderList(
         blacklistHost,
@@ -1577,6 +1663,16 @@
             removeNodeVisibilityWhitelistId(nodeId);
           }} else if (action === "remove-block") {{
             removeNodeVisibilityBlacklistId(nodeId);
+          }} else if (action === "favorite") {{
+            if (typeof togglePinnedNode === "function") {{
+              togglePinnedNode(nodeId, true);
+              renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+            }}
+          }} else if (action === "unfavorite" || action === "remove-meshtastic-favorite") {{
+            if (typeof togglePinnedNode === "function") {{
+              togglePinnedNode(nodeId, false);
+              renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+            }}
           }}
           return;
         }}
