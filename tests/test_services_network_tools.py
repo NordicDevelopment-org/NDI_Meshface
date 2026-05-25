@@ -249,6 +249,8 @@ class _FakeLocalNode:
         self.reboot_calls: list[int] = []
         self.shutdown_calls: list[int] = []
         self.set_time_calls: list[int] = []
+        self.set_favorite_calls: list[str] = []
+        self.remove_favorite_calls: list[str] = []
         self.user = {
             "id": f"!{node_num:08x}",
             "longName": "Local Ridge",
@@ -280,6 +282,14 @@ class _FakeLocalNode:
     def setTime(self, timeSec: int = 0):
         self.set_time_calls.append(timeSec)
         return _FakeSentPacket(3333)
+
+    def setFavorite(self, nodeId: str):
+        self.set_favorite_calls.append(str(nodeId))
+        return _FakeSentPacket(9111)
+
+    def removeFavorite(self, nodeId: str):
+        self.remove_favorite_calls.append(str(nodeId))
+        return _FakeSentPacket(9222)
 
 
 class _FakeIface:
@@ -669,6 +679,48 @@ def test_run_network_tool_device_metadata_success(monkeypatch: pytest.MonkeyPatc
     assert response["destination"] == "!abcd1234"
     assert response["console_lines"] == ["[device-metadata] !abcd1234 | request sent"]
     assert iface.remote_nodes["!abcd1234"].get_metadata_calls == 1
+
+
+def test_run_network_tool_set_favorite_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="set_favorite", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "set_favorite"
+    assert response["destination"] == "!abcd1234"
+    assert response["sent_packet_id"] == 9111
+    assert response["console_lines"] == ["[set-favorite] !abcd1234 | request sent"]
+    assert iface.localNode.set_favorite_calls == ["!abcd1234"]
+
+
+def test_run_network_tool_remove_favorite_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "meshdash.services_network_tools._load_meshtastic_modules",
+        lambda: (_FakeChannelPb2, _FakeMeshPb2, _FakePortnumsPb2, _FakeTelemetryPb2),
+    )
+    iface = _FakeIface(None)
+
+    response = run_network_tool(
+        NetworkToolRequest(command="remove_favorite", destination="!abcd1234"),
+        iface=iface,
+        send_lock=threading.Lock(),
+    )
+
+    assert response["ok"] is True
+    assert response["command"] == "remove_favorite"
+    assert response["destination"] == "!abcd1234"
+    assert response["sent_packet_id"] == 9222
+    assert response["console_lines"] == ["[remove-favorite] !abcd1234 | request sent"]
+    assert iface.localNode.remove_favorite_calls == ["!abcd1234"]
 
 
 def test_run_network_tool_reset_nodedb_requires_confirm(monkeypatch: pytest.MonkeyPatch) -> None:

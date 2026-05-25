@@ -62,6 +62,12 @@ _COMMAND_ALIASES = {
     "factory-reset-device": "factory_reset_device",
     "--factory-reset-device": "factory_reset_device",
     "factory_reset_device": "factory_reset_device",
+    "set-favorite": "set_favorite",
+    "--set-favorite": "set_favorite",
+    "set_favorite": "set_favorite",
+    "remove-favorite": "remove_favorite",
+    "--remove-favorite": "remove_favorite",
+    "remove_favorite": "remove_favorite",
 }
 
 _DESTINATION_OPTIONAL_COMMANDS = {

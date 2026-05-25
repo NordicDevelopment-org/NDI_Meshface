@@ -154,6 +154,7 @@
         '#nodes-table tbody tr[data-node-id="%ID%"]',
         '#chat-feed .chat-feed-item[data-node-id="%ID%"]',
         '#chat-room-unread-list .chat-member-item[data-node-id="%ID%"]',
+        '#chat-room-meshtastic-list .chat-member-item[data-node-id="%ID%"]',
         '#chat-room-pinned-list .chat-member-item[data-node-id="%ID%"]',
         '#chat-room-list .chat-member-item[data-node-id="%ID%"]',
         '#favorites-list .favorite-node-item[data-node-id="%ID%"]',
@@ -409,6 +410,7 @@
       if (!suppressChatRosterSelectionScroll) {{
         for (const chatRoomList of [
           document.getElementById("chat-room-unread-list"),
+          document.getElementById("chat-room-meshtastic-list"),
           document.getElementById("chat-room-pinned-list"),
           document.getElementById("chat-room-list"),
         ]) {{

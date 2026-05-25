@@ -171,3 +171,21 @@ def test_parse_network_tool_request_parses_confirm_bool() -> None:
 
     assert request.command == "factory_reset"
     assert request.confirm is True
+
+
+def test_parse_network_tool_request_normalizes_set_favorite_command() -> None:
+    raw = b'{"command":"set-favorite","destination":"!abcd1234"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "set_favorite"
+    assert request.destination == "!abcd1234"
+
+
+def test_parse_network_tool_request_normalizes_remove_favorite_command() -> None:
+    raw = b'{"command":"remove-favorite","destination":"!abcd1234"}'
+
+    request = parse_network_tool_request(raw, to_int_fn=to_int)
+
+    assert request.command == "remove_favorite"
+    assert request.destination == "!abcd1234"

@@ -83,6 +83,9 @@ def test_render_html_adds_unread_and_manual_pin_node_shells() -> None:
     assert 'id="chat-room-unread-shell"' in html
     assert 'id="chat-room-unread-list"' in html
     assert 'id="chat-room-unread-count"' in html
+    assert 'id="chat-room-meshtastic-shell"' in html
+    assert 'id="chat-room-meshtastic-list"' in html
+    assert 'id="chat-room-meshtastic-count"' in html
     assert 'id="chat-room-pinned-shell"' in html
     assert 'id="chat-room-pinned-list"' in html
     assert 'id="chat-room-pinned-count"' in html
@@ -325,13 +328,17 @@ def test_dashboard_js_tracks_unread_direct_counts_and_priority_sections_in_node_
     assert "const unreadDirectByPeer = new Map();" in js
     assert "function normalizeChatNodeNavigatorUnreadDirectByPeer(source = null) {" in js
     assert 'const unreadShell = document.getElementById("chat-room-unread-shell");' in js
+    assert 'const meshtasticShell = document.getElementById("chat-room-meshtastic-shell");' in js
     assert 'const pinnedShell = document.getElementById("chat-room-pinned-shell");' in js
+    assert "const meshtasticRows = [];" in js
     assert "const pinnedUnreadRows = [];" in js
     assert "const pinnedManualRows = [];" in js
     assert "const regularRows = [];" in js
     assert "unreadShell.hidden = pinnedUnreadRows.length <= 0;" in js
+    assert "meshtasticShell.hidden = meshtasticRows.length <= 0;" in js
     assert "pinnedShell.hidden = pinnedManualRows.length <= 0;" in js
     assert 'bindChatNodeNavigatorListInteractions(unreadList);' in js
+    assert 'bindChatNodeNavigatorListInteractions(meshtasticList);' in js
     assert 'bindChatNodeNavigatorListInteractions(pinnedList);' in js
     assert "const unreadDirectCount = Math.max(0, Math.trunc(Number(unreadDirectByPeer.get(nodeId) || 0)));" in js
     assert 'tooltipLines.splice(4, 0, `Unread direct messages: ${unreadDirectCount}`);' in js

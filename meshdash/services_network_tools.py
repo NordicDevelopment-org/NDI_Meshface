@@ -1209,6 +1209,98 @@ def _run_factory_reset_device(
     )
 
 
+def _run_set_favorite(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    node_id = str(request.destination or "").strip()
+    if not node_id:
+        raise ValueError("Missing destination")
+
+    local_node = getattr(iface, "localNode", None)
+    set_favorite = getattr(local_node, "setFavorite", None)
+    if not callable(set_favorite):
+        return _error_response(
+            request,
+            summary_label="set-favorite",
+            detail="Connected local node does not support setFavorite()",
+        )
+
+    try:
+        with send_lock:
+            sent_packet = set_favorite(node_id)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="set-favorite",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="set-favorite",
+            detail=f"Set favorite failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "set_favorite",
+        "destination": node_id,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[set-favorite] {node_id} | request sent"],
+    }
+
+
+def _run_remove_favorite(
+    request: NetworkToolRequest,
+    *,
+    iface: object,
+    send_lock,
+    to_int_fn=to_int,
+) -> dict[str, object]:
+    node_id = str(request.destination or "").strip()
+    if not node_id:
+        raise ValueError("Missing destination")
+
+    local_node = getattr(iface, "localNode", None)
+    remove_favorite = getattr(local_node, "removeFavorite", None)
+    if not callable(remove_favorite):
+        return _error_response(
+            request,
+            summary_label="remove-favorite",
+            detail="Connected local node does not support removeFavorite()",
+        )
+
+    try:
+        with send_lock:
+            sent_packet = remove_favorite(node_id)
+        sent_packet_id = to_int_fn(getattr(sent_packet, "id", None))
+    except ValueError as exc:
+        return _error_response(
+            request,
+            summary_label="remove-favorite",
+            detail=str(exc),
+        )
+    except Exception as exc:
+        return _error_response(
+            request,
+            summary_label="remove-favorite",
+            detail=f"Remove favorite failed: {exc}",
+        )
+
+    return {
+        "ok": True,
+        "command": "remove_favorite",
+        "destination": node_id,
+        "sent_packet_id": sent_packet_id,
+        "console_lines": [f"[remove-favorite] {node_id} | request sent"],
+    }
+
+
 def _run_send_alert(
     request: NetworkToolRequest,
     *,
@@ -1967,6 +2059,20 @@ def run_network_tool(
         )
     if request.command == "factory_reset_device":
         return _run_factory_reset_device(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "set_favorite":
+        return _run_set_favorite(
+            request,
+            iface=iface,
+            send_lock=send_lock,
+            to_int_fn=to_int_fn,
+        )
+    if request.command == "remove_favorite":
+        return _run_remove_favorite(
             request,
             iface=iface,
             send_lock=send_lock,

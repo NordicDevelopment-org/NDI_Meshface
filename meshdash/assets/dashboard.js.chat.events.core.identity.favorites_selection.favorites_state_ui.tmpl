@@ -839,8 +839,26 @@
       const nextFavoriteIds = meshtasticFavoriteNodeIdsFromState(state);
       let pinnedChanged = false;
       let syncStateChanged = false;
+      const pendingTimeoutMs = 30000;
+
+      for (const [rawNodeId, pendingRaw] of Array.from(meshtasticFavoritePendingDesiredByNodeId.entries())) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        if (!isSelectableNodeId(nodeId)) {{
+          meshtasticFavoritePendingDesiredByNodeId.delete(rawNodeId);
+          continue;
+        }}
+        const pending = (pendingRaw && typeof pendingRaw === "object") ? pendingRaw : {{}};
+        const desiredActive = !!pending.active;
+        const sinceMs = Number(pending.sinceMs);
+        const ageMs = Number.isFinite(sinceMs) ? Math.max(0, Date.now() - sinceMs) : 0;
+        const hasFavorite = nextFavoriteIds.has(nodeId);
+        if (hasFavorite === desiredActive || ageMs > pendingTimeoutMs) {{
+          meshtasticFavoritePendingDesiredByNodeId.delete(rawNodeId);
+        }}
+      }}
 
       for (const nodeId of Array.from(meshtasticFavoriteSyncedPinnedNodeIds)) {{
+        if (meshtasticFavoritePendingDesiredByNodeId.has(nodeId)) continue;
         if (nextFavoriteIds.has(nodeId)) continue;
         meshtasticFavoriteSyncedPinnedNodeIds.delete(nodeId);
         syncStateChanged = true;
@@ -851,6 +869,7 @@
       }}
 
       for (const nodeId of nextFavoriteIds) {{
+        if (meshtasticFavoritePendingDesiredByNodeId.has(nodeId)) continue;
         if (!meshtasticFavoriteSyncedPinnedNodeIds.has(nodeId)) {{
           meshtasticFavoriteSyncedPinnedNodeIds.add(nodeId);
           syncStateChanged = true;

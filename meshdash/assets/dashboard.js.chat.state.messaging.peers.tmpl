@@ -392,6 +392,7 @@
     function resetChatNodeNavigatorViewport() {{
       const scrollLists = [
         document.getElementById("chat-room-unread-list"),
+        document.getElementById("chat-room-meshtastic-list"),
         document.getElementById("chat-room-pinned-list"),
         document.getElementById("chat-room-list"),
       ].filter((listEl) => listEl instanceof HTMLElement);
@@ -1438,12 +1439,17 @@
     function syncChatNodeNavigatorSearchBounds() {{
       const panel = document.getElementById("chat-left-panel");
       const unreadList = document.getElementById("chat-room-unread-list");
+      const meshtasticList = document.getElementById("chat-room-meshtastic-list");
       const pinnedList = document.getElementById("chat-room-pinned-list");
       const roomList = document.getElementById("chat-room-list");
       const bottomBar = document.querySelector(".chat-left-bottom-bar");
       const anchor = (
         unreadList instanceof HTMLElement
           ? unreadList.querySelector(".chat-member-item, .chat-member-empty")
+          : null
+      ) || (
+        meshtasticList instanceof HTMLElement
+          ? meshtasticList.querySelector(".chat-member-item, .chat-member-empty")
           : null
       ) || (
         pinnedList instanceof HTMLElement
@@ -1487,6 +1493,9 @@
       const unreadShell = document.getElementById("chat-room-unread-shell");
       const unreadList = document.getElementById("chat-room-unread-list");
       const unreadCountEl = document.getElementById("chat-room-unread-count");
+      const meshtasticShell = document.getElementById("chat-room-meshtastic-shell");
+      const meshtasticList = document.getElementById("chat-room-meshtastic-list");
+      const meshtasticCountEl = document.getElementById("chat-room-meshtastic-count");
       const pinnedShell = document.getElementById("chat-room-pinned-shell");
       const pinnedList = document.getElementById("chat-room-pinned-list");
       const pinnedCountEl = document.getElementById("chat-room-pinned-count");
@@ -1598,7 +1607,11 @@
         }})
       ));
       chatRosterModel = rosterAll;
+      const meshtasticFavoriteIds = (typeof meshtasticFavoriteNodeIdsFromState === "function")
+        ? meshtasticFavoriteNodeIdsFromState(safeState)
+        : new Set();
       const pinnedUnreadRows = [];
+      const meshtasticRows = [];
       const pinnedManualRows = [];
       const historyPriorityRows = [];
       const regularRows = [];
@@ -1606,6 +1619,8 @@
         const nodeId = normalizeNodeId(item && item.id);
         if (chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, nodeId) > 0) {{
           pinnedUnreadRows.push(item);
+        }} else if (meshtasticFavoriteIds.has(nodeId)) {{
+          meshtasticRows.push(item);
         }} else if ((typeof isPinnedNode === "function") && isPinnedNode(nodeId)) {{
           pinnedManualRows.push(item);
         }} else if (pinDirectHistory && directHistoryPeerIds.has(nodeId)) {{
@@ -1641,6 +1656,22 @@
           unreadCountEl.textContent = String(pinnedUnreadRows.length);
         }}
       }}
+      if (meshtasticShell instanceof HTMLElement && meshtasticList instanceof HTMLElement) {{
+        const nextMeshtasticHtml = meshtasticRows.length > 0
+          ? meshtasticRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
+          : "";
+        const previousMeshtasticHtml = (typeof meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list === "string")
+          ? meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list
+          : null;
+        if (previousMeshtasticHtml !== nextMeshtasticHtml) {{
+          meshtasticList.innerHTML = nextMeshtasticHtml;
+          meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list = nextMeshtasticHtml;
+        }}
+        meshtasticShell.hidden = meshtasticRows.length <= 0;
+        if (meshtasticCountEl instanceof HTMLElement) {{
+          meshtasticCountEl.textContent = String(meshtasticRows.length);
+        }}
+      }}
       if (pinnedShell instanceof HTMLElement && pinnedList instanceof HTMLElement) {{
         const nextPinnedHtml = pinnedManualRows.length > 0
           ? pinnedManualRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
@@ -1658,6 +1689,7 @@
         }}
       }}
       const orderedRoomRows = historyPriorityRows.concat(regularRows);
+      const pinnedSectionCount = pinnedUnreadRows.length + meshtasticRows.length + pinnedManualRows.length;
       const nextRoomListHtml = orderedRoomRows.length > 0
         ? orderedRoomRows.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
             nowUnix,
@@ -1670,9 +1702,9 @@
             directHistoryPeerIds,
             resolveChatNodeFreshnessFn,
           }})).join("")
-        : (((pinnedUnreadRows.length + pinnedManualRows.length) <= 0 && rosterQuery)
+        : ((pinnedSectionCount <= 0 && rosterQuery)
             ? '<div class="chat-member-empty">No users match this search.</div>'
-            : ((pinnedUnreadRows.length + pinnedManualRows.length) <= 0
+            : (pinnedSectionCount <= 0
                 ? '<div class="chat-member-empty">No users discovered yet.</div>'
                 : ""));
       const nextMarkup = String(nextRoomListHtml == null ? "" : nextRoomListHtml);
@@ -1684,10 +1716,12 @@
         roomList.__meshLastInnerHtml_chat_room_list = nextMarkup;
       }}
       hydrateChatNodeNavigatorCities(unreadList);
+      hydrateChatNodeNavigatorCities(meshtasticList);
       hydrateChatNodeNavigatorCities(pinnedList);
       hydrateChatNodeNavigatorCities(roomList);
       bindChatNodeNavigatorListInteractions(roomList);
       bindChatNodeNavigatorListInteractions(unreadList);
+      bindChatNodeNavigatorListInteractions(meshtasticList);
       bindChatNodeNavigatorListInteractions(pinnedList);
       scheduleChatNodeNavigatorSearchBoundsSync();
       if (chatNodeNavigatorSelectionScrollLocked) {{

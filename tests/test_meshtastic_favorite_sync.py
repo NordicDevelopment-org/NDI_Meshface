@@ -15,9 +15,18 @@ def test_dashboard_js_includes_meshtastic_favorite_sync_state() -> None:
 
     assert 'const meshtasticFavoritePinnedSyncStorageKey = "meshDashboardMeshtasticFavoritePinnedSyncIdsV1";' in js
     assert "const meshtasticFavoriteSyncedPinnedNodeIds = new Set();" in js
+    assert "const meshtasticFavoriteSyncInFlightNodeIds = new Set();" in js
+    assert "const meshtasticFavoritePendingDesiredByNodeId = new Map();" in js
     assert "function loadMeshtasticFavoritePinnedSyncIds()" in js
     assert "function persistMeshtasticFavoritePinnedSyncIds()" in js
     assert "function syncPinnedNodesWithMeshtasticFavorites(state = latestState)" in js
+    assert "const pendingTimeoutMs = 30000;" in js
+    assert "function connectedDeviceRoleForFavoriteSync(state = latestState)" in js
+    assert "async function syncPinnedNodeToMeshtasticFavorite(nodeId, targetActive, previousActive)" in js
+    assert "CLIENT_BASE should only favorite nodes you control. Continue?" in js
+    assert "CLIENT_BASE safeguard" in js
+    assert 'const command = targetActive ? "set-favorite" : "remove-favorite";' in js
+    assert 'const meshtasticShell = document.getElementById("chat-room-meshtastic-shell");' in js
 
 
 def test_dashboard_js_boot_and_poll_wire_meshtastic_favorite_sync() -> None:
