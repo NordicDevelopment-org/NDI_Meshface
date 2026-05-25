@@ -238,7 +238,7 @@
         const state = applyNodeVisibilityFiltersToState(rawState);
         latestState = state;
         syncSelectedNodeWithVisibilityFilters();
-        syncPinnedNodesWithMeshtasticFavorites(state);
+        syncNodeTagsWithMeshtasticFavorites(rawState);
         if (mapLiveActivityEnabled) {{
           syncNetworkMapPacketActivity(state);
         }}

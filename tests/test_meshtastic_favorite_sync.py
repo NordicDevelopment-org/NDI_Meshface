@@ -13,16 +13,15 @@ def test_dashboard_js_includes_meshtastic_favorite_sync_state() -> None:
         node_history_max_points=240,
     )
 
-    assert 'const meshtasticFavoritePinnedSyncStorageKey = "meshDashboardMeshtasticFavoritePinnedSyncIdsV1";' in js
-    assert "const meshtasticFavoriteSyncedPinnedNodeIds = new Set();" in js
     assert "const meshtasticFavoriteSyncInFlightNodeIds = new Set();" in js
     assert "const meshtasticFavoritePendingDesiredByNodeId = new Map();" in js
-    assert "function loadMeshtasticFavoritePinnedSyncIds()" in js
-    assert "function persistMeshtasticFavoritePinnedSyncIds()" in js
-    assert "function syncPinnedNodesWithMeshtasticFavorites(state = latestState)" in js
+    assert 'const meshtasticFavoriteTagPresetId = "meshtastic-favorite";' in js
+    assert "function meshtasticFavoriteNodeIdsWithPending(state = latestState)" in js
+    assert "function syncNodeTagsWithMeshtasticFavorites(state = latestState)" in js
     assert "const pendingTimeoutMs = 30000;" in js
     assert "function connectedDeviceRoleForFavoriteSync(state = latestState)" in js
-    assert "async function syncPinnedNodeToMeshtasticFavorite(nodeId, targetActive, previousActive)" in js
+    assert "async function requestMeshtasticFavoriteTagSync(nodeId, targetActive)" in js
+    assert "function toggleMeshtasticFavoriteNode(nodeId, forceActive = null)" in js
     assert "CLIENT_BASE should only favorite nodes you control. Continue?" in js
     assert "CLIENT_BASE safeguard" in js
     assert 'const command = targetActive ? "set-favorite" : "remove-favorite";' in js
@@ -40,5 +39,5 @@ def test_dashboard_js_boot_and_poll_wire_meshtastic_favorite_sync() -> None:
         node_history_max_points=240,
     )
 
-    assert 'runBootStep("loadMeshtasticFavoritePinnedSyncIds", () => loadMeshtasticFavoritePinnedSyncIds());' in js
-    assert "syncPinnedNodesWithMeshtasticFavorites(state);" in js
+    assert 'runBootStep("loadMeshtasticFavoritePinnedSyncIds", () => loadMeshtasticFavoritePinnedSyncIds());' not in js
+    assert "syncNodeTagsWithMeshtasticFavorites(rawState);" in js

@@ -24,6 +24,9 @@
       const selectedPresetId = currentTag && currentTag.presetId
         ? currentTag.presetId
         : normalizeNodeTagPresetId(activeNodeTagPresetId || currentPreset.id || "tag-default", "tag-default");
+      const selectedPresetLocked = (typeof isNodeTagPresetIdLocked === "function")
+        ? isNodeTagPresetIdLocked(selectedPresetId)
+        : false;
       const presets = nodeTagPresetEntries();
       const optionsHtml = presets.map((preset) => {{
         const presetId = normalizeNodeTagPresetId(preset.id, "tag-default");
@@ -39,11 +42,11 @@
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-label">Name</label>
-          <input id="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(normalizeNodeTagPresetName(currentPreset.name, "Tagged"))}}" placeholder="Tag name" />
+          <input id="favorite-menu-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(normalizeNodeTagPresetName(currentPreset.name, "Tagged"))}}" placeholder="Tag name"${{selectedPresetLocked ? " disabled" : ""}} />
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-label">Tag Emoji</label>
-          <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(normalizeNodeTagEmoji(currentPreset.emoji, ""))}}" placeholder="Optional emoji" />
+          <input id="favorite-menu-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(normalizeNodeTagEmoji(currentPreset.emoji, ""))}}" placeholder="Optional emoji"${{selectedPresetLocked ? " disabled" : ""}} />
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="favorite-menu-node-emoji-input" class="favorite-menu-tag-editor-label">Node Icon</label>
@@ -51,14 +54,14 @@
         </div>
         <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
           <label for="favorite-menu-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
-          <input id="favorite-menu-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(normalizeNodeTagColor(currentPreset.color, "#2aa85a"))}}" />
+          <input id="favorite-menu-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(normalizeNodeTagColor(currentPreset.color, "#2aa85a"))}}"${{selectedPresetLocked ? " disabled" : ""}} />
           <label for="favorite-menu-tag-vibrance-input" class="favorite-menu-tag-editor-label">Vibrance</label>
-          <input id="favorite-menu-tag-vibrance-input" class="favorite-menu-tag-vibrance-input" type="range" min="0" max="100" step="1" value="${{escAttr(clampNodeTagVibrance(currentPreset.vibrance, 70))}}" />
+          <input id="favorite-menu-tag-vibrance-input" class="favorite-menu-tag-vibrance-input" type="range" min="0" max="100" step="1" value="${{escAttr(clampNodeTagVibrance(currentPreset.vibrance, 70))}}"${{selectedPresetLocked ? " disabled" : ""}} />
           <span id="favorite-menu-tag-vibrance-value" class="favorite-menu-tag-vibrance-value">${{escAttr(clampNodeTagVibrance(currentPreset.vibrance, 70))}}%</span>
           <span id="favorite-menu-tag-preview" class="favorite-menu-tag-chip favorite-menu-tag-chip-preview" style="${{escAttr(nodeTagStyleVars({{ preset: currentPreset }}))}}" aria-hidden="true"></span>
         </div>
         <div class="favorite-menu-tag-editor-actions">
-          <button id="favorite-menu-tag-save-preset-btn" class="btn btn-secondary" type="button">Save Preset</button>
+          <button id="favorite-menu-tag-save-preset-btn" class="btn btn-secondary" type="button"${{selectedPresetLocked ? " disabled" : ""}}>Save Preset</button>
           <button id="favorite-menu-tag-assign-btn" class="btn btn-secondary" type="button">Assign</button>
           <button id="favorite-menu-node-emoji-save-btn" class="btn btn-secondary" type="button">Save Icon</button>
           <button id="favorite-menu-node-emoji-clear-btn" class="btn btn-secondary" type="button">Clear Icon</button>
@@ -125,6 +128,17 @@
         preview.innerHTML = (nodeEmoji || emoji) ? `<span class="favorite-menu-tag-chip-emoji" aria-hidden="true">${{escAttr(nodeEmoji || emoji)}}</span>` : "";
       }};
 
+      const applyPresetLockState = (presetId) => {{
+        const locked = (typeof isNodeTagPresetIdLocked === "function")
+          ? isNodeTagPresetIdLocked(presetId)
+          : false;
+        nameInput.disabled = locked;
+        emojiInput.disabled = locked;
+        colorInput.disabled = locked;
+        vibranceInput.disabled = locked;
+        savePresetBtn.disabled = locked;
+      }};
+
       const loadPresetIntoEditor = (presetId) => {{
         const preset = nodeTagPresetForId(presetId);
         if (!preset) return;
@@ -133,6 +147,7 @@
         nodeEmojiInput.value = nodeEmojiOverrideForNode(cleanNodeId);
         colorInput.value = normalizeNodeTagColor(preset.color, "#2aa85a");
         vibranceInput.value = String(clampNodeTagVibrance(preset.vibrance, 70));
+        applyPresetLockState(preset.id);
         applyPreview();
       }};
 
@@ -776,10 +791,9 @@
       return "CLIENT";
     }}
 
-    async function syncPinnedNodeToMeshtasticFavorite(nodeId, targetActive, previousActive) {{
+    async function requestMeshtasticFavoriteTagSync(nodeId, targetActive) {{
       const normalized = normalizeNodeId(nodeId);
-      if (!isCanonicalNodeId(normalized)) return true;
-      if (targetActive === previousActive) return true;
+      if (!isCanonicalNodeId(normalized)) return false;
       if (meshtasticFavoriteSyncInFlightNodeIds.has(normalized)) {{
         setChatSendStatus(`Favorite sync already in progress for ${{normalized}}.`);
         return false;
@@ -791,7 +805,6 @@
             "CLIENT_BASE should only favorite nodes you control. Continue?"
           );
           if (!approved) {{
-            applyPinnedNodeState(normalized, previousActive);
             setChatSendStatus(
               `Canceled Meshtastic favorite sync for ${{normalized}} (CLIENT_BASE safeguard).`,
               true
@@ -801,9 +814,8 @@
         }}
       }}
       if (typeof postNetworkToolCommand !== "function") {{
-        applyPinnedNodeState(normalized, previousActive);
         setChatSendStatus(
-          `Favorite sync unavailable; restored previous pin state for ${{normalized}}.`,
+          `Favorite sync unavailable for ${{normalized}}.`,
           true
         );
         return false;
@@ -820,45 +832,77 @@
           command,
           destination: normalized,
         }});
-        if (targetActive) {{
-          meshtasticFavoriteSyncedPinnedNodeIds.add(normalized);
-        }} else {{
-          meshtasticFavoriteSyncedPinnedNodeIds.delete(normalized);
-        }}
-        persistMeshtasticFavoritePinnedSyncIds();
         if (typeof requestImmediatePoll === "function") {{
           requestImmediatePoll(0);
         }}
         setChatSendStatus(
           targetActive
-            ? `Pinned ${{normalized}} and synced as Meshtastic favorite.`
-            : `Unpinned ${{normalized}} and removed Meshtastic favorite.`
+            ? `Tagged ${{normalized}} as Meshtastic favorite.`
+            : `Removed Meshtastic favorite for ${{normalized}}.`
         );
         return true;
       }} catch (err) {{
-        applyPinnedNodeState(normalized, previousActive);
         const reason = (err && typeof err === "object" && "message" in err)
           ? String(err.message || "").trim()
           : "";
         const message = reason || "favorite sync failed";
         meshtasticFavoritePendingDesiredByNodeId.delete(normalized);
         setChatSendStatus(
-          `Meshtastic favorite sync failed for ${{normalized}}: ${{message}}. Restored previous pin state.`,
+          `Meshtastic favorite sync failed for ${{normalized}}: ${{message}}.`,
           true
         );
+        if (typeof requestImmediatePoll === "function") {{
+          requestImmediatePoll(0);
+        }}
         return false;
       }} finally {{
         meshtasticFavoriteSyncInFlightNodeIds.delete(normalized);
+        if (typeof renderNodeVisibilityListsUi === "function") {{
+          renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+        }}
+      }}
+    }}
+
+    function toggleMeshtasticFavoriteNode(nodeId, forceActive = null) {{
+      const normalized = normalizeNodeId(nodeId);
+      if (!isSelectableNodeId(normalized) || !isCanonicalNodeId(normalized)) return;
+      if (meshtasticFavoriteSyncInFlightNodeIds.has(normalized)) {{
+        setChatSendStatus(`Favorite sync already in progress for ${{normalized}}.`);
+        return;
+      }}
+      const previousPresetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(normalized), "");
+      const previousActive = (typeof isMeshtasticFavoritePresetId === "function")
+        ? isMeshtasticFavoritePresetId(previousPresetId)
+        : false;
+      const targetActive = forceActive == null ? !previousActive : !!forceActive;
+      if (targetActive === previousActive) return;
+      if (targetActive) {{
+        const meshtasticPreset = (typeof ensureMeshtasticFavoriteTagPreset === "function")
+          ? ensureMeshtasticFavoriteTagPreset()
+          : null;
+        const presetId = normalizeNodeTagPresetId(
+          meshtasticPreset && meshtasticPreset.id,
+          "meshtastic-favorite"
+        );
+        if (!presetId || !nodeTagPresetsById.has(presetId)) return;
+        assignNodeTagPresetToNode(normalized, presetId, {{ persist: true }});
+      }} else {{
+        clearNodeTagForNode(normalized, {{ persist: true }});
+      }}
+      refreshFavoriteToggleButtons();
+      if (latestState) {{
+        renderFavorites(latestState);
+      }} else {{
+        renderStarredNodeSelect({{}});
+      }}
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{ fetchHistory: false }});
       }}
     }}
 
     function togglePinnedNode(nodeId, forceActive = null) {{
       const normalized = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(normalized)) return;
-      if (meshtasticFavoriteSyncInFlightNodeIds.has(normalized)) {{
-        setChatSendStatus(`Favorite sync already in progress for ${{normalized}}.`);
-        return;
-      }}
       const previousActive = pinnedNodeIds.has(normalized);
       const targetActive = forceActive == null ? !previousActive : !!forceActive;
       applyPinnedNodeState(normalized, targetActive);
@@ -867,6 +911,4 @@
           ? `Pinned ${{normalized}} to the top of the chat list.`
           : `Unpinned ${{normalized}} from the top of the chat list.`
       );
-      if (!isCanonicalNodeId(normalized)) return;
-      void syncPinnedNodeToMeshtasticFavorite(normalized, targetActive, previousActive);
     }}

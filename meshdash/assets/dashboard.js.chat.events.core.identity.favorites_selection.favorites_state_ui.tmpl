@@ -122,8 +122,10 @@
       }};
     }}
 
+    const meshtasticFavoriteTagPresetId = "meshtastic-favorite";
     const nodeTagBuiltInIconPaths = {{
       "auto-new-node": "M20,4C21.11,4 22,4.89 22,6V18C22,19.11 21.11,20 20,20H4C2.89,20 2,19.11 2,18V6C2,4.89 2.89,4 4,4H20M8.5,15V9H7.25V12.5L4.75,9H3.5V15H4.75V11.5L7.3,15H8.5M13.5,10.26V9H9.5V15H13.5V13.75H11V12.64H13.5V11.38H11V10.26H13.5M20.5,14V9H19.25V13.5H18.13V10H16.88V13.5H15.75V9H14.5V14A1,1 0 0,0 15.5,15H19.5A1,1 0 0,0 20.5,14Z",
+      "meshtastic-favorite": "M11,2A2,2 0 0,1 13,4V5H17A2,2 0 0,1 19,7V11H20A2,2 0 0,1 22,13V20A2,2 0 0,1 20,22H4A2,2 0 0,1 2,20V13A2,2 0 0,1 4,11H5V7A2,2 0 0,1 7,5H11V4A2,2 0 0,1 11,2M7,7V11H17V7H7M7.5,13L9.5,16L7.5,19H10L12,16L10,13H7.5M14,13L16,16L14,19H16.5L18.5,16L16.5,13H14Z",
     }};
 
     function autoNewNodeTagPreset() {{
@@ -134,6 +136,34 @@
         color: "#f2c94c",
         vibrance: 84,
       }};
+    }}
+
+    function meshtasticFavoriteNodeTagPreset() {{
+      return {{
+        id: meshtasticFavoriteTagPresetId,
+        name: "Meshtastic",
+        emoji: "",
+        color: "#2b8bd5",
+        vibrance: 76,
+      }};
+    }}
+
+    function isMeshtasticFavoritePresetId(presetId) {{
+      return normalizeNodeTagPresetId(presetId, "") === meshtasticFavoriteTagPresetId;
+    }}
+
+    function isNodeTagPresetIdLocked(presetId) {{
+      const cleanPresetId = normalizeNodeTagPresetId(presetId, "");
+      return cleanPresetId === "tag-default" || cleanPresetId === meshtasticFavoriteTagPresetId;
+    }}
+
+    function ensureMeshtasticFavoriteTagPreset() {{
+      const preset = normalizeNodeTagPreset(
+        meshtasticFavoriteNodeTagPreset(),
+        meshtasticFavoriteTagPresetId
+      );
+      nodeTagPresetsById.set(preset.id, preset);
+      return preset;
     }}
 
     function normalizeNodeTagPreset(rawPreset, fallbackId = "tag-default") {{
@@ -162,12 +192,19 @@
     }}
 
     function nodeTagPresetEntries() {{
+      ensureMeshtasticFavoriteTagPreset();
       const entries = Array.from(nodeTagPresetsById.values())
         .filter((entry) => entry && typeof entry === "object")
         .map((entry) => normalizeNodeTagPreset(entry, entry.id || "tag-default"));
       entries.sort((a, b) => {{
-        if (a.id === "tag-default" && b.id !== "tag-default") return -1;
-        if (b.id === "tag-default" && a.id !== "tag-default") return 1;
+        const presetRank = (presetId) => {{
+          const cleanPresetId = normalizeNodeTagPresetId(presetId, "");
+          if (cleanPresetId === "tag-default") return 0;
+          if (cleanPresetId === meshtasticFavoriteTagPresetId) return 1;
+          return 2;
+        }};
+        const rankDiff = presetRank(a.id) - presetRank(b.id);
+        if (rankDiff !== 0) return rankDiff;
         const nameDiff = String(a.name || "").localeCompare(String(b.name || ""));
         if (nameDiff !== 0) return nameDiff;
         return String(a.id || "").localeCompare(String(b.id || ""));
@@ -511,7 +548,19 @@
     function upsertNodeTagPreset(name, color, vibrance, options = null) {{
       const opts = options && typeof options === "object" ? options : {{}};
       const preferredId = normalizeNodeTagPresetId(opts.preferredId || "", "");
+      if (isMeshtasticFavoritePresetId(preferredId)) {{
+        const preset = ensureMeshtasticFavoriteTagPreset();
+        persistNodeTagPresets();
+        setActiveNodeTagPreset(preset.id, true);
+        return preset;
+      }}
       const cleanName = normalizeNodeTagPresetName(name, "Tagged");
+      if (cleanName.toLowerCase() === "meshtastic") {{
+        const preset = ensureMeshtasticFavoriteTagPreset();
+        persistNodeTagPresets();
+        setActiveNodeTagPreset(preset.id, true);
+        return preset;
+      }}
       const cleanEmoji = normalizeNodeTagEmoji(opts.emoji, "");
       const cleanColor = normalizeNodeTagColor(color, "#2aa85a");
       const cleanVibrance = clampNodeTagVibrance(vibrance, 70);
@@ -543,29 +592,46 @@
       return preset;
     }}
 
+    function syncMeshtasticFavoriteFromTagTransition(nodeId, beforePresetId, afterPresetId, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      if (opts.syncMeshtasticFavorite === false) return;
+      const cleanNodeId = normalizeNodeId(nodeId);
+      if (!isCanonicalNodeId(cleanNodeId)) return;
+      const wasMeshtastic = isMeshtasticFavoritePresetId(beforePresetId);
+      const isMeshtastic = isMeshtasticFavoritePresetId(afterPresetId);
+      if (wasMeshtastic === isMeshtastic) return;
+      if (typeof requestMeshtasticFavoriteTagSync === "function") {{
+        void requestMeshtasticFavoriteTagSync(cleanNodeId, isMeshtastic);
+      }}
+    }}
+
     function assignNodeTagPresetToNode(nodeId, presetId, options = null) {{
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return false;
       const cleanPresetId = normalizeNodeTagPresetId(presetId, "");
       if (!cleanPresetId || !nodeTagPresetsById.has(cleanPresetId)) return false;
+      const beforePresetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(cleanNodeId), "");
       nodeTagByNodeId.set(cleanNodeId, cleanPresetId);
       syncFavoriteNodeIdsFromTags();
       if (!(options && options.persist === false)) {{
         persistFavoriteNodes();
       }}
       setActiveNodeTagPreset(cleanPresetId, true);
+      syncMeshtasticFavoriteFromTagTransition(cleanNodeId, beforePresetId, cleanPresetId, options);
       return true;
     }}
 
     function clearNodeTagForNode(nodeId, options = null) {{
       const cleanNodeId = normalizeNodeId(nodeId);
       if (!isSelectableNodeId(cleanNodeId)) return false;
+      const beforePresetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(cleanNodeId), "");
       const existed = nodeTagByNodeId.delete(cleanNodeId);
       if (!existed) return false;
       syncFavoriteNodeIdsFromTags();
       if (!(options && options.persist === false)) {{
         persistFavoriteNodes();
       }}
+      syncMeshtasticFavoriteFromTagTransition(cleanNodeId, beforePresetId, "", options);
       return true;
     }}
 
@@ -578,6 +644,7 @@
           changed: false,
         }};
       }}
+      const beforePresetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(cleanNodeId), "");
       const tagCleared = nodeTagByNodeId.delete(cleanNodeId);
       const emojiCleared = nodeEmojiByNodeId.delete(cleanNodeId);
       const changed = !!(tagCleared || emojiCleared);
@@ -591,6 +658,9 @@
       syncFavoriteNodeIdsFromTags();
       if (!(options && options.persist === false)) {{
         persistFavoriteNodes();
+      }}
+      if (tagCleared) {{
+        syncMeshtasticFavoriteFromTagTransition(cleanNodeId, beforePresetId, "", options);
       }}
       return {{
         tagCleared: !!tagCleared,
@@ -643,6 +713,7 @@
       if (!nodeTagPresetsById.has(fallbackPreset.id)) {{
         nodeTagPresetsById.set(fallbackPreset.id, fallbackPreset);
       }}
+      ensureMeshtasticFavoriteTagPreset();
 
       try {{
         const rawTags = window.localStorage.getItem(nodeTagsStorageKey);
@@ -775,34 +846,6 @@
       }}
     }}
 
-    function loadMeshtasticFavoritePinnedSyncIds() {{
-      meshtasticFavoriteSyncedPinnedNodeIds.clear();
-      try {{
-        const raw = window.localStorage.getItem(meshtasticFavoritePinnedSyncStorageKey);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return;
-        for (const entry of parsed) {{
-          const nodeId = normalizeNodeId(entry);
-          if (isSelectableNodeId(nodeId)) {{
-            meshtasticFavoriteSyncedPinnedNodeIds.add(nodeId);
-          }}
-        }}
-      }} catch (_err) {{
-      }}
-    }}
-
-    function persistMeshtasticFavoritePinnedSyncIds() {{
-      try {{
-        const ids = Array.from(meshtasticFavoriteSyncedPinnedNodeIds).slice(0, 2000);
-        window.localStorage.setItem(
-          meshtasticFavoritePinnedSyncStorageKey,
-          JSON.stringify(ids)
-        );
-      }} catch (_err) {{
-      }}
-    }}
-
     function meshtasticNodeFavoriteFlag(value) {{
       if (typeof parseBoolToken === "function") {{
         return parseBoolToken(value, false);
@@ -835,12 +878,20 @@
       return ids;
     }}
 
-    function syncPinnedNodesWithMeshtasticFavorites(state = latestState) {{
-      const nextFavoriteIds = meshtasticFavoriteNodeIdsFromState(state);
-      let pinnedChanged = false;
-      let syncStateChanged = false;
-      const pendingTimeoutMs = 30000;
+    function meshtasticFavoriteTaggedNodeIds() {{
+      const ids = new Set();
+      for (const [rawNodeId, rawPresetId] of nodeTagByNodeId.entries()) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        if (!isSelectableNodeId(nodeId)) continue;
+        if (!isMeshtasticFavoritePresetId(rawPresetId)) continue;
+        ids.add(nodeId);
+      }}
+      return ids;
+    }}
 
+    function meshtasticFavoriteNodeIdsWithPending(state = latestState) {{
+      const nextFavoriteIds = meshtasticFavoriteNodeIdsFromState(state);
+      const pendingTimeoutMs = 30000;
       for (const [rawNodeId, pendingRaw] of Array.from(meshtasticFavoritePendingDesiredByNodeId.entries())) {{
         const nodeId = normalizeNodeId(rawNodeId);
         if (!isSelectableNodeId(nodeId)) {{
@@ -854,39 +905,43 @@
         const hasFavorite = nextFavoriteIds.has(nodeId);
         if (hasFavorite === desiredActive || ageMs > pendingTimeoutMs) {{
           meshtasticFavoritePendingDesiredByNodeId.delete(rawNodeId);
+          continue;
+        }}
+        if (desiredActive) {{
+          nextFavoriteIds.add(nodeId);
+        }} else {{
+          nextFavoriteIds.delete(nodeId);
         }}
       }}
+      return nextFavoriteIds;
+    }}
 
-      for (const nodeId of Array.from(meshtasticFavoriteSyncedPinnedNodeIds)) {{
-        if (meshtasticFavoritePendingDesiredByNodeId.has(nodeId)) continue;
-        if (nextFavoriteIds.has(nodeId)) continue;
-        meshtasticFavoriteSyncedPinnedNodeIds.delete(nodeId);
-        syncStateChanged = true;
-        if (pinnedNodeIds.has(nodeId)) {{
-          pinnedNodeIds.delete(nodeId);
-          pinnedChanged = true;
-        }}
-      }}
+    function syncNodeTagsWithMeshtasticFavorites(state = latestState) {{
+      const meshtasticPreset = ensureMeshtasticFavoriteTagPreset();
+      const meshtasticPresetId = normalizeNodeTagPresetId(meshtasticPreset.id, meshtasticFavoriteTagPresetId);
+      const nextFavoriteIds = meshtasticFavoriteNodeIdsWithPending(state);
+      let changed = false;
 
       for (const nodeId of nextFavoriteIds) {{
-        if (meshtasticFavoritePendingDesiredByNodeId.has(nodeId)) continue;
-        if (!meshtasticFavoriteSyncedPinnedNodeIds.has(nodeId)) {{
-          meshtasticFavoriteSyncedPinnedNodeIds.add(nodeId);
-          syncStateChanged = true;
-        }}
-        if (!pinnedNodeIds.has(nodeId)) {{
-          pinnedNodeIds.add(nodeId);
-          pinnedChanged = true;
-        }}
+        const currentPresetId = normalizeNodeTagPresetId(nodeTagByNodeId.get(nodeId), "");
+        if (currentPresetId === meshtasticPresetId) continue;
+        nodeTagByNodeId.set(nodeId, meshtasticPresetId);
+        changed = true;
       }}
 
-      if (syncStateChanged) {{
-        persistMeshtasticFavoritePinnedSyncIds();
+      for (const [rawNodeId, rawPresetId] of Array.from(nodeTagByNodeId.entries())) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        const presetId = normalizeNodeTagPresetId(rawPresetId, "");
+        if (!isSelectableNodeId(nodeId) || presetId !== meshtasticPresetId) continue;
+        if (nextFavoriteIds.has(nodeId)) continue;
+        nodeTagByNodeId.delete(nodeId);
+        changed = true;
       }}
-      if (pinnedChanged) {{
-        persistPinnedNodes();
+
+      if (changed) {{
+        persistFavoriteNodes();
       }}
-      return pinnedChanged;
+      return changed;
     }}
 
     function normalizeNodeVisibilityListIds(rawValue) {{
@@ -1184,7 +1239,7 @@
 
     function deleteNodeTagPreset(presetId, options = null) {{
       const cleanPresetId = normalizeNodeTagPresetId(presetId, "");
-      if (!cleanPresetId || cleanPresetId === "tag-default" || !nodeTagPresetsById.has(cleanPresetId)) return false;
+      if (!cleanPresetId || isNodeTagPresetIdLocked(cleanPresetId) || !nodeTagPresetsById.has(cleanPresetId)) return false;
       const fallbackPreset = nodeTagPresetForId("tag-default") || defaultNodeTagPreset();
       if (!nodeTagPresetsById.has(fallbackPreset.id)) {{
         nodeTagPresetsById.set(fallbackPreset.id, fallbackPreset);
@@ -1214,6 +1269,7 @@
         draft && draft.selectedPresetId,
         normalizeNodeTagPresetId(activePreset.id, "tag-default")
       );
+      const selectedPresetLocked = isNodeTagPresetIdLocked(selectedPresetId);
       const formName = normalizeNodeTagPresetName(draft && draft.name, activePreset.name);
       const formEmoji = normalizeNodeTagEmoji(draft && draft.emoji, activePreset.emoji);
       const formColor = normalizeNodeTagColor(draft && draft.color, activePreset.color);
@@ -1241,24 +1297,24 @@
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="settings-node-tag-name-input" class="favorite-menu-tag-editor-label">Name</label>
-          <input id="settings-node-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(formName)}}" placeholder="Tag name" />
+          <input id="settings-node-tag-name-input" class="favorite-menu-tag-editor-input" type="text" maxlength="40" value="${{escAttr(formName)}}" placeholder="Tag name"${{selectedPresetLocked ? " disabled" : ""}} />
         </div>
         <div class="favorite-menu-tag-editor-row">
           <label for="settings-node-tag-emoji-input" class="favorite-menu-tag-editor-label">Emoji</label>
-          <input id="settings-node-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(formEmoji)}}" placeholder="Optional emoji" />
+          <input id="settings-node-tag-emoji-input" class="favorite-menu-tag-editor-input favorite-menu-tag-emoji-input" type="text" maxlength="8" value="${{escAttr(formEmoji)}}" placeholder="Optional emoji"${{selectedPresetLocked ? " disabled" : ""}} />
         </div>
         <div class="favorite-menu-tag-editor-row favorite-menu-tag-editor-row-inline">
           <label for="settings-node-tag-color-input" class="favorite-menu-tag-editor-label">Color</label>
-          <input id="settings-node-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(formColor)}}" />
+          <input id="settings-node-tag-color-input" class="favorite-menu-tag-color-input" type="color" value="${{escAttr(formColor)}}"${{selectedPresetLocked ? " disabled" : ""}} />
           <label for="settings-node-tag-vibrance-input" class="favorite-menu-tag-editor-label">Vibrance</label>
-          <input id="settings-node-tag-vibrance-input" class="favorite-menu-tag-vibrance-input" type="range" min="0" max="100" step="1" value="${{escAttr(formVibrance)}}" />
+          <input id="settings-node-tag-vibrance-input" class="favorite-menu-tag-vibrance-input" type="range" min="0" max="100" step="1" value="${{escAttr(formVibrance)}}"${{selectedPresetLocked ? " disabled" : ""}} />
           <span id="settings-node-tag-vibrance-value" class="favorite-menu-tag-vibrance-value">${{escAttr(formVibrance)}}%</span>
           <span id="settings-node-tag-preview" class="favorite-menu-tag-chip favorite-menu-tag-chip-preview${{previewEmoji ? " has-emoji" : ""}}" style="${{escAttr(previewStyle)}}" aria-hidden="true">${{previewEmoji}}</span>
         </div>
         <div class="favorite-menu-tag-editor-actions">
-          <button id="settings-node-tag-save-btn" class="btn btn-secondary" type="button">Save Preset</button>
+          <button id="settings-node-tag-save-btn" class="btn btn-secondary" type="button"${{selectedPresetLocked ? " disabled" : ""}}>Save Preset</button>
           <button id="settings-node-tag-new-btn" class="btn btn-secondary" type="button">New Preset</button>
-          <button id="settings-node-tag-delete-btn" class="btn btn-secondary" type="button"${{selectedPresetId === "tag-default" ? " disabled" : ""}}>Delete Preset</button>
+          <button id="settings-node-tag-delete-btn" class="btn btn-secondary" type="button"${{selectedPresetLocked ? " disabled" : ""}}>Delete Preset</button>
         </div>
         <div id="settings-node-tag-status" class="favorite-menu-tag-status"></div>
       </div>`;
@@ -1328,6 +1384,17 @@
         syncDraft();
       }};
 
+      const applyPresetLockState = (presetId) => {{
+        const locked = isNodeTagPresetIdLocked(presetId);
+        const hasPreset = !!normalizeNodeTagPresetId(presetId, "");
+        nameInput.disabled = locked;
+        emojiInput.disabled = locked;
+        colorInput.disabled = locked;
+        vibranceInput.disabled = locked;
+        saveBtn.disabled = locked;
+        deleteBtn.disabled = locked || !hasPreset;
+      }};
+
       const loadPreset = (presetId) => {{
         const preset = nodeTagPresetForId(presetId);
         if (!preset) {{
@@ -1335,7 +1402,7 @@
           emojiInput.value = "";
           colorInput.value = "#2aa85a";
           vibranceInput.value = "70";
-          deleteBtn.disabled = true;
+          applyPresetLockState("");
           applyPreview();
           return;
         }}
@@ -1343,7 +1410,7 @@
         emojiInput.value = normalizeNodeTagEmoji(preset.emoji, "");
         colorInput.value = normalizeNodeTagColor(preset.color, "#2aa85a");
         vibranceInput.value = String(clampNodeTagVibrance(preset.vibrance, 70));
-        deleteBtn.disabled = normalizeNodeTagPresetId(preset.id, "tag-default") === "tag-default";
+        applyPresetLockState(preset.id);
         applyPreview();
       }};
 
@@ -1472,16 +1539,10 @@
 
       const safeState = state && typeof state === "object" ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
-      const meshtasticFavoriteIds = (typeof meshtasticFavoriteNodeIdsFromState === "function")
-        ? meshtasticFavoriteNodeIdsFromState(safeState)
-        : new Set();
+      const meshtasticFavoriteIds = meshtasticFavoriteTaggedNodeIds();
       const nodeIsMeshtasticFavorite = (nodeId) => {{
         const cleanNodeId = normalizeNodeId(nodeId || "");
         if (!isSelectableNodeId(cleanNodeId)) return false;
-        const pending = meshtasticFavoritePendingDesiredByNodeId.get(cleanNodeId);
-        if (pending && typeof pending === "object" && Object.prototype.hasOwnProperty.call(pending, "active")) {{
-          return !!pending.active;
-        }}
         return meshtasticFavoriteIds.has(cleanNodeId);
       }};
       const nodesById = new Map(
@@ -1664,13 +1725,13 @@
           }} else if (action === "remove-block") {{
             removeNodeVisibilityBlacklistId(nodeId);
           }} else if (action === "favorite") {{
-            if (typeof togglePinnedNode === "function") {{
-              togglePinnedNode(nodeId, true);
+            if (typeof toggleMeshtasticFavoriteNode === "function") {{
+              toggleMeshtasticFavoriteNode(nodeId, true);
               renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
             }}
           }} else if (action === "unfavorite" || action === "remove-meshtastic-favorite") {{
-            if (typeof togglePinnedNode === "function") {{
-              togglePinnedNode(nodeId, false);
+            if (typeof toggleMeshtasticFavoriteNode === "function") {{
+              toggleMeshtasticFavoriteNode(nodeId, false);
               renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
             }}
           }}
