@@ -98,8 +98,15 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function renderNetworkRoutes(state = latestState, options = {})' in js
     assert 'function networkRoutesFindInferredPath(fromNodeId, toNodeId, adjacency)' in js
     assert 'function buildNetworkRoutesScopedLinks(route, data)' in js
+    assert 'const returnPath = (Array.isArray(route && route.returnPath) ? route.returnPath : [])' in js
+    assert 'appendPathEdges(returnPath, returnEdgesRaw, "return");' in js
     assert 'function networkRoutesScopeNodeEmoji(nodeId, node = null)' in js
     assert 'function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId)' in js
+    assert 'const isReturnRoute = kind === "return";' in js
+    assert 'const bidirectionalEdgeKeys = new Set();' in js
+    assert 'const markerDefsHtml = `<defs>' in js
+    assert 'marker-end="${markerEnd}"' in js
+    assert 'hopNodeId === "!local"' in js
     assert 'const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);' in js
     assert 'nodeEmoji ? "has-emoji-glyph" : ""' in js
     assert 'class="network-route-scope-node-emoji-fo"' in js
@@ -119,6 +126,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'zoomNetworkRoutesScopeView(svg, event);' in js
     assert 'const maxSideLinks = Math.max(10, Math.min(22, path.length * 4));' in js
     assert 'const maxClusterLinks = 14;' in js
+    assert 'const isBidirectionalOverlap = (isPrimaryRoute || isReturnRoute) && bidirectionalEdgeKeys.has(edgeKey);' in js
+    assert 'const offsetPx = isBidirectionalOverlap ? 7 : 0;' in js
+    assert 'if (keyAlreadyPresent && kind !== "return") continue;' in js
+    assert 'returnPath: backRoute.path,' in js
+    assert 'returnEdges: backRoute.edges,' in js
     assert 'Live trace is not wired yet.' in js
     assert 'function refreshNetworkDiagnosticsPanel(force = false)' in js
     assert 'fetch(`/api/history/malformed?${params.toString()}`' in js
@@ -553,7 +565,11 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-route-scope {" in css
     assert ".network-route-scope-reset-btn {" in css
     assert ".network-route-scope-svg.is-panning {" in css
+    assert ".network-route-scope-arrow-marker path {" in css
+    assert ".network-route-scope-arrow-marker.is-route path {" in css
+    assert ".network-route-scope-arrow-marker.is-return path {" in css
     assert ".network-route-scope-edge.is-route {" in css
+    assert ".network-route-scope-edge.is-return {" in css
     assert ".network-route-scope-node-hit {" in css
     assert ".network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {" in css
     assert ".network-route-scope-node-emoji-fo {" in css
@@ -569,7 +585,11 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert '[data-theme="dark"] .network-routes-card {' in css
     assert '[data-theme="dark"] .network-route-scope {' in css
     assert '[data-theme="dark"] .network-route-scope-reset-btn {' in css
+    assert '[data-theme="dark"] .network-route-scope-arrow-marker path {' in css
+    assert '[data-theme="dark"] .network-route-scope-arrow-marker.is-route path {' in css
+    assert '[data-theme="dark"] .network-route-scope-arrow-marker.is-return path {' in css
     assert '[data-theme="dark"] .network-route-scope-edge.is-route {' in css
+    assert '[data-theme="dark"] .network-route-scope-edge.is-return {' in css
     assert '[data-theme="dark"] .network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {' in css
     assert '[data-theme="dark"] .network-route-hop {' in css
     assert '[data-theme="dark"] .network-route-hop-index {' in css

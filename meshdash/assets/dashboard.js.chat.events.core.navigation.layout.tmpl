@@ -2499,7 +2499,10 @@
       for (let index = 0; index < hopList.length; index += 1) {{
         const hop = (hopList[index] && typeof hopList[index] === "object") ? hopList[index] : {{}};
         let hopNodeId = normalizeNodeId(hop.node || "");
-        if ((!hopNodeId || hopNodeId === "local") && isSelectableNodeId(localAliasNodeId)) {{
+        if (
+          (!hopNodeId || hopNodeId === "local" || hopNodeId === "!local")
+          && isSelectableNodeId(localAliasNodeId)
+        ) {{
           hopNodeId = localAliasNodeId;
         }}
         if (!isSelectableNodeId(hopNodeId)) continue;
@@ -2687,8 +2690,14 @@
       const towardsHopCount = Math.max(0, towardsRoute.path.length - 1);
       const updatedUnix = safeState.updatedMs > 0 ? Math.floor(safeState.updatedMs / 1000) : 0;
       const updatedLabel = updatedUnix > 0 ? formatLocalChatTime(updatedUnix, "n/a") : "n/a";
+      const scopeRoute = {{
+        path: towardsRoute.path,
+        edges: towardsRoute.edges,
+        returnPath: backRoute.path,
+        returnEdges: backRoute.edges,
+      }};
       const towardScopeHtml = towardsRoute.path.length > 1
-        ? networkRoutesScopeHtml(towardsRoute, renderData, sourceId, targetId, {{ allowNodeEmoji: false }})
+        ? networkRoutesScopeHtml(scopeRoute, renderData, sourceId, targetId, {{ allowNodeEmoji: false }})
         : "";
       const towardPathHtml = networkRoutesCompactPathHtml(
         towardsRoute,
@@ -2931,34 +2940,45 @@
       const path = (Array.isArray(route && route.path) ? route.path : [])
         .map((nodeId) => normalizeNodeId(nodeId || ""))
         .filter((nodeId) => isSelectableNodeId(nodeId) && nodeMap.has(nodeId));
+      const returnPath = (Array.isArray(route && route.returnPath) ? route.returnPath : [])
+        .map((nodeId) => normalizeNodeId(nodeId || ""))
+        .filter((nodeId) => isSelectableNodeId(nodeId) && nodeMap.has(nodeId));
       const routeEdgesRaw = Array.isArray(route && route.edges) ? route.edges : [];
+      const returnEdgesRaw = Array.isArray(route && route.returnEdges) ? route.returnEdges : [];
       const pathIndex = new Map(path.map((nodeId, index) => [nodeId, index]));
+      const scopedPathNodeIds = new Set(path.concat(returnPath));
       const routeEdgeKeys = new Set();
       const routeEdges = [];
       const maxSideLinks = Math.max(10, Math.min(22, path.length * 4));
       const maxSideLinksPerRouteNode = 4;
       const maxClusterLinks = 14;
       const maxClusterNewNodes = 10;
-      for (let index = 0; index < Math.max(0, path.length - 1); index += 1) {{
-        const a = path[index];
-        const b = path[index + 1];
-        const edge = routeEdgesRaw[index] || ((adjacency.get(a) || new Map()).get(b)) || null;
-        const key = networkGraphEdgeKeyBetween(a, b);
-        if (!key) continue;
-        routeEdgeKeys.add(key);
-        routeEdges.push({{
-          key,
-          a,
-          b,
-          edge,
-          kind: "route",
-          routeIndex: index,
-        }});
-      }}
+      const appendPathEdges = (pathNodes, rawEdges, kind = "route") => {{
+        for (let index = 0; index < Math.max(0, pathNodes.length - 1); index += 1) {{
+          const a = pathNodes[index];
+          const b = pathNodes[index + 1];
+          const edge = rawEdges[index] || ((adjacency.get(a) || new Map()).get(b)) || null;
+          const key = networkGraphEdgeKeyBetween(a, b);
+          if (!key) continue;
+          const keyAlreadyPresent = routeEdgeKeys.has(key);
+          if (!keyAlreadyPresent) routeEdgeKeys.add(key);
+          if (keyAlreadyPresent && kind !== "return") continue;
+          routeEdges.push({{
+            key,
+            a,
+            b,
+            edge,
+            kind,
+            routeIndex: index,
+          }});
+        }}
+      }};
+      appendPathEdges(path, routeEdgesRaw, "route");
+      appendPathEdges(returnPath, returnEdgesRaw, "return");
 
       const candidateKeys = new Set();
       const contextCandidates = [];
-      for (const nodeId of path) {{
+      for (const nodeId of scopedPathNodeIds) {{
         const peers = adjacency.get(nodeId);
         if (!(peers instanceof Map)) continue;
         for (const [peerIdRaw, edge] of peers.entries()) {{
@@ -2996,7 +3016,7 @@
         contextEdges.push(item);
       }}
 
-      const nodeIds = new Set(path);
+      const nodeIds = new Set(scopedPathNodeIds);
       const ringOneContextIds = new Set();
       for (const item of contextEdges) {{
         const a = normalizeNodeId(item && item.a || "");
@@ -3352,7 +3372,13 @@
         fromId,
         toId,
         scoped.path.join(">"),
-        scoped.edges.map((item) => String(item && item.key || "")).join("|"),
+        scoped.edges.map((item) => {{
+          const kind = String(item && item.kind || "");
+          const a = normalizeNodeId(item && item.a || "");
+          const b = normalizeNodeId(item && item.b || "");
+          const key = String(item && item.key || "");
+          return `${{kind}}:${{a}}>${{b}}:${{key}}`;
+        }}).join("|"),
       ].join("::");
       if (networkRoutesScopeViewState.signature !== scopeSignature) {{
         networkRoutesScopeViewState.signature = scopeSignature;
@@ -3360,29 +3386,77 @@
       }}
       const viewBox = networkRoutesScopeViewBoxFrom(networkRoutesScopeViewState.viewBox, defaultViewBox);
       const maxWeight = scoped.edges.reduce((max, item) => Math.max(max, Number(item && item.edge && item.edge.weight) || 0), 0);
+      const directionalKindsByEdgeKey = new Map();
+      for (const edgeItem of scoped.edges) {{
+        const kind = String(edgeItem && edgeItem.kind || "");
+        if (kind !== "route" && kind !== "return") continue;
+        const key = String(edgeItem && edgeItem.key || "").trim();
+        if (!key) continue;
+        let kinds = directionalKindsByEdgeKey.get(key);
+        if (!(kinds instanceof Set)) {{
+          kinds = new Set();
+          directionalKindsByEdgeKey.set(key, kinds);
+        }}
+        kinds.add(kind);
+      }}
+      const bidirectionalEdgeKeys = new Set();
+      for (const [key, kinds] of directionalKindsByEdgeKey.entries()) {{
+        if (kinds.has("route") && kinds.has("return")) {{
+          bidirectionalEdgeKeys.add(key);
+        }}
+      }}
+      const markerDefsHtml = `<defs>
+        <marker id="network-route-scope-arrow-route" class="network-route-scope-arrow-marker is-route" viewBox="0 0 10 8" markerWidth="8" markerHeight="8" refX="8.3" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L10,4 L0,8 z"></path>
+        </marker>
+        <marker id="network-route-scope-arrow-return" class="network-route-scope-arrow-marker is-return" viewBox="0 0 10 8" markerWidth="8" markerHeight="8" refX="8.3" refY="4" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L10,4 L0,8 z"></path>
+        </marker>
+      </defs>`;
       const edgeHtml = scoped.edges.map((item) => {{
         const a = positions.get(item && item.a);
         const b = positions.get(item && item.b);
         if (!a || !b) return "";
         const kind = String(item && item.kind || "context");
+        const edgeKey = String(item && item.key || "").trim();
         const sourceId = normalizeNodeId(item && item.a || "");
         const targetId = normalizeNodeId(item && item.b || "");
         const weight = Math.max(0, Number(item && item.edge && item.edge.weight) || 0);
         const pct = maxWeight > 0 ? Math.max(0.2, Math.min(1, weight / maxWeight)) : 0.3;
-        const width = kind === "route" ? (3.8 + (pct * 4.2)) : (1.2 + (pct * 2.2));
         const title = networkRoutesEdgeMetaText(item && item.edge) || "observed link";
         const sourceName = networkGraphNodeDisplayName(sourceId, nodeMap);
         const targetName = networkGraphNodeDisplayName(targetId, nodeMap);
+        const isPrimaryRoute = kind === "route";
+        const isReturnRoute = kind === "return";
+        const width = isPrimaryRoute
+          ? (3.8 + (pct * 4.2))
+          : (isReturnRoute ? (3.1 + (pct * 3.2)) : (1.2 + (pct * 2.2)));
+        const isBidirectionalOverlap = (isPrimaryRoute || isReturnRoute) && bidirectionalEdgeKeys.has(edgeKey);
+        const offsetSign = isPrimaryRoute ? 1 : (isReturnRoute ? -1 : 0);
+        const offsetPx = isBidirectionalOverlap ? 7 : 0;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const length = Math.hypot(dx, dy);
+        const normalX = (length > 0.001) ? (-dy / length) : 0;
+        const normalY = (length > 0.001) ? (dx / length) : 0;
+        const shiftedX1 = a.x + (normalX * offsetPx * offsetSign);
+        const shiftedY1 = a.y + (normalY * offsetPx * offsetSign);
+        const shiftedX2 = b.x + (normalX * offsetPx * offsetSign);
+        const shiftedY2 = b.y + (normalY * offsetPx * offsetSign);
+        const markerEnd = isPrimaryRoute
+          ? "url(#network-route-scope-arrow-route)"
+          : (isReturnRoute ? "url(#network-route-scope-arrow-return)" : "");
         return `<line class="network-route-scope-edge is-${{escAttr(kind)}}"
           data-route-edge-a="${{escAttr(sourceId)}}"
           data-route-edge-b="${{escAttr(targetId)}}"
           tabindex="0"
           role="button"
           aria-label="${{escAttr(`Focus link ${{sourceName}} to ${{targetName}}`)}}"
-          x1="${{a.x.toFixed(1)}}"
-          y1="${{a.y.toFixed(1)}}"
-          x2="${{b.x.toFixed(1)}}"
-          y2="${{b.y.toFixed(1)}}"
+          x1="${{shiftedX1.toFixed(1)}}"
+          y1="${{shiftedY1.toFixed(1)}}"
+          x2="${{shiftedX2.toFixed(1)}}"
+          y2="${{shiftedY2.toFixed(1)}}"
+          ${{markerEnd ? `marker-end="${{markerEnd}}"` : ""}}
           style="--route-scope-edge-width:${{width.toFixed(1)}};"
         ><title>${{escAttr(title)}}</title></line>`;
       }}).join("");
@@ -3449,6 +3523,7 @@
           role="img"
           aria-label="Route scoped links from selected endpoints"
         >
+          ${{markerDefsHtml}}
           <g class="network-route-scope-links">${{edgeHtml}}</g>
           <g class="network-route-scope-nodes">${{nodeHtml}}</g>
         </svg>

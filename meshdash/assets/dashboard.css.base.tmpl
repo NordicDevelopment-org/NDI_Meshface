@@ -7276,6 +7276,16 @@
       pointer-events: stroke;
       vector-effect: non-scaling-stroke;
     }}
+    .network-route-scope-arrow-marker path {{
+      stroke: none;
+      fill: rgba(103, 137, 114, 0.7);
+    }}
+    .network-route-scope-arrow-marker.is-route path {{
+      fill: color-mix(in srgb, var(--accent) 82%, var(--accent-2) 18%);
+    }}
+    .network-route-scope-arrow-marker.is-return path {{
+      fill: color-mix(in srgb, var(--accent-2) 72%, #bd6a14 28%);
+    }}
     .network-route-scope-edge:hover,
     .network-route-scope-edge:focus-visible {{
       stroke: color-mix(in srgb, var(--accent) 64%, var(--ink) 36%);
@@ -7284,6 +7294,10 @@
     .network-route-scope-edge.is-route {{
       stroke: color-mix(in srgb, var(--accent) 82%, var(--accent-2) 18%);
       stroke-dasharray: none;
+    }}
+    .network-route-scope-edge.is-return {{
+      stroke: color-mix(in srgb, var(--accent-2) 72%, #bd6a14 28%);
+      stroke-dasharray: 11 7;
     }}
     .network-route-scope-edge.is-alternate {{
       stroke: rgba(176, 139, 55, 0.68);
