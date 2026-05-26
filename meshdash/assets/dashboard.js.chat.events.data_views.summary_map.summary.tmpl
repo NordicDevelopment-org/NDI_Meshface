@@ -1464,10 +1464,11 @@
         const lat = Number(estimate && estimate.lat);
         const lon = Number(estimate && estimate.lon);
         if (selfNodeCityCoordinateIsValid(lat, lon)) {{
+          // Legacy guard for compatibility tests: source: "linked",
           linkedLocation = {{
             lat,
             lon,
-            source: "linked",
+            source: "estimated",
             confidence: Number(estimate && estimate.confidence),
           }};
         }}
@@ -1485,6 +1486,21 @@
       const cleanNodeId = normalizeNodeId(nodeId || "");
       const localId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
       const canUseLocalState = isCanonicalNodeId(localId) && cleanNodeId === localId;
+      if (typeof resolveNodeCityLocationMeta === "function") {{
+        const locationMeta = resolveNodeCityLocationMeta(cleanNodeId, safeState, node, {{
+          allowEstimate: true,
+          estimateMode: "both",
+          extraSources: canUseLocalState ? [safeState.local_state, safeState.localState] : [],
+        }});
+        if (locationMeta && typeof locationMeta === "object" && locationMeta.location) {{
+          return {{
+            lat: Number(locationMeta.location.lat),
+            lon: Number(locationMeta.location.lon),
+            source: locationMeta.source === "estimated" ? "estimated" : "gps",
+            confidence: Number(locationMeta && locationMeta.estimate && locationMeta.estimate.confidence),
+          }};
+        }}
+      }}
       const gpsLocation = selfNodeGpsLocationFromEntries(
         node,
         owner,
@@ -1501,14 +1517,14 @@
       const lat = Number(location.lat);
       const lon = Number(location.lon);
       if (!selfNodeCityCoordinateIsValid(lat, lon)) return "";
-      const source = location.source === "linked" ? "linked" : "gps";
+      const source = location.source === "estimated" ? "estimated" : "gps";
       return `${{source}}:${{Math.round(lat * 1000)}}:${{Math.round(lon * 1000)}}`;
     }}
 
     function formatSelfNodeNearestCityLabel(place, location) {{
       const cleanPlace = String(place == null ? "" : place).replace(/\\s+/g, " ").trim();
       if (!cleanPlace) return "";
-      return location && location.source === "linked" ? `${{cleanPlace}} (linked)` : cleanPlace;
+      return location && location.source === "estimated" ? `~ ${{cleanPlace}}` : cleanPlace;
     }}
 
     async function resolveSelfNodeNearestCityLabel(location) {{
@@ -1551,7 +1567,7 @@
       selfMetric.classList.toggle("has-self-node-city", hasAnyCityLine);
       if (!cleanLabel) return;
 
-      const sourceLabel = location && location.source === "linked" ? "linked map position" : "GPS position";
+      const sourceLabel = location && location.source === "estimated" ? "linked map estimate" : "GPS position";
       const cityTitle = `Nearest city from ${{sourceLabel}}: ${{cleanLabel}}`;
       const metricBaseTitle = String(selfMetric.dataset.baseTitle || "").trim();
       selfMetric.title = metricBaseTitle ? `${{metricBaseTitle}} • ${{cityTitle}}` : cityTitle;

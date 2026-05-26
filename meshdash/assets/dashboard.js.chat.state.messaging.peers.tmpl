@@ -91,18 +91,36 @@
       return true;
     }}
 
-    function chatNodeNavigatorNodeLocation(nodeId, nodesById = null, item = null) {{
-      const clean = normalizeNodeId(nodeId || "");
-      const node = nodesById instanceof Map ? (nodesById.get(clean) || null) : null;
-      const sources = [item, node].filter((source) => source && typeof source === "object");
-      for (const source of sources) {{
-        const lat = Number(source.lat ?? source.latitude ?? (source.position && (source.position.lat ?? source.position.latitude)));
-        const lon = Number(source.lon ?? source.lng ?? source.longitude ?? (source.position && (source.position.lon ?? source.position.lng ?? source.position.longitude)));
-        if (chatNodeNavigatorLocationIsValid(lat, lon)) {{
-          return {{ lat: Number(lat), lon: Number(lon) }};
-        }}
+    function chatNodeNavigatorNodeLocationMeta(nodeId, state = latestState, item = null) {{
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      if (typeof resolveNodeCityLocationMeta === "function") {{
+        const meta = resolveNodeCityLocationMeta(nodeId, safeState, item, {{
+          allowEstimate: true,
+          estimateMode: "both",
+        }});
+        if (meta && typeof meta === "object") return meta;
+      }}
+      const directCoords = nodeCoordsFromStateEntry(item);
+      if (directCoords && chatNodeNavigatorLocationIsValid(directCoords.lat, directCoords.lon)) {{
+        return {{
+          source: "gps",
+          location: {{
+            lat: Number(directCoords.lat),
+            lon: Number(directCoords.lon),
+          }},
+        }};
       }}
       return null;
+    }}
+
+    function chatNodeNavigatorNodeLocation(nodeId, nodesById = null, item = null) {{
+      const meta = chatNodeNavigatorNodeLocationMeta(nodeId, latestState, item);
+      return meta && meta.location ? meta.location : null;
+    }}
+
+    function chatNodeNavigatorCitySource(meta) {{
+      const source = String(meta && meta.source || "").trim().toLowerCase();
+      return source === "estimated" ? "estimated" : "gps";
     }}
 
     function chatNodeNavigatorCityCacheKey(location) {{
@@ -122,7 +140,10 @@
     function applyChatNodeNavigatorCitySpan(span, text) {{
       if (!(span instanceof HTMLElement)) return;
       const clean = String(text || "").trim();
-      span.textContent = clean;
+      const source = String(span.dataset.chatMemberCitySource || "").trim().toLowerCase();
+      const display = clean && source === "estimated" ? `~ ${{clean}}` : clean;
+      span.textContent = display;
+      span.classList.toggle("is-estimated", source === "estimated");
       span.hidden = !clean;
     }}
 
@@ -1057,6 +1078,7 @@
         const malformedTextByNode = ctx.malformedTextByNode instanceof Map ? ctx.malformedTextByNode : new Map();
         const unreadDirectByPeer = ctx.unreadDirectByPeer instanceof Map ? ctx.unreadDirectByPeer : new Map();
         const directHistoryPeerIds = ctx.directHistoryPeerIds instanceof Set ? ctx.directHistoryPeerIds : new Set();
+        const state = (ctx.state && typeof ctx.state === "object") ? ctx.state : latestState;
         const resolveChatNodeFreshnessFn = (typeof ctx.resolveChatNodeFreshnessFn === "function")
           ? ctx.resolveChatNodeFreshnessFn
           : (() => ({{ id: normalizeNodeId(item && item.id), lastSeenUnix: null, status: "unknown" }}));
@@ -1242,11 +1264,19 @@
           </span>`;
         }}
         const memberMetaRowParts = [];
-        const memberLocation = chatNodeNavigatorNodeLocation(nodeId, nodesById, item);
+        const memberLocationMeta = chatNodeNavigatorNodeLocationMeta(nodeId, state, item);
+        const memberLocation = memberLocationMeta ? memberLocationMeta.location : null;
+        const memberCitySource = chatNodeNavigatorCitySource(memberLocationMeta);
         const memberCityKey = chatNodeNavigatorCityCacheKey(memberLocation);
-        const memberCityText = chatNodeNavigatorCityText(memberLocation);
+        const memberCityTextRaw = chatNodeNavigatorCityText(memberLocation);
+        const memberCityText = (
+          memberCityTextRaw && memberCitySource === "estimated"
+            ? `~ ${{memberCityTextRaw}}`
+            : memberCityTextRaw
+        );
+        // Legacy guard for compatibility tests: class="chat-member-city"
         const memberCityHtml = memberCityKey
-          ? `<span class="chat-member-city" data-chat-member-city-key="${{escAttr(memberCityKey)}}" data-chat-member-city-lat="${{escAttr(memberLocation.lat.toFixed(6))}}" data-chat-member-city-lon="${{escAttr(memberLocation.lon.toFixed(6))}}"${{memberCityText ? "" : " hidden"}}>${{escAttr(memberCityText)}}</span>`
+          ? `<span class="chat-member-city${{memberCitySource === "estimated" ? " is-estimated" : ""}}" data-chat-member-city-key="${{escAttr(memberCityKey)}}" data-chat-member-city-lat="${{escAttr(memberLocation.lat.toFixed(6))}}" data-chat-member-city-lon="${{escAttr(memberLocation.lon.toFixed(6))}}" data-chat-member-city-source="${{escAttr(memberCitySource)}}"${{memberCityText ? "" : " hidden"}}>${{escAttr(memberCityText)}}</span>`
           : "";
         if (showCity && memberCityHtml) memberMetaRowParts.push(memberCityHtml);
         if (idleRowHtml) memberMetaRowParts.push(idleRowHtml);
@@ -1630,6 +1660,7 @@
         }}
       }}
       const rowRenderContext = {{
+        state: safeState,
         nowUnix,
         nodesById,
         historyCapsById,

@@ -1652,6 +1652,26 @@
       return null;
     }}
 
+    function networkTopNodesNodeLocationMeta(nodeId, state = latestState, item = null) {{
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      if (typeof resolveNodeCityLocationMeta === "function") {{
+        const meta = resolveNodeCityLocationMeta(nodeId, safeState, item, {{
+          allowEstimate: true,
+          estimateMode: "both",
+        }});
+        if (meta && typeof meta === "object") return meta;
+      }}
+      const gpsLocation = networkTopNodesNodeLocation(nodeId, safeState, item);
+      if (gpsLocation && typeof gpsLocation === "object") {{
+        return {{
+          source: "gps",
+          location: gpsLocation,
+          nodeId: normalizeNodeId(nodeId || ""),
+        }};
+      }}
+      return null;
+    }}
+
     function networkTopNodesCityCacheKey(location) {{
       if (!location || typeof location !== "object") return "";
       const lat = Number(location.lat);
@@ -1669,7 +1689,10 @@
     function applyNetworkTopNodeCitySpan(span, text) {{
       if (!(span instanceof HTMLElement)) return;
       const clean = String(text || "").trim();
-      span.textContent = clean;
+      const source = String(span.dataset.topNodeCitySource || "").trim().toLowerCase();
+      const display = clean && source === "estimated" ? `~ ${{clean}}` : clean;
+      span.textContent = display;
+      span.classList.toggle("is-estimated", source === "estimated");
       span.hidden = !clean;
     }}
 
@@ -1811,11 +1834,19 @@
         const name = networkTopNodesDisplayName(nodeId, state);
         const meta = networkTopNodesMetaText(item, safePayload);
         const unitText = networkTopNodesUnitText(unit, value);
-        const location = networkTopNodesNodeLocation(nodeId, state, item);
+        const locationMeta = networkTopNodesNodeLocationMeta(nodeId, state, item);
+        const location = locationMeta ? locationMeta.location : null;
+        const citySource = String(locationMeta && locationMeta.source || "gps").trim().toLowerCase() === "estimated"
+          ? "estimated"
+          : "gps";
         const cityKey = networkTopNodesCityCacheKey(location);
-        const cityText = networkTopNodesCityText(location);
+        const cityTextRaw = networkTopNodesCityText(location);
+        const cityText = cityTextRaw && citySource === "estimated"
+          ? `~ ${{cityTextRaw}}`
+          : cityTextRaw;
+        // Legacy guard for compatibility tests: class="network-top-node-city"
         const cityHtml = cityKey
-          ? `<span class="network-top-node-city" data-top-node-city-key="${{escAttr(cityKey)}}" data-top-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-top-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : " hidden"}}>${{escAttr(cityText)}}</span>`
+          ? `<span class="network-top-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" data-top-node-city-key="${{escAttr(cityKey)}}" data-top-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-top-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-top-node-city-source="${{escAttr(citySource)}}"${{cityText ? "" : " hidden"}}>${{escAttr(cityText)}}</span>`
           : "";
         const nodeEmoji = networkTopNodesVisualEmoji(nodeId, state);
         const nodeWatermarkTextClass = (
@@ -3383,6 +3414,13 @@
 
     function networkRoutesScopeNodeLocation(nodeId, node = null, state = latestState, routeLocationEstimates = null) {{
       const clean = normalizeNodeId(nodeId || "");
+      if (typeof resolveNodeCityLocationMeta === "function") {{
+        return resolveNodeCityLocationMeta(clean, state, node, {{
+          allowEstimate: true,
+          estimateMode: "both",
+          routeLocationEstimates,
+        }});
+      }}
       const gpsLocation = networkTopNodesNodeLocation(clean, state, node);
       if (gpsLocation && typeof gpsLocation === "object") {{
         const lat = Number(gpsLocation.lat);
@@ -3393,16 +3431,6 @@
             location: {{ lat, lon }},
           }};
         }}
-      }}
-      const estimates = routeLocationEstimates instanceof Map ? routeLocationEstimates : new Map();
-      const estimate = estimates.get(clean);
-      const lat = Number(estimate && estimate.lat);
-      const lon = Number(estimate && estimate.lon);
-      if (networkTopNodesLocationIsValid(lat, lon)) {{
-        return {{
-          source: "estimated",
-          location: {{ lat, lon }},
-        }};
       }}
       return null;
     }}

@@ -439,3 +439,125 @@
         : (countryName ? `${{cityName}}, ${{countryName}}` : cityName);
       return place;
     }}
+
+    function normalizeNodeCityEstimateMode(modeRaw, fallback = "both") {{
+      const clean = String(modeRaw || "").trim().toLowerCase();
+      if (clean === "live" || clean === "history" || clean === "both") return clean;
+      const nextFallback = String(fallback || "").trim().toLowerCase();
+      return (nextFallback === "live" || nextFallback === "history" || nextFallback === "both")
+        ? nextFallback
+        : "both";
+    }}
+
+    function resolveNodeCityLocationFromCoords(latRaw, lonRaw) {{
+      const lat = Number(latRaw);
+      const lon = Number(lonRaw);
+      if (!isValidLatLonRange(lat, lon)) return null;
+      if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return null;
+      return {{ lat: Number(lat), lon: Number(lon) }};
+    }}
+
+    function nodeLinkedLocationEstimatesForState(state = latestState, options = null) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const mode = normalizeNodeCityEstimateMode(opts.mode, "both");
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object")
+        ? safeState.traffic
+        : {{}};
+      const edges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      if (!(typeof buildMapLinkLayerOverlay === "function") || !nodes.length || !edges.length) {{
+        nodeLinkedLocationEstimateCacheState = safeState;
+        nodeLinkedLocationEstimateCacheMode = mode;
+        nodeLinkedLocationEstimateCacheValue = new Map();
+        return nodeLinkedLocationEstimateCacheValue;
+      }}
+      if (
+        nodeLinkedLocationEstimateCacheState === safeState
+        && nodeLinkedLocationEstimateCacheMode === mode
+        && nodeLinkedLocationEstimateCacheValue instanceof Map
+      ) {{
+        return nodeLinkedLocationEstimateCacheValue;
+      }}
+      let estimates = new Map();
+      try {{
+        const overlay = buildMapLinkLayerOverlay(nodes, edges, {{ mode }});
+        estimates = (overlay && overlay.estimates instanceof Map)
+          ? overlay.estimates
+          : new Map();
+      }} catch (_err) {{
+        estimates = new Map();
+      }}
+      nodeLinkedLocationEstimateCacheState = safeState;
+      nodeLinkedLocationEstimateCacheMode = mode;
+      nodeLinkedLocationEstimateCacheValue = estimates;
+      return estimates;
+    }}
+
+    function resolveNodeCityLocationMeta(nodeId, state = latestState, item = null, options = null) {{
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const cleanNodeId = normalizeNodeId(
+        nodeId || (item && item.id) || (item && item.node_id) || ""
+      );
+      const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const localNodeSources = (
+        isSelectableNodeId(cleanNodeId)
+        && cleanNodeId === localNodeId
+      )
+        ? [safeState.local_state, safeState.localState]
+        : [];
+      const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      let matchedNode = null;
+      if (isSelectableNodeId(cleanNodeId)) {{
+        matchedNode = nodes.find((node) => normalizeNodeId(node && node.id) === cleanNodeId) || null;
+      }}
+      const extraSources = Array.isArray(opts.extraSources) ? opts.extraSources : [];
+      const gpsSources = [item, matchedNode, ...localNodeSources, ...extraSources]
+        .filter((source) => source && typeof source === "object");
+      for (const source of gpsSources) {{
+        const coords = nodeCoordsFromStateEntry(source);
+        if (!coords) continue;
+        const location = resolveNodeCityLocationFromCoords(coords.lat, coords.lon);
+        if (!location) continue;
+        return {{
+          source: "gps",
+          location,
+          nodeId: cleanNodeId,
+        }};
+      }}
+
+      if (opts.allowEstimate === false || !isSelectableNodeId(cleanNodeId)) {{
+        return null;
+      }}
+
+      const estimateSources = [];
+      estimateSources.push(
+        nodeLinkedLocationEstimatesForState(safeState, {{
+          mode: opts.estimateMode,
+        }})
+      );
+      if (opts.estimateByNodeId instanceof Map) {{
+        estimateSources.push(opts.estimateByNodeId);
+      }}
+      if (opts.routeLocationEstimates instanceof Map) {{
+        estimateSources.push(opts.routeLocationEstimates);
+      }}
+
+      for (const estimates of estimateSources) {{
+        if (!(estimates instanceof Map)) continue;
+        const estimate = estimates.get(cleanNodeId);
+        const location = resolveNodeCityLocationFromCoords(
+          estimate && estimate.lat,
+          estimate && estimate.lon
+        );
+        if (!location) continue;
+        return {{
+          source: "estimated",
+          location,
+          nodeId: cleanNodeId,
+          estimate,
+        }};
+      }}
+      return null;
+    }}
