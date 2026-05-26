@@ -2626,8 +2626,32 @@
         nodeMap,
         adjacency,
         combinedEdges,
+        rawEdges,
+        filteredRawEdges: rawEdges,
+        edgeMode: "live",
         localNodeId: normalizeNodeId(sourceId || safeBase.localNodeId || ""),
       }};
+    }}
+
+    function networkRoutesBuildLocationEstimates(data) {{
+      const safeData = (data && typeof data === "object") ? data : {{}};
+      if (typeof buildMapLinkLayerOverlay !== "function") return new Map();
+      const nodeMap = safeData.nodeMap instanceof Map ? safeData.nodeMap : new Map();
+      if (!nodeMap.size) return new Map();
+      const rawEdges = Array.isArray(safeData.filteredRawEdges)
+        ? safeData.filteredRawEdges
+        : (Array.isArray(safeData.rawEdges) ? safeData.rawEdges : []);
+      if (!rawEdges.length) return new Map();
+      const nodes = Array.from(nodeMap.values()).filter((node) => node && typeof node === "object");
+      if (!nodes.length) return new Map();
+      const modeRaw = String(safeData.edgeMode || "").trim().toLowerCase();
+      const mapMode = modeRaw === "live" ? "live" : "history";
+      try {{
+        const overlay = buildMapLinkLayerOverlay(nodes, rawEdges, {{ mode: mapMode }});
+        return (overlay && overlay.estimates instanceof Map) ? overlay.estimates : new Map();
+      }} catch (_err) {{
+        return new Map();
+      }}
     }}
 
     function networkRoutesLiveTraceMatchesSelection(liveState, fromId, toId) {{
@@ -2687,6 +2711,7 @@
       }});
 
       const renderData = networkRoutesBuildLiveTraceRenderData(baseData, towardsRoute, backRoute, sourceId, targetId);
+      const routeLocationEstimates = networkRoutesBuildLocationEstimates(renderData);
       const towardsHopCount = Math.max(0, towardsRoute.path.length - 1);
       const updatedUnix = safeState.updatedMs > 0 ? Math.floor(safeState.updatedMs / 1000) : 0;
       const updatedLabel = updatedUnix > 0 ? formatLocalChatTime(updatedUnix, "n/a") : "n/a";
@@ -2697,7 +2722,10 @@
         returnEdges: backRoute.edges,
       }};
       const towardScopeHtml = towardsRoute.path.length > 1
-        ? networkRoutesScopeHtml(scopeRoute, renderData, sourceId, targetId, {{ allowNodeEmoji: false }})
+        ? networkRoutesScopeHtml(scopeRoute, renderData, sourceId, targetId, {{
+            allowNodeEmoji: false,
+            routeLocationEstimates,
+          }})
         : "";
       const towardPathHtml = networkRoutesCompactPathHtml(
         towardsRoute,
@@ -3353,10 +3381,39 @@
       svg.addEventListener("lostpointercapture", finishDrag);
     }}
 
+    function networkRoutesScopeNodeLocation(nodeId, node = null, state = latestState, routeLocationEstimates = null) {{
+      const clean = normalizeNodeId(nodeId || "");
+      const gpsLocation = networkTopNodesNodeLocation(clean, state, node);
+      if (gpsLocation && typeof gpsLocation === "object") {{
+        const lat = Number(gpsLocation.lat);
+        const lon = Number(gpsLocation.lon);
+        if (networkTopNodesLocationIsValid(lat, lon)) {{
+          return {{
+            source: "gps",
+            location: {{ lat, lon }},
+          }};
+        }}
+      }}
+      const estimates = routeLocationEstimates instanceof Map ? routeLocationEstimates : new Map();
+      const estimate = estimates.get(clean);
+      const lat = Number(estimate && estimate.lat);
+      const lon = Number(estimate && estimate.lon);
+      if (networkTopNodesLocationIsValid(lat, lon)) {{
+        return {{
+          source: "estimated",
+          location: {{ lat, lon }},
+        }};
+      }}
+      return null;
+    }}
+
     function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId) {{
       const options = arguments.length > 4 ? arguments[4] : null;
       const opts = (options && typeof options === "object") ? options : {{}};
       const allowNodeEmoji = opts.allowNodeEmoji !== false;
+      const routeLocationEstimates = opts.routeLocationEstimates instanceof Map
+        ? opts.routeLocationEstimates
+        : new Map();
       // Legacy guard string for compatibility tests:
       // ${{isRoute && !nodeEmoji ? `<text class="network-route-scope-node-index"`
       const scoped = buildNetworkRoutesScopedLinks(route, data);
@@ -3478,9 +3535,12 @@
         const label = truncateNetworkGraphLabel(name, labelMax);
         const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
         const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
-        const location = networkTopNodesNodeLocation(clean, latestState, node);
+        const locationMeta = networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates);
+        const location = locationMeta ? locationMeta.location : null;
+        const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
         const cityKey = networkTopNodesCityCacheKey(location);
         const cityText = truncateNetworkGraphLabel(networkTopNodesCityText(location), 20);
+        const cityLabel = cityText && citySource === "estimated" ? `~ ${{cityText}}` : cityText;
         const cityY = radius + 38;
         const classes = [
           "network-route-scope-node",
@@ -3509,7 +3569,7 @@
           ${{isRoute && !resolvedNodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
           <text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>
           <text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>
-          ${{cityKey ? `<text class="network-route-scope-node-city" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : ' visibility="hidden"'}}>${{escAttr(cityText || " ")}}</text>` : ""}}
+          ${{cityKey ? `<text class="network-route-scope-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-route-node-city-source="${{escAttr(citySource || "gps")}}"${{cityLabel ? "" : ' visibility="hidden"'}}>${{escAttr(cityLabel || " ")}}</text>` : ""}}
         </g>`;
       }}).join("");
       const contextCount = scoped.contextEdges.length;
@@ -3538,7 +3598,9 @@
     function applyNetworkRoutesScopeNodeCityText(el, text) {{
       if (!(el instanceof Element)) return;
       const clean = truncateNetworkGraphLabel(String(text || "").trim(), 20);
-      el.textContent = clean || " ";
+      const source = String(el.getAttribute("data-route-node-city-source") || "").trim().toLowerCase();
+      const display = clean && source === "estimated" ? `~ ${{clean}}` : clean;
+      el.textContent = display || " ";
       if (clean) {{
         el.removeAttribute("visibility");
       }} else {{
@@ -3737,7 +3799,8 @@
       summary.innerHTML = "";
       summary.hidden = true;
       summary.setAttribute("aria-hidden", "true");
-      result.innerHTML = `${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId)}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
+      const routeLocationEstimates = networkRoutesBuildLocationEstimates(data);
+      result.innerHTML = `${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId, {{ routeLocationEstimates }})}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
       bindNetworkRoutesScopeInteractions(result);
       hydrateNetworkRoutesScopeNodeCities(result);
     }}

@@ -101,16 +101,22 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const returnPath = (Array.isArray(route && route.returnPath) ? route.returnPath : [])' in js
     assert 'appendPathEdges(returnPath, returnEdgesRaw, "return");' in js
     assert 'function networkRoutesScopeNodeEmoji(nodeId, node = null)' in js
+    assert 'function networkRoutesBuildLocationEstimates(data)' in js
+    assert 'function networkRoutesScopeNodeLocation(nodeId, node = null, state = latestState, routeLocationEstimates = null)' in js
     assert 'function networkRoutesScopeHtml(route, data, fromNodeId, toNodeId)' in js
     assert 'const isReturnRoute = kind === "return";' in js
     assert 'const bidirectionalEdgeKeys = new Set();' in js
     assert 'const markerDefsHtml = `<defs>' in js
     assert 'marker-end="${markerEnd}"' in js
     assert 'const cityKey = networkTopNodesCityCacheKey(location);' in js
-    assert 'class="network-route-scope-node-city"' in js
+    assert 'const citySource = locationMeta ? String(locationMeta.source || "gps") : "";' in js
+    assert 'const cityLabel = cityText && citySource === "estimated" ? `~ ${cityText}` : cityText;' in js
+    assert 'data-route-node-city-source="${escAttr(citySource || "gps")}"' in js
+    assert 'class="network-route-scope-node-city${citySource === "estimated" ? " is-estimated" : ""}"' in js
     assert 'function hydrateNetworkRoutesScopeNodeCities(root)' in js
     assert 'nearestOfflineCityHintFromCoords(lat, lon)' in js
     assert 'hydrateNetworkRoutesScopeNodeCities(result);' in js
+    assert 'const display = clean && source === "estimated" ? `~ ${clean}` : clean;' in js
     assert 'hopNodeId === "!local"' in js
     assert 'const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);' in js
     assert 'nodeEmoji ? "has-emoji-glyph" : ""' in js
@@ -134,6 +140,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const isBidirectionalOverlap = (isPrimaryRoute || isReturnRoute) && bidirectionalEdgeKeys.has(edgeKey);' in js
     assert 'const offsetPx = isBidirectionalOverlap ? 7 : 0;' in js
     assert 'if (keyAlreadyPresent && kind !== "return") continue;' in js
+    assert 'const routeLocationEstimates = networkRoutesBuildLocationEstimates(data);' in js
     assert 'returnPath: backRoute.path,' in js
     assert 'returnEdges: backRoute.edges,' in js
     assert 'Live trace is not wired yet.' in js
@@ -577,6 +584,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-route-scope-edge.is-return {" in css
     assert ".network-route-scope-node-hit {" in css
     assert ".network-route-scope-node-city {" in css
+    assert ".network-route-scope-node-city.is-estimated {" in css
     assert ".network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {" in css
     assert ".network-route-scope-node-emoji-fo {" in css
     assert ".network-route-scope-node-emoji {" in css
@@ -598,6 +606,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert '[data-theme="dark"] .network-route-scope-edge.is-return {' in css
     assert '[data-theme="dark"] .network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {' in css
     assert '[data-theme="dark"] .network-route-scope-node-city {' in css
+    assert '[data-theme="dark"] .network-route-scope-node-city.is-estimated {' in css
     assert '[data-theme="dark"] .network-route-hop {' in css
     assert '[data-theme="dark"] .network-route-hop-index {' in css
     assert "[data-theme=\"dark\"] .network-graph-layout-control," in css
