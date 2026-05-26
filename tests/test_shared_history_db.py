@@ -120,3 +120,44 @@ def test_runtime_uses_same_history_db_for_different_local_radios(tmp_path) -> No
     assert getattr(stores[1], "db_path") == history_db
     assert getattr(stores[0], "local_node_id") == "!12345678"
     assert getattr(stores[1], "local_node_id") == "!87654321"
+
+
+def test_runtime_does_not_auto_enable_bots_even_when_games_feature_is_enabled(tmp_path) -> None:
+    history_db = str(tmp_path / "mesh_dashboard_history.sqlite3")
+    enable_calls: list[object] = []
+
+    class _TrackerWithBots(_Tracker):
+        def enable_zork_bot(self, *, send_lock: object | None = None) -> bool:
+            enable_calls.append(send_lock)
+            return True
+
+    args = _args(history_db)
+    args.games_enable = True
+
+    build_dashboard_runtime_context(
+        args,
+        mesh_target_label_fn=lambda _args: "/dev/ttyUSB0 (serial)",
+        open_mesh_interface_fn=lambda _args: object(),
+        history_store_cls=lambda **_kwargs: object(),
+        dashboard_tracker_cls=_TrackerWithBots,
+        subscribe_fn=lambda _callback, _topic: None,
+        seed_tracker_fn=lambda _tracker, _iface: None,
+        revision_info_fn=_RevisionInfo,
+        send_chat_message_fn=lambda **_kwargs: {},
+        send_reaction_packet_fn=lambda **_kwargs: None,
+        get_local_node_id_fn=lambda _iface: "!12345678",
+        normalize_single_emoji_fn=lambda _value: (None, None),
+        to_int_fn=lambda _value: None,
+        utc_now_fn=lambda: "2026-05-02T00:00:00Z",
+        build_state_fn=lambda **_kwargs: {},
+        build_state_snapshot_loader_fn=lambda *_args, **_kwargs: lambda: {},
+        build_node_history_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_online_activity_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_summary_metrics_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_send_chat_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        default_chat_max_bytes=200,
+        resolve_history_db_path_fn=lambda path: path,
+        build_dashboard_runtime_loaders_fn=_loaders,
+    )
+
+    assert enable_calls == []
