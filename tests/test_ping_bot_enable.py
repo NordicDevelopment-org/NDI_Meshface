@@ -74,6 +74,36 @@ def test_dashboard_tracker_answers_direct_ping_when_enabled() -> None:
     assert str(iface.sent[0]["text"]).strip() == "3 hops."
 
 
+def test_dashboard_tracker_repeats_direct_ping_reply_when_count_is_requested() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+    assert runtime["ping"]["enabled"] is True
+
+    tracker.on_receive(_text_packet("ping 5", hop_start=7, hop_limit=4), iface)
+
+    assert len(iface.sent) == 5
+    assert [str(item["text"]).strip() for item in iface.sent] == ["1/5", "2/5", "3/5", "4/5", "5/5"]
+    for item in iface.sent:
+        assert item["kwargs"]["destinationId"] == "!01020304"
+        assert item["kwargs"]["replyId"] == 901
+        assert item["kwargs"]["channelIndex"] == 1
+
+
+def test_dashboard_tracker_caps_direct_ping_repeat_count() -> None:
+    tracker = DashboardTracker(packet_limit=25)
+    iface = _FakeInterface()
+    runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
+    assert runtime["ok"] is True
+
+    tracker.on_receive(_text_packet("ping 100"), iface)
+
+    assert len(iface.sent) == 25
+    assert str(iface.sent[0]["text"]).strip() == "1/25"
+    assert str(iface.sent[-1]["text"]).strip() == "25/25"
+
+
 def test_dashboard_tracker_answers_public_ping_with_direct_reply() -> None:
     tracker = DashboardTracker(packet_limit=25)
     iface = _FakeInterface()

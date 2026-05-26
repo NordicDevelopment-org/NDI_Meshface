@@ -15,6 +15,7 @@ from .tracker_ingest import _normalize_packet_node_id
 _BROADCAST_NUM = 0xFFFFFFFF
 _PING_HEADS = {"ping", "test"}
 _NATURAL_PING_TRIGGERS = {"can you see this", "can you see this?"}
+_MAX_DIRECT_PING_REPEAT_COUNT = 25
 
 
 def _normalize_node_id(value: object) -> str:
@@ -285,12 +286,12 @@ def _target_matches_local(target: str, *, local_node_id: str, local_aliases: set
     return target_norm in {alias.replace(" ", "") for alias in local_aliases}
 
 
-def _parse_ping_request(text: str, *, local_aliases: set[str]) -> tuple[str, str] | None:
+def _parse_ping_request(text: str, *, local_aliases: set[str]) -> tuple[str, list[str]] | None:
     clean = _clean_text_token(text)
     if not clean:
         return None
     if clean in _NATURAL_PING_TRIGGERS:
-        return "ping", ""
+        return "ping", []
 
     alias_stripped = clean
     for alias in sorted((a for a in local_aliases if " " in a), key=len, reverse=True):
@@ -306,13 +307,13 @@ def _parse_ping_request(text: str, *, local_aliases: set[str]) -> tuple[str, str
     if command_text.startswith("!") or command_text.startswith("#"):
         command_text = command_text[1:].strip()
     if command_text in _NATURAL_PING_TRIGGERS:
-        return "ping", ""
+        return "ping", []
 
     head, _, tail = command_text.partition(" ")
     if head not in _PING_HEADS:
         return None
-    target = tail.split(" ", 1)[0].strip() if tail else ""
-    return "ping", target
+    args = [part for part in tail.split(" ") if part] if tail else []
+    return "ping", args
 
 
 def _format_hops_label(hops: Optional[int]) -> str:
@@ -389,49 +390,71 @@ class PingBotService:
         parsed = _parse_ping_request(text, local_aliases=local_aliases)
         if parsed is None:
             return False
-        _, target = parsed
+        _, args = parsed
+        direct_message = to_id_lower == local_id_lower
+        target = ""
+        repeat_count = 1
+        if args:
+            first_arg = args[0]
+            if direct_message:
+                direct_repeat = _to_int(first_arg)
+                if direct_repeat is not None and direct_repeat > 0:
+                    repeat_count = min(direct_repeat, _MAX_DIRECT_PING_REPEAT_COUNT)
+                else:
+                    target = first_arg
+                    if len(args) > 1:
+                        trailing_repeat = _to_int(args[1])
+                        if trailing_repeat is not None and trailing_repeat > 0:
+                            repeat_count = min(trailing_repeat, _MAX_DIRECT_PING_REPEAT_COUNT)
+            else:
+                target = first_arg
         if not _target_matches_local(target, local_node_id=local_node_id, local_aliases=local_aliases):
             return False
 
         requester = _iter_nodes_by_id(iface).get(from_id.lower())
+        response_texts: list[str] = []
+        if direct_message and repeat_count > 1:
+            response_texts = [f"{index}/{repeat_count}" for index in range(1, repeat_count + 1)]
+        else:
+            hops = _packet_hops(packet)
+            if hops is None:
+                hops = _node_hops(requester)
 
-        hops = _packet_hops(packet)
-        if hops is None:
-            hops = _node_hops(requester)
+            signal_snr, signal_rssi = _packet_signal(packet)
+            if signal_snr is None or signal_rssi is None:
+                node_snr, node_rssi = _node_signal(requester)
+                if signal_snr is None:
+                    signal_snr = node_snr
+                if signal_rssi is None:
+                    signal_rssi = node_rssi
 
-        signal_snr, signal_rssi = _packet_signal(packet)
-        if signal_snr is None or signal_rssi is None:
-            node_snr, node_rssi = _node_signal(requester)
-            if signal_snr is None:
-                signal_snr = node_snr
-            if signal_rssi is None:
-                signal_rssi = node_rssi
-
-        response_text = _format_hops_label(hops)
-        signal_text = _format_signal_label(signal_snr, signal_rssi)
-        if signal_text:
-            response_text = f"{response_text} {signal_text}"
+            response_text = _format_hops_label(hops)
+            signal_text = _format_signal_label(signal_snr, signal_rssi)
+            if signal_text:
+                response_text = f"{response_text} {signal_text}"
+            response_texts = [response_text]
         channel_index = _packet_channel_index(packet)
         reply_id = _packet_id(packet)
-        sent_packet = self._send_text(
-            iface,
-            text=response_text,
-            destination_id=from_id,
-            channel_index=channel_index,
-            reply_id=reply_id,
-        )
-        sent_message_id = _sent_packet_id(sent_packet)
-        if record_local_chat_fn is not None:
-            record_local_chat_fn(
+        for response_text in response_texts:
+            sent_packet = self._send_text(
+                iface,
                 text=response_text,
-                from_id=local_node_id,
-                to_id=from_id,
+                destination_id=from_id,
                 channel_index=channel_index,
-                message_id=sent_message_id,
                 reply_id=reply_id,
-                ack_requested=True,
-                bot_command="ping",
             )
+            sent_message_id = _sent_packet_id(sent_packet)
+            if record_local_chat_fn is not None:
+                record_local_chat_fn(
+                    text=response_text,
+                    from_id=local_node_id,
+                    to_id=from_id,
+                    channel_index=channel_index,
+                    message_id=sent_message_id,
+                    reply_id=reply_id,
+                    ack_requested=True,
+                    bot_command="ping",
+                )
         return True
 
     def handle_local_chat(

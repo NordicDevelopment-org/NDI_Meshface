@@ -35,7 +35,7 @@ def normalize_bot_command_name(value: object) -> str:
 MANAGED_BOT_COMMAND_SPECS = (
     BotCommandSpec(
         name="ping",
-        usage="ping [target]",
+        usage="ping [target|count]",
         description="measure reply latency and hop path",
     ),
     BotCommandSpec(
