@@ -3476,8 +3476,12 @@
         const resolvedNodeEmoji = allowNodeEmoji ? nodeEmoji : "";
         const labelMax = denseRoute && !isFrom && !isTo ? 9 : (isRoute ? 14 : 11);
         const label = truncateNetworkGraphLabel(name, labelMax);
-        const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
         const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
+        const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
+        const location = networkTopNodesNodeLocation(clean, latestState, node);
+        const cityKey = networkTopNodesCityCacheKey(location);
+        const cityText = truncateNetworkGraphLabel(networkTopNodesCityText(location), 20);
+        const cityY = radius + 38;
         const classes = [
           "network-route-scope-node",
           isRoute ? "is-route" : "is-context",
@@ -3505,6 +3509,7 @@
           ${{isRoute && !resolvedNodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
           <text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>
           <text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>
+          ${{cityKey ? `<text class="network-route-scope-node-city" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}"${{cityText ? "" : ' visibility="hidden"'}}>${{escAttr(cityText || " ")}}</text>` : ""}}
         </g>`;
       }}).join("");
       const contextCount = scoped.contextEdges.length;
@@ -3528,6 +3533,53 @@
           <g class="network-route-scope-nodes">${{nodeHtml}}</g>
         </svg>
       </section>`;
+    }}
+
+    function applyNetworkRoutesScopeNodeCityText(el, text) {{
+      if (!(el instanceof Element)) return;
+      const clean = truncateNetworkGraphLabel(String(text || "").trim(), 20);
+      el.textContent = clean || " ";
+      if (clean) {{
+        el.removeAttribute("visibility");
+      }} else {{
+        el.setAttribute("visibility", "hidden");
+      }}
+    }}
+
+    function hydrateNetworkRoutesScopeNodeCities(root) {{
+      if (!(root instanceof HTMLElement)) return;
+      const nodes = Array.from(root.querySelectorAll("[data-route-node-city-key]"));
+      if (!nodes.length) return;
+      for (const node of nodes) {{
+        if (!(node instanceof Element)) continue;
+        const key = String(node.getAttribute("data-route-node-city-key") || "").trim();
+        if (!key) continue;
+        if (nodeCityHintCache instanceof Map && nodeCityHintCache.has(key)) {{
+          applyNetworkRoutesScopeNodeCityText(node, nodeCityHintCache.get(key));
+          continue;
+        }}
+        const lat = Number(node.getAttribute("data-route-node-city-lat"));
+        const lon = Number(node.getAttribute("data-route-node-city-lon"));
+        if (!networkTopNodesLocationIsValid(lat, lon) || typeof nearestOfflineCityHintFromCoords !== "function") {{
+          if (nodeCityHintCache instanceof Map) nodeCityHintCache.set(key, "");
+          applyNetworkRoutesScopeNodeCityText(node, "");
+          continue;
+        }}
+        nearestOfflineCityHintFromCoords(lat, lon)
+          .then((city) => {{
+            const text = String(city || "").trim();
+            if (nodeCityHintCache instanceof Map) nodeCityHintCache.set(key, text);
+            if (node.isConnected && String(node.getAttribute("data-route-node-city-key") || "").trim() === key) {{
+              applyNetworkRoutesScopeNodeCityText(node, text);
+            }}
+          }})
+          .catch(() => {{
+            if (nodeCityHintCache instanceof Map) nodeCityHintCache.set(key, "");
+            if (node.isConnected && String(node.getAttribute("data-route-node-city-key") || "").trim() === key) {{
+              applyNetworkRoutesScopeNodeCityText(node, "");
+            }}
+          }});
+      }}
     }}
 
     function renderNetworkRoutes(state = latestState, options = {{}}) {{
@@ -3653,6 +3705,7 @@
             networkRoutesToNodeId
           );
           bindNetworkRoutesScopeInteractions(result);
+          hydrateNetworkRoutesScopeNodeCities(result);
           return;
         }}
         if (liveMatchesSelection && liveState.ok === false) {{
@@ -3686,6 +3739,7 @@
       summary.setAttribute("aria-hidden", "true");
       result.innerHTML = `${{networkRoutesScopeHtml(route, data, networkRoutesFromNodeId, networkRoutesToNodeId)}}${{networkRoutesPathHtml(route, data.nodeMap, data.localNodeId)}}`;
       bindNetworkRoutesScopeInteractions(result);
+      hydrateNetworkRoutesScopeNodeCities(result);
     }}
 
     function formatMalformedDiagnosticsTimestamp(unixValue) {{

@@ -106,6 +106,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const bidirectionalEdgeKeys = new Set();' in js
     assert 'const markerDefsHtml = `<defs>' in js
     assert 'marker-end="${markerEnd}"' in js
+    assert 'const cityKey = networkTopNodesCityCacheKey(location);' in js
+    assert 'class="network-route-scope-node-city"' in js
+    assert 'function hydrateNetworkRoutesScopeNodeCities(root)' in js
+    assert 'nearestOfflineCityHintFromCoords(lat, lon)' in js
+    assert 'hydrateNetworkRoutesScopeNodeCities(result);' in js
     assert 'hopNodeId === "!local"' in js
     assert 'const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);' in js
     assert 'nodeEmoji ? "has-emoji-glyph" : ""' in js
@@ -571,6 +576,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-route-scope-edge.is-route {" in css
     assert ".network-route-scope-edge.is-return {" in css
     assert ".network-route-scope-node-hit {" in css
+    assert ".network-route-scope-node-city {" in css
     assert ".network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {" in css
     assert ".network-route-scope-node-emoji-fo {" in css
     assert ".network-route-scope-node-emoji {" in css
@@ -591,6 +597,7 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert '[data-theme="dark"] .network-route-scope-edge.is-route {' in css
     assert '[data-theme="dark"] .network-route-scope-edge.is-return {' in css
     assert '[data-theme="dark"] .network-route-scope-node.has-emoji-glyph .network-route-scope-node-core {' in css
+    assert '[data-theme="dark"] .network-route-scope-node-city {' in css
     assert '[data-theme="dark"] .network-route-hop {' in css
     assert '[data-theme="dark"] .network-route-hop-index {' in css
     assert "[data-theme=\"dark\"] .network-graph-layout-control," in css
