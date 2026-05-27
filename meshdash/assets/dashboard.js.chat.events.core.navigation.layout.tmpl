@@ -3797,14 +3797,26 @@
           result.innerHTML = `<div class="network-routes-empty">Choose a destination node, then run a live traceroute.</div>`;
           return;
         }}
+        const liveSourceId = normalizeNodeId(liveState.sourceId || "");
+        const liveTargetId = normalizeNodeId(liveState.targetId || "");
+        const runningFromId = (
+          liveState.running
+          && isSelectableNodeId(liveSourceId)
+        ) ? liveSourceId : networkRoutesFromNodeId;
+        const runningToId = (
+          liveState.running
+          && isSelectableNodeId(liveTargetId)
+        ) ? liveTargetId : networkRoutesToNodeId;
+        const runningFromName = networkGraphNodeDisplayName(runningFromId, data.nodeMap);
+        const runningToName = networkGraphNodeDisplayName(runningToId, data.nodeMap);
         const liveMatchesSelection = networkRoutesLiveTraceMatchesSelection(
           liveState,
           networkRoutesFromNodeId,
           networkRoutesToNodeId
         );
-        summary.innerHTML = `<span><strong>Live trace</strong> - ${{escAttr(fromName)}} to ${{escAttr(toName)}}</span><span>${{liveState.running ? "running" : "ready"}}</span>`;
+        summary.innerHTML = `<span><strong>Live trace</strong> - ${{escAttr(runningFromName)}} to ${{escAttr(runningToName)}}</span><span>${{liveState.running ? "running" : "ready"}}</span>`;
         if (liveState.running && !liveMatchesSelection) {{
-          result.innerHTML = `<div class="network-routes-empty">Running traceroute from ${{escAttr(fromName)}} to ${{escAttr(toName)}}...</div>`;
+          result.innerHTML = `<div class="network-routes-empty">Running traceroute from ${{escAttr(runningFromName)}} to ${{escAttr(runningToName)}}...</div>`;
           return;
         }}
         if (liveMatchesSelection && liveState.ok === true && liveState.result && typeof liveState.result === "object") {{

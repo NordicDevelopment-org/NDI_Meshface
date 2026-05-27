@@ -1272,8 +1272,11 @@
             ? node.hops_away
             : (caps && caps.last_hops)
         );
-        const hopsText = Number.isFinite(hopsRaw) && hopsRaw >= 0
-          ? String(Math.trunc(hopsRaw))
+        const hopsValue = Number.isFinite(hopsRaw) && hopsRaw >= 0
+          ? Math.trunc(hopsRaw)
+          : null;
+        const hopsText = hopsValue != null
+          ? String(hopsValue)
           : "n/a";
         const hasLivePosition = (
           node
@@ -1407,6 +1410,9 @@
         const idleRowHtml = showIdle
           ? `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`
           : "";
+        const hopsInlineHtml = hopsValue != null
+          ? `<span class="chat-member-hops-inline" title="Last known hops away: ${{escAttr(hopsText)}}">Hops ${{escAttr(hopsText)}}</span>`
+          : "";
         let packetSparkWrapHtml = "";
         if (showPacketTrendRow) {{
           const packetSparklinePath = buildChatNodeNavigatorPacketSparklinePath(packetSparklineBuckets, 56, 12);
@@ -1440,6 +1446,7 @@
           : "";
         if (showCity && memberCityHtml) memberMetaRowParts.push(memberCityHtml);
         if (idleRowHtml) memberMetaRowParts.push(idleRowHtml);
+        if (hopsInlineHtml) memberMetaRowParts.push(hopsInlineHtml);
         const memberMetaRowHtml = memberMetaRowParts.length > 0
           ? `<span class="chat-member-meta-row">${{memberMetaRowParts.join("")}}</span>`
           : "";
@@ -1449,7 +1456,7 @@
           const chips = [];
           for (const fieldIdRaw of visibleFieldIds) {{
             const fieldId = normalizeNodeExplorerFieldId(fieldIdRaw);
-            if (!fieldId || fieldId === "favorite") continue;
+            if (!fieldId || fieldId === "favorite" || fieldId === "hops") continue;
             const def = nodeExplorerFieldDef(fieldId);
             const field = nodeProjection && nodeProjection.fields ? nodeProjection.fields[fieldId] : null;
             if (!def || !field) continue;
