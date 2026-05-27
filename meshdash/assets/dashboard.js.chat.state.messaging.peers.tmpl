@@ -1083,6 +1083,40 @@
           ? ctx.resolveChatNodeFreshnessFn
           : (() => ({{ id: normalizeNodeId(item && item.id), lastSeenUnix: null, status: "unknown" }}));
         const nodeId = normalizeNodeId(item && item.id);
+        const liveTraceState = (typeof normalizedNetworkRoutesLiveTraceState === "function")
+          ? normalizedNetworkRoutesLiveTraceState(
+              (typeof networkRoutesLiveTraceState !== "undefined")
+                ? networkRoutesLiveTraceState
+                : null
+            )
+          : null;
+        const liveTraceTargetId = normalizeNodeId(liveTraceState && liveTraceState.targetId);
+        const liveTraceRunningForNode = !!(
+          liveTraceState
+          && liveTraceState.running === true
+          && isSelectableNodeId(liveTraceTargetId)
+          && liveTraceTargetId === nodeId
+        );
+        const liveTraceTimeoutMs = (
+          typeof networkRoutesLiveTraceTimeoutMs !== "undefined"
+          && Number.isFinite(Number(networkRoutesLiveTraceTimeoutMs))
+        )
+          ? Math.max(1000, Math.trunc(Number(networkRoutesLiveTraceTimeoutMs)))
+          : 30000;
+        const liveTraceUpdatedMs = Number(liveTraceState && liveTraceState.updatedMs);
+        const liveTraceElapsedMs = liveTraceRunningForNode
+          ? Math.max(
+              0,
+              Date.now() - (
+                Number.isFinite(liveTraceUpdatedMs)
+                  ? Math.trunc(liveTraceUpdatedMs)
+                  : Date.now()
+              )
+            )
+          : 0;
+        const liveTraceProgressPct = liveTraceRunningForNode
+          ? Math.max(1, Math.min(99, Math.round((liveTraceElapsedMs / liveTraceTimeoutMs) * 100)))
+          : 0;
         const snapshot = resolveChatNodeFreshnessFn(nodeId);
         const node = nodesById.get(nodeId) || null;
         const nodeProjection = nodeExplorerBuildProjection(
@@ -1209,6 +1243,9 @@
         }}
         if (showPacketTrendRow) {{
           tooltipLines.splice(4, 0, packetTickerDetail);
+        }}
+        if (liveTraceRunningForNode) {{
+          tooltipLines.splice(4, 0, `Traceroute: running (${{liveTraceProgressPct}}% of timeout window)`);
         }}
         if (malformedTextCount > 0) {{
           tooltipLines.push(
@@ -1359,6 +1396,9 @@
         const malformedTextChipHtml = malformedTextCount > 0
           ? `<span class="chat-member-alert-chip" title="${{escAttr(`Malformed text payloads detected: ${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}} on TEXT_MESSAGE_APP. Last seen ${{malformedTextLatestText}}${{malformedTextPayloadPreview ? `. Payload: ${{malformedTextPayloadPreview}}` : ""}`)}}">bad text</span>`
           : "";
+        const traceChipHtml = liveTraceRunningForNode
+          ? `<span class="chat-member-trace-chip" title="${{escAttr(`Traceroute in progress (${{liveTraceProgressPct}}%)`)}}">Tracing ${{escAttr(String(liveTraceProgressPct))}}%</span>`
+          : "";
         const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
         const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
           ? nodeVisualEmojiForNode(nodeId, tagEntry, node)
@@ -1396,7 +1436,7 @@
         const actionRowHtml = removeBtn
           ? `<span class="chat-member-actions">${{removeBtn}}</span>`
           : '<span class="chat-member-actions"></span>';
-        return `<div class="chat-member-item status-${{statusKey}}${{statusVisibilityClass}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-unread-direct-count="${{escAttr(unreadDirectCount)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
+        return `<div class="chat-member-item status-${{statusKey}}${{statusVisibilityClass}}${{selectedNodeId === ((item && item.id) || nodeId) ? " selected-node" : ""}}${{tagClass}}${{mutedClass}}${{packetSparkClass}}${{liveTraceRunningForNode ? " is-traceroute-running" : ""}}" data-node-id="${{escAttr((item && item.id) || nodeId)}}" data-unread-direct-count="${{escAttr(unreadDirectCount)}}" data-node-tint-outline-seed="${{escAttr(tintOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(tintStartSeed)}}" data-node-tint-end-seed="${{escAttr(tintEndSeed)}}" style="${{escAttr(memberTintStyle)}}" title="${{escAttr(memberTitle)}}">
           ${{statusMarkerHtml}}
           <span class="chat-member-main">
             <span class="chat-member-name-row">
@@ -1404,6 +1444,7 @@
                 <span class="chat-member-name status-${{statusKey}}">${{escAttr(memberDisplayName)}}</span>
                 ${{tagChipHtml}}
                 ${{malformedTextChipHtml}}
+                ${{traceChipHtml}}
               </span>
               ${{actionRowHtml}}
             </span>

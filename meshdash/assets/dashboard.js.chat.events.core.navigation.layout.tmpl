@@ -1022,6 +1022,9 @@
           : null,
       }});
       setNetworkRoutesPinnedTargetId(targetId);
+      if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
+        renderChatNodeNavigatorList(latestState);
+      }}
 
       if (
         opts.renderIfVisible !== false
@@ -2837,6 +2840,9 @@
           result: null,
         }});
         renderNetworkRoutes(latestState);
+        if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
+          renderChatNodeNavigatorList(latestState);
+        }}
         return null;
       }}
 
@@ -2885,6 +2891,9 @@
         }}
       }}
       renderNetworkRoutes(latestState);
+      if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
+        renderChatNodeNavigatorList(latestState);
+      }}
 
       try {{
         let payload = null;

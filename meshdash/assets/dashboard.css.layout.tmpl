@@ -5234,6 +5234,33 @@
       line-height: 1;
       transform: translateY(0.2px);
     }}
+    @keyframes chat-member-trace-ring-spin {{
+      to {{
+        transform: rotate(1turn);
+      }}
+    }}
+    .chat-member-item.is-traceroute-running .chat-member-status::after {{
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 999px;
+      border: 1.5px solid currentColor;
+      border-right-color: transparent;
+      border-bottom-color: transparent;
+      box-sizing: border-box;
+      pointer-events: none;
+      animation: chat-member-trace-ring-spin 900ms linear infinite;
+      opacity: 0.92;
+      z-index: 2;
+    }}
+    .chat-member-item.is-traceroute-running .chat-member-status.chat-member-status-emoji::after {{
+      display: none;
+    }}
+    .chat-member-item.is-traceroute-running .chat-member-status.chat-member-status-emoji .chat-member-status-ring {{
+      border-right-color: transparent;
+      border-bottom-color: transparent;
+      animation: chat-member-trace-ring-spin 900ms linear infinite;
+    }}
     .chat-member-status.status-online {{
       color: #2aa85a;
     }}
@@ -5515,6 +5542,28 @@
       letter-spacing: 0.14px;
       text-transform: uppercase;
       white-space: nowrap;
+    }}
+    .chat-member-trace-chip {{
+      flex: 0 0 auto;
+      border: 1px solid rgba(69, 128, 188, 0.56);
+      color: #295e8f;
+      background: rgba(217, 236, 252, 0.86);
+      border-radius: 999px;
+      padding: 0 5px;
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: 0.12px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      animation: chat-member-trace-chip-pulse 1.2s ease-in-out infinite;
+    }}
+    @keyframes chat-member-trace-chip-pulse {{
+      0%, 100% {{
+        opacity: 0.84;
+      }}
+      50% {{
+        opacity: 1;
+      }}
     }}
     .chat-member-id {{
       font-size: 9px;
