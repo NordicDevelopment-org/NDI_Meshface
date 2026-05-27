@@ -405,6 +405,113 @@
       chatNodeNavigatorProgrammaticScrollResetUntilMs = Date.now() + duration;
     }}
 
+    function normalizedChatNodeNavigatorTraceVisibilityState(rawState = chatNodeNavigatorTraceVisibilityState) {{
+      const safe = (rawState && typeof rawState === "object") ? rawState : {{}};
+      return {{
+        active: !!safe.active,
+        targetId: normalizeNodeId(safe.targetId || ""),
+        startedMs: Math.max(0, Number(safe.startedMs) || 0),
+        userReleased: !!safe.userReleased,
+      }};
+    }}
+
+    function syncChatNodeNavigatorTraceVisibilityState() {{
+      const previous = normalizedChatNodeNavigatorTraceVisibilityState(chatNodeNavigatorTraceVisibilityState);
+      let active = false;
+      let targetId = "";
+      let startedMs = 0;
+      if (typeof normalizedNetworkRoutesLiveTraceState === "function") {{
+        const liveState = normalizedNetworkRoutesLiveTraceState(networkRoutesLiveTraceState);
+        const liveTargetId = normalizeNodeId(liveState && liveState.targetId);
+        if (
+          liveState
+          && liveState.running === true
+          && isSelectableNodeId(liveTargetId)
+        ) {{
+          active = true;
+          targetId = liveTargetId;
+          startedMs = Math.max(0, Number(liveState.updatedMs) || 0);
+        }}
+      }}
+      const preserveRelease = (
+        active
+        && previous.active
+        && previous.targetId === targetId
+        && previous.startedMs === startedMs
+      );
+      chatNodeNavigatorTraceVisibilityState = {{
+        active,
+        targetId: active ? targetId : "",
+        startedMs: active ? startedMs : 0,
+        userReleased: preserveRelease ? previous.userReleased : false,
+      }};
+      return chatNodeNavigatorTraceVisibilityState;
+    }}
+
+    function chatNodeNavigatorRowForNodeIdInList(listEl, rawNodeId) {{
+      const nodeId = normalizeNodeId(rawNodeId || "");
+      if (!(listEl instanceof HTMLElement) || !isSelectableNodeId(nodeId)) return null;
+      for (const member of listEl.querySelectorAll(".chat-member-item")) {{
+        if (normalizeNodeId(member.dataset.nodeId || "") === nodeId) {{
+          return member;
+        }}
+      }}
+      return null;
+    }}
+
+    function chatNodeNavigatorRowOutOfView(listEl, rowEl) {{
+      if (!(listEl instanceof HTMLElement) || !(rowEl instanceof HTMLElement)) return false;
+      const listRect = listEl.getBoundingClientRect();
+      if (listRect.height <= 2 || listRect.width <= 2) return false;
+      const rowRect = rowEl.getBoundingClientRect();
+      const topSafe = listRect.top + 3;
+      let bottomSafe = listRect.bottom - 3;
+      const detailsDrawer = document.getElementById("chat-node-details-drawer");
+      if (
+        listEl.id === "chat-room-list"
+        && detailsDrawer instanceof HTMLElement
+        && !detailsDrawer.hidden
+        && typeof isVisibleForSelectionScroll === "function"
+        && isVisibleForSelectionScroll(detailsDrawer)
+      ) {{
+        const drawerRect = detailsDrawer.getBoundingClientRect();
+        bottomSafe = Math.min(bottomSafe, drawerRect.top - 3);
+      }}
+      if (bottomSafe <= topSafe + 8) {{
+        bottomSafe = topSafe + 8;
+      }}
+      return rowRect.bottom < topSafe || rowRect.top > bottomSafe;
+    }}
+
+    function chatNodeNavigatorFindRowForNodeId(rawNodeId) {{
+      const nodeId = normalizeNodeId(rawNodeId || "");
+      if (!isSelectableNodeId(nodeId)) return null;
+      for (const listId of [
+        "chat-room-unread-list",
+        "chat-room-meshtastic-list",
+        "chat-room-pinned-list",
+        "chat-room-list",
+      ]) {{
+        const listEl = document.getElementById(listId);
+        const rowEl = chatNodeNavigatorRowForNodeIdInList(listEl, nodeId);
+        if (rowEl instanceof HTMLElement && listEl instanceof HTMLElement) {{
+          return {{ listEl, rowEl }};
+        }}
+      }}
+      return null;
+    }}
+
+    function keepTraceTargetNodeVisibleInNavigator() {{
+      const traceState = syncChatNodeNavigatorTraceVisibilityState();
+      if (!traceState.active || traceState.userReleased) return false;
+      const located = chatNodeNavigatorFindRowForNodeId(traceState.targetId);
+      if (!located) return false;
+      if (!chatNodeNavigatorRowOutOfView(located.listEl, located.rowEl)) return false;
+      noteChatNodeNavigatorProgrammaticScrollReset(420);
+      located.rowEl.scrollIntoView({{ block: "nearest", inline: "nearest" }});
+      return true;
+    }}
+
     function clearChatNodeNavigatorSelectionScrollLock() {{
       chatNodeNavigatorSelectionScrollLocked = false;
       chatNodeNavigatorProgrammaticScrollResetUntilMs = 0;
@@ -825,8 +932,24 @@
       if (!(targetList instanceof HTMLElement) || targetList.dataset.memberClickBound === "1") return;
       targetList.dataset.memberClickBound = "1";
       targetList.addEventListener("scroll", () => {{
+        const nowMs = Date.now();
+        if (
+          nowMs > Number(chatNodeNavigatorProgrammaticScrollResetUntilMs || 0)
+          && typeof syncChatNodeNavigatorTraceVisibilityState === "function"
+        ) {{
+          const traceState = syncChatNodeNavigatorTraceVisibilityState();
+          if (traceState.active && !traceState.userReleased) {{
+            const rowEl = chatNodeNavigatorRowForNodeIdInList(targetList, traceState.targetId);
+            if (rowEl instanceof HTMLElement && chatNodeNavigatorRowOutOfView(targetList, rowEl)) {{
+              chatNodeNavigatorTraceVisibilityState = {{
+                ...traceState,
+                userReleased: true,
+              }};
+            }}
+          }}
+        }}
         if (!chatNodeNavigatorSelectionScrollLocked) return;
-        if (Date.now() <= Number(chatNodeNavigatorProgrammaticScrollResetUntilMs || 0)) return;
+        if (nowMs <= Number(chatNodeNavigatorProgrammaticScrollResetUntilMs || 0)) return;
         clearChatNodeNavigatorSelectionScrollLock();
       }}, {{ passive: true }});
       targetList.addEventListener("click", (ev) => {{
@@ -1799,6 +1922,7 @@
       if (chatNodeNavigatorSelectionScrollLocked) {{
         resetChatNodeNavigatorViewport();
       }}
+      keepTraceTargetNodeVisibleInNavigator();
 
       const onlineCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "online").length;
       const warnCount = rosterAll.filter((item) => normalizeFreshnessKey(item && item.status) === "warn").length;
