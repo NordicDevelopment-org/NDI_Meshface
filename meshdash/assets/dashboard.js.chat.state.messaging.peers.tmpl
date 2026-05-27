@@ -1526,8 +1526,19 @@
         const malformedTextChipHtml = malformedTextCount > 0
           ? `<span class="chat-member-alert-chip" title="${{escAttr(`Malformed text payloads detected: ${{malformedTextCount}} recent packet${{malformedTextCount === 1 ? "" : "s"}} on TEXT_MESSAGE_APP. Last seen ${{malformedTextLatestText}}${{malformedTextPayloadPreview ? `. Payload: ${{malformedTextPayloadPreview}}` : ""}`)}}">bad text</span>`
           : "";
-        const traceChipHtml = liveTraceRunningForNode
-          ? `<span class="chat-member-trace-chip" title="${{escAttr(`Traceroute in progress (${{liveTraceProgressPct}}%)`)}}">Tracing ${{escAttr(String(liveTraceProgressPct))}}%</span>`
+        const traceProgressHtml = liveTraceRunningForNode
+          ? `<span class="chat-member-task-progress"
+              role="progressbar"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="${{escAttr(String(liveTraceProgressPct))}}"
+              aria-valuetext="${{escAttr(`Traceroute ${{liveTraceProgressPct}} percent`)}}"
+              title="${{escAttr(`Traceroute in progress (${{liveTraceProgressPct}}%)`)}}"
+              style="--chat-member-task-progress:${{escAttr(String(liveTraceProgressPct))}}%;"
+            >
+              <span class="chat-member-task-progress-fill" aria-hidden="true"></span>
+              <span class="chat-member-task-progress-text">Tracing ${{escAttr(String(liveTraceProgressPct))}}%</span>
+            </span>`
           : "";
         const packetSparkClass = packetSparkWrapHtml ? " has-packet-spark" : "";
         const nodeVisualEmoji = (typeof nodeVisualEmojiForNode === "function")
@@ -1574,10 +1585,10 @@
                 <span class="chat-member-name status-${{statusKey}}">${{escAttr(memberDisplayName)}}</span>
                 ${{tagChipHtml}}
                 ${{malformedTextChipHtml}}
-                ${{traceChipHtml}}
               </span>
               ${{actionRowHtml}}
             </span>
+            ${{traceProgressHtml}}
             ${{memberMetaRowHtml}}
             ${{memberFieldsRowHtml}}
           </span>

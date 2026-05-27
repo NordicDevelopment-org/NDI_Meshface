@@ -5543,27 +5543,51 @@
       text-transform: uppercase;
       white-space: nowrap;
     }}
-    .chat-member-trace-chip {{
-      flex: 0 0 auto;
-      border: 1px solid rgba(69, 128, 188, 0.56);
-      color: #295e8f;
-      background: rgba(217, 236, 252, 0.86);
+    .chat-member-task-progress {{
+      --chat-member-task-progress: 0%;
+      position: relative;
+      display: block;
+      width: 100%;
+      height: 12px;
+      margin-top: 2px;
       border-radius: 999px;
-      padding: 0 5px;
+      overflow: hidden;
+      border: 1px solid rgba(69, 128, 188, 0.42);
+      background: rgba(217, 236, 252, 0.20);
+      box-sizing: border-box;
+      isolation: isolate;
+    }}
+    .chat-member-task-progress-fill {{
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: var(--chat-member-task-progress);
+      max-width: 100%;
+      border-radius: inherit;
+      background: linear-gradient(
+        90deg,
+        rgba(95, 163, 233, 0.60) 0%,
+        rgba(68, 145, 223, 0.82) 100%
+      );
+      transition: width 180ms linear;
+      pointer-events: none;
+      z-index: 0;
+    }}
+    .chat-member-task-progress-text {{
+      position: absolute;
+      inset: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-size: 8px;
-      line-height: 1.35;
+      line-height: 1;
       letter-spacing: 0.12px;
       text-transform: uppercase;
-      white-space: nowrap;
-      animation: chat-member-trace-chip-pulse 1.2s ease-in-out infinite;
-    }}
-    @keyframes chat-member-trace-chip-pulse {{
-      0%, 100% {{
-        opacity: 0.84;
-      }}
-      50% {{
-        opacity: 1;
-      }}
+      color: #1f4c78;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+      pointer-events: none;
+      z-index: 1;
     }}
     .chat-member-id {{
       font-size: 9px;
@@ -5710,6 +5734,7 @@
     .workspace-shell.chat-panel-collapsed .chat-member-actions,
     .workspace-shell.chat-panel-collapsed .chat-member-meta-row,
     .workspace-shell.chat-panel-collapsed .chat-member-fields-row,
+    .workspace-shell.chat-panel-collapsed .chat-member-task-progress,
     .workspace-shell.chat-panel-collapsed .chat-member-packet-spark-wrap,
     .workspace-shell.chat-panel-collapsed .chat-member-tag-chip,
     .workspace-shell.chat-panel-collapsed .chat-member-alert-chip {{
