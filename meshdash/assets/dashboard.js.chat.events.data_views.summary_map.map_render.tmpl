@@ -147,6 +147,8 @@
       }}
       let count = 0;
       for (const edge of (edges || [])) {{
+        const isReal = !!(edge && edge.is_real);
+        if (!isReal) continue;
         const src = byId[normalizeNodeId(edge && edge.from)];
         const dst = byId[normalizeNodeId(edge && edge.to)];
         if (!src || !dst) continue;
@@ -674,6 +676,7 @@
             const lifetimeCount = edge.lifetime_count ?? edge.count ?? 0;
             const sessionCount = edge.session_count ?? edge.count ?? 0;
             const isReal = !!edge.is_real;
+            if (!isReal) continue;
             const lastSeenUnix = parseEdgeLastSeenUnix(edge);
             const recencyFade = packetLineRecencyFade(lastSeenUnix, nowUnix);
             const ageMinutes = Number.isFinite(lastSeenUnix) && lastSeenUnix > 0
