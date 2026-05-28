@@ -33,6 +33,14 @@
       return signalHeatModeDefaults[key] || signalHeatModeDefaults.coverage;
     }}
 
+    function resolveSignalHeatGradient(mode = signalHeatmapMode) {{
+      const key = normalizeSignalHeatmapMode(mode);
+      if (key === "live") {{
+        return signalHeatmapGradientLiveContrast;
+      }}
+      return signalHeatmapGradientCoverage;
+    }}
+
     function signalHeatNodeAgeSeconds(node, nowUnix = Math.floor(Date.now() / 1000)) {{
       const heardUnix = nodeLastHeardUnix(node);
       if (!Number.isFinite(heardUnix) || heardUnix <= 0) {{
@@ -263,4 +271,3 @@
       // which can block marker hover/click unless canvas hit-testing is disabled.
       canvas.style.pointerEvents = "none";
     }}
-

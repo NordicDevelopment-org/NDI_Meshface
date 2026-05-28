@@ -98,6 +98,11 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function estimatedMarkerStyle(isSelected, confidence = 0.5, isLocal = false)" in js
     assert "function buildMapLinkLayerOverlay(nodes, rawEdges, options = null)" in js
     assert "function buildMapLinkEstimateDensityOverlay(linkOverlay, options = null)" in js
+    assert "const signalHeatmapGradientCoverage = {" in js
+    assert "const signalHeatmapGradientLiveContrast = {" in js
+    assert "function resolveSignalHeatGradient(mode = signalHeatmapMode) {" in js
+    assert "Signal heatmap uses a warm colorblind-friendly palette; link-cloud heatmaps stay blue." in js
+    assert "const gradient = resolveSignalHeatGradient(signalHeatmapMode);" in js
     assert "hideEstimatedMarkers: false," in js
     assert "hideEstimatedMarkers: clouds.length > 0," in js
     assert "cloudLinks" in js

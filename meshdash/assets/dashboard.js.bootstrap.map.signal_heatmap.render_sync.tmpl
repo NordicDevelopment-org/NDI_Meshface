@@ -31,6 +31,9 @@
         const fadeText = signalHeatmapMode === "none"
           ? ""
           : ` Freshness decays over ~${{fadeMinutes}}m.`;
+        const contrastText = signalHeatmapMode !== "none"
+          ? " Signal heatmap uses a warm colorblind-friendly palette; link-cloud heatmaps stay blue."
+          : "";
         const geoText = signalHeatDevKnobs.geoRadiusLock >= 0.5
           ? " Coverage is geo-locked (km-stable across zoom/latitude)."
           : "";
@@ -39,7 +42,7 @@
           ? " In Node view this shows only the selected node's signal footprint."
           : "";
         const baseTitle = supported
-          ? `Overlay realtime signal heatmap from positioned nodes. Intensity and radius are derived from reported SNR/RSSI (freshness-faded). ${{profileText}}${{modeText}}${{fadeText}}${{savedModeText}}${{geoText}}${{devText}}`
+          ? `Overlay realtime signal heatmap from positioned nodes. Intensity and radius are derived from reported SNR/RSSI (freshness-faded). ${{profileText}}${{modeText}}${{fadeText}}${{contrastText}}${{savedModeText}}${{geoText}}${{devText}}`
           : "Heatmap overlay is unavailable (leaflet.heat not loaded).";
         if (Number.isFinite(pointsCount)) {{
           modeWrap.title = `${{baseTitle}} Active nodes with signal+position: ${{pointsCount}}.`;
@@ -77,6 +80,7 @@
       const shouldShow = !(forceHide && !savedSingleNodeMode)
         && signalHeatmapEnabled
         && pointsCount > 0;
+      const gradient = resolveSignalHeatGradient(signalHeatmapMode);
 
       for (let i = 0; i < layers.length; i++) {{
         const layer = layers[i];
@@ -108,6 +112,7 @@
                 baseVisual.blur
               ),
               minOpacity: Math.max(baseVisual.minOpacity, 0.42),
+              gradient,
             }}
           : {{
               radius: clampNumber(
@@ -123,6 +128,7 @@
                 baseVisual.blur
               ),
               minOpacity: baseVisual.minOpacity,
+              gradient,
             }};
         if (typeof layer.setOptions === "function") {{
           layer.setOptions(visual);

@@ -160,12 +160,21 @@
     let mapLinkLegendOffsetRaf = null;
     const signalHeatmapPaneName = "signalHeatmapPane";
     const linkEstimateHeatmapPaneName = "linkEstimateHeatmapPane";
-    const signalHeatmapGradient = {{
-      0.02: "#1f4f79",
-      0.24: "#2f855a",
-      0.58: "#45ad69",
-      0.82: "#d1a02d",
-      1.0: "#b22222",
+    const signalHeatmapGradientCoverage = {{
+      0.05: "#332100",
+      0.26: "#6f4300",
+      0.54: "#a96800",
+      0.80: "#d9951a",
+      1.0: "#f4d38c",
+    }};
+    // Live signal uses a warm high-contrast scale so it stays distinct from
+    // blue link-cloud heatmaps under common color-vision deficiencies.
+    const signalHeatmapGradientLiveContrast = {{
+      0.04: "#2a1600",
+      0.22: "#7a3f00",
+      0.46: "#b85b00",
+      0.72: "#e67e22",
+      1.0: "#ffe5a6",
     }};
     const linkEstimateHeatmapGradient = {{
       0.06: "#0b2f6f",
@@ -176,7 +185,7 @@
     }};
     const signalHeatmapLayerOptions = {{
       maxZoom: 14,
-      gradient: signalHeatmapGradient,
+      gradient: signalHeatmapGradientCoverage,
     }};
     const linkEstimateHeatmapLayerOptions = {{
       maxZoom: 14,

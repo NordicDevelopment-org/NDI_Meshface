@@ -179,6 +179,36 @@ scp_cmd() {
   scp "${SCP_OPTS[@]}" "$@"
 }
 
+compute_local_deploy_payload_hash() {
+  (
+    cd "${ROOT_DIR}" || exit 1
+    {
+      LC_ALL=C sha256sum "mesh_dashboard.py" "mesh_connection.py" "requirements.txt"
+      LC_ALL=C find "meshdash" -type f \
+        ! -path 'meshdash/__pycache__/*' \
+        ! -name '*.pyc' \
+        -print0 \
+      | LC_ALL=C sort -z \
+      | LC_ALL=C xargs -0 sha256sum
+    } | LC_ALL=C sha256sum | awk '{print $1}'
+  )
+}
+
+compute_remote_deploy_payload_hash() {
+  ssh_cmd "${TARGET}" "\
+set -euo pipefail && \
+cd '${APP_DIR}' && \
+{ \
+  LC_ALL=C sha256sum 'mesh_dashboard.py' 'mesh_connection.py' 'requirements.txt' && \
+  LC_ALL=C find 'meshdash' -type f \
+    ! -path 'meshdash/__pycache__/*' \
+    ! -name '*.pyc' \
+    -print0 \
+  | LC_ALL=C sort -z \
+  | LC_ALL=C xargs -0 sha256sum; \
+} | LC_ALL=C sha256sum | awk '{print \$1}'"
+}
+
 path_is_within_root() {
   local path="${1:-}"
   local root="${2:-}"
@@ -646,6 +676,21 @@ tar \
   -cf - \
   meshdash \
 | ssh_cmd "${TARGET}" "tar -C '${APP_DIR}' -xf -"
+
+echo "[deploy] verifying copied payload"
+local_payload_hash="$(compute_local_deploy_payload_hash)"
+remote_payload_hash="$(compute_remote_deploy_payload_hash)"
+if [[ -z "${local_payload_hash}" || -z "${remote_payload_hash}" ]]; then
+  echo "deploy payload verification failed: unable to compute hash" >&2
+  exit 1
+fi
+if [[ "${local_payload_hash}" != "${remote_payload_hash}" ]]; then
+  echo "deploy payload verification failed: local and remote app payload differ" >&2
+  echo "[deploy] local payload hash:  ${local_payload_hash}" >&2
+  echo "[deploy] remote payload hash: ${remote_payload_hash}" >&2
+  exit 1
+fi
+echo "[deploy] payload hash: ${remote_payload_hash}"
 
 if [[ "${BOOTSTRAP}" -eq 1 ]]; then
   echo "[deploy] bootstrapping runtime + service"
