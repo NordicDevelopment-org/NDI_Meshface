@@ -389,6 +389,13 @@
       }}
     }}
 
+    function persistMapEstimatedNodeCloudsPreference() {{
+      try {{
+        window.localStorage.setItem(mapEstimatedNodeCloudsStorageKey, mapEstimatedNodeCloudsEnabled ? "1" : "0");
+      }} catch (_err) {{
+      }}
+    }}
+
     function persistMapLiveActivityPreference() {{
       try {{
         window.localStorage.setItem(mapLiveActivityStorageKey, mapLiveActivityEnabled ? "1" : "0");
@@ -421,6 +428,19 @@
         persistMapLinkLayerModePreference();
       }}
       updateMapLinkLayerControl();
+    }}
+
+    function loadMapEstimatedNodeCloudsPreference() {{
+      mapEstimatedNodeCloudsEnabled = true;
+      try {{
+        const stored = window.localStorage.getItem(mapEstimatedNodeCloudsStorageKey);
+        if (stored === "0") {{
+          mapEstimatedNodeCloudsEnabled = false;
+        }} else if (stored === "1") {{
+          mapEstimatedNodeCloudsEnabled = true;
+        }}
+      }} catch (_err) {{
+      }}
     }}
 
     function loadMapLiveActivityPreference() {{

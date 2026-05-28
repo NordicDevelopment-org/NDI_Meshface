@@ -1690,7 +1690,26 @@
       }}
       }}
 
-      return {{ estimates, lines }};
+      // Keep estimated positions only for nodes that participate in at least one
+      // rendered estimated-link segment. If no line touches a node, don't place it.
+      const estimatedNodeIdsWithLines = new Set();
+      for (const line of lines) {{
+        const fromId = normalizeNodeId(line && line.fromId);
+        const toId = normalizeNodeId(line && line.toId);
+        if (estimates.has(fromId)) {{
+          estimatedNodeIdsWithLines.add(fromId);
+        }}
+        if (estimates.has(toId)) {{
+          estimatedNodeIdsWithLines.add(toId);
+        }}
+      }}
+      const filteredEstimates = new Map();
+      for (const [nodeId, estimate] of estimates.entries()) {{
+        if (!estimatedNodeIdsWithLines.has(nodeId)) continue;
+        filteredEstimates.set(nodeId, estimate);
+      }}
+
+      return {{ estimates: filteredEstimates, lines }};
     }}
 
     function getNetworkMapFullscreenTarget() {{
