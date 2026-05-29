@@ -8,8 +8,59 @@
     const metricTickerSeriesPersistMaxAgeMs = 24 * 60 * 60 * 1000;
     const metricTickerSeriesPersistMaxPointsPerMetric = 2400;
     const metricTickerSeriesPersistThrottleMs = Math.max(4000, refreshMs * 3);
+    const metricTickerExpandedMinWindowMs = 6 * 60 * 60 * 1000;
     let metricTickerSeriesPersistTimer = null;
     let metricTickerSeriesLastPersistMs = 0;
+
+    function metricTickerSafeWindowMs(rawWindowMs, fallbackMs = metricTickerWindowMs) {{
+      const fallback = Math.max(60000, Number(fallbackMs) || metricTickerWindowMs);
+      const parsed = Number(rawWindowMs);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.max(60000, parsed);
+    }}
+
+    function metricTickerExpandedWindowMs(baseWindowMs = metricTickerWindowMs) {{
+      const base = metricTickerSafeWindowMs(baseWindowMs, metricTickerWindowMs);
+      const minimumExpanded = Math.max(base, metricTickerExpandedMinWindowMs);
+      const persistedCap = metricTickerSafeWindowMs(
+        metricTickerSeriesPersistMaxAgeMs,
+        metricTickerExpandedMinWindowMs
+      );
+      return Math.min(persistedCap, minimumExpanded);
+    }}
+
+    function metricTickerRetentionWindowMs(baseWindowMs = metricTickerWindowMs) {{
+      const base = metricTickerSafeWindowMs(baseWindowMs, metricTickerWindowMs);
+      const expanded = metricTickerExpandedWindowMs(base);
+      const persisted = metricTickerSafeWindowMs(
+        metricTickerSeriesPersistMaxAgeMs,
+        metricTickerExpandedMinWindowMs
+      );
+      return Math.max(base, expanded, persisted);
+    }}
+
+    function metricTickerRetentionMaxPoints() {{
+      return Math.max(
+        Math.max(1, Math.trunc(Number(metricTickerMaxPoints) || 1)),
+        Math.max(1, Math.trunc(Number(metricTickerSeriesPersistMaxPointsPerMetric) || 1))
+      );
+    }}
+
+    function sliceMetricTickerPointsByWindow(points, windowMs, nowMs = Date.now()) {{
+      const source = Array.isArray(points) ? points : [];
+      if (!source.length) return [];
+      const effectiveWindowMs = metricTickerSafeWindowMs(windowMs, metricTickerWindowMs);
+      const cutoffMs = Number(nowMs) - effectiveWindowMs;
+      const trimmed = source.filter((point) => {{
+        const ms = Number(point && point.ms);
+        return Number.isFinite(ms) && ms >= cutoffMs;
+      }});
+      if (trimmed.length > 0) {{
+        return trimmed;
+      }}
+      const last = source[source.length - 1];
+      return last ? [last] : [];
+    }}
 
     function formatTickerNumber(value, digits = 0) {{
       const numeric = Number(value);

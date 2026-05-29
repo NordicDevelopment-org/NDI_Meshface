@@ -1952,7 +1952,13 @@
       if (newNodesTicker instanceof HTMLElement && !showNewNodesTrend) {{
         newNodesTicker.hidden = true;
       }}
-      appendMetricTickerPoint("live_packets", livePacketTotal);
+      appendMetricTickerPoint(
+        "live_packets",
+        livePacketTotal,
+        Date.now(),
+        metricTickerRetentionWindowMs(metricTickerWindowMs),
+        metricTickerRetentionMaxPoints()
+      );
       const livePacketSeries = metricTickerSeries.get("live_packets") || [];
       const packetsPerMinuteSeries = derivePacketsPerMinuteSeriesFromTotals(livePacketSeries);
       const latestPacketsPerMinute = packetsPerMinuteSeries.length

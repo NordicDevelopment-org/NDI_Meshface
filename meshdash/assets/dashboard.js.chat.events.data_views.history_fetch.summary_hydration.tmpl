@@ -91,7 +91,7 @@
       return data;
     }}
 
-    function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerWindowMs) {{
+    function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerRetentionWindowMs()) {{
       const cleanKey = String(metricKey || "").trim();
       const incoming = Array.isArray(incomingSeries) ? incomingSeries : [];
       if (!cleanKey || incoming.length === 0) return [];
@@ -113,7 +113,7 @@
       }}
       const merged = Array.from(mergedByBucket.values())
         .sort((a, b) => Number(a.ms) - Number(b.ms));
-      trimMetricTickerPoints(merged, cutoffMs);
+      trimMetricTickerPoints(merged, cutoffMs, metricTickerRetentionMaxPoints());
       if (merged.length > 0) {{
         metricTickerSeries.set(cleanKey, merged);
       }}
@@ -159,12 +159,12 @@
         byKey.set("live_packets_per_min", livePacketRates);
       }}
 
-      const cutoffMs = Date.now() - metricTickerWindowMs;
+      const cutoffMs = Date.now() - metricTickerRetentionWindowMs();
       let loadedAny = false;
       for (const [metricKey, series] of byKey.entries()) {{
         if (!Array.isArray(series) || series.length === 0) continue;
         series.sort((a, b) => Number(a.ms) - Number(b.ms));
-        trimMetricTickerPoints(series, cutoffMs);
+        trimMetricTickerPoints(series, cutoffMs, metricTickerRetentionMaxPoints());
         const merged = mergeMetricTickerSeries(metricKey, series, cutoffMs);
         loadedAny = loadedAny || merged.length > 0;
       }}

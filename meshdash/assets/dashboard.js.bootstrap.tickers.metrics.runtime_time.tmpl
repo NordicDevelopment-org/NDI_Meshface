@@ -105,13 +105,38 @@
         container.hidden = true;
         return;
       }}
-      const points = appendMetricTickerPoint(
+      const tickerItem = container.closest(".summary-ticker-item");
+      const compactDetailTickerView = tickerItem instanceof HTMLElement
+        && (
+          tickerItem.classList.contains("is-compact-detail-source")
+          || tickerItem.classList.contains("is-compact-detail-open")
+        );
+      const expandedPlotZoomTickerView = tickerItem instanceof HTMLElement
+        && tickerItem.classList.contains("is-expanded-plot-zoom");
+      const expandedTickerView = topbarElement instanceof HTMLElement
+        && (topbarElement.classList.contains("ticker-expanded") || compactDetailTickerView);
+      const baseWindowMs = metricTickerSafeWindowMs(config.windowMs, metricTickerWindowMs);
+      const displayWindowMs = expandedPlotZoomTickerView
+        ? metricTickerRetentionWindowMs(baseWindowMs)
+        : (
+          expandedTickerView
+            ? metricTickerExpandedWindowMs(baseWindowMs)
+            : baseWindowMs
+        );
+      const retentionWindowMs = metricTickerRetentionWindowMs(baseWindowMs);
+      const configuredMaxPoints = Math.max(
+        1,
+        Math.trunc(Number(config.maxPoints) || metricTickerMaxPoints)
+      );
+      const retentionMaxPoints = Math.max(configuredMaxPoints, metricTickerRetentionMaxPoints());
+      const allPoints = appendMetricTickerPoint(
         metricKey,
         value,
         Date.now(),
-        Number(config.windowMs) || metricTickerWindowMs,
-        Number(config.maxPoints) || metricTickerMaxPoints
+        retentionWindowMs,
+        retentionMaxPoints
       );
+      const points = sliceMetricTickerPointsByWindow(allPoints, displayWindowMs, Date.now());
       if (!Array.isArray(points) || points.length === 0) {{
         clearMetricTickerStateClasses(container);
         container.hidden = true;
@@ -148,15 +173,17 @@
       container.hidden = false;
 
       chart.innerHTML = "";
-      const tickerItem = container.closest(".summary-ticker-item");
-      const compactDetailTickerView = tickerItem instanceof HTMLElement
-        && tickerItem.classList.contains("is-compact-detail-open");
-      const expandedTickerView = topbarElement instanceof HTMLElement
-        && (topbarElement.classList.contains("ticker-expanded") || compactDetailTickerView);
-      const chartWidth = expandedTickerView ? 184 : 72;
-      const chartHeight = expandedTickerView ? 44 : 16;
-      const chartPad = expandedTickerView ? 3 : 1.5;
+      const chartWidth = expandedPlotZoomTickerView ? 296 : (expandedTickerView ? 184 : 72);
+      const chartHeight = expandedPlotZoomTickerView ? 68 : (expandedTickerView ? 44 : 16);
+      const chartPad = expandedPlotZoomTickerView ? 4 : (expandedTickerView ? 3 : 1.5);
       chart.setAttribute("viewBox", `0 0 ${{chartWidth}} ${{chartHeight}}`);
+      if (expandedPlotZoomTickerView) {{
+        chart.style.height = "56px";
+      }} else if (expandedTickerView) {{
+        chart.style.height = "30px";
+      }} else {{
+        chart.style.removeProperty("height");
+      }}
       const pathData = buildMetricTickerPath(points, chartWidth, chartHeight, chartPad);
       if (pathData) {{
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -167,7 +194,7 @@
       const firstMs = Number(points[0] && points[0].ms);
       const rangeMinutes = Number.isFinite(firstMs)
         ? Math.max(1, Math.round((Date.now() - firstMs) / 60000))
-        : Math.max(1, Math.round(metricTickerWindowMs / 60000));
+        : Math.max(1, Math.round(displayWindowMs / 60000));
       const rangeHours = Math.max(1 / 60, rangeMinutes / 60);
       const ratePerHour = delta / rangeHours;
       const rateAbsBaseText = formatTickerNumber(

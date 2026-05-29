@@ -4,10 +4,16 @@
     }}
 
     let activeCompactTickerDetailId = "";
+    let activeExpandedTickerZoomId = "";
 
     function compactTickerDetailModeActive() {{
       return topbarElement instanceof HTMLElement
         && !topbarElement.classList.contains("ticker-expanded");
+    }}
+
+    function expandedTickerZoomModeActive() {{
+      return topbarElement instanceof HTMLElement
+        && topbarElement.classList.contains("ticker-expanded");
     }}
 
     function tickerNavigationTarget(tickerId) {{
@@ -23,6 +29,17 @@
       const id = normalizeTickerId(item.dataset.tickerId || "");
       if (tickerNavigationTarget(id)) return false;
       return !!id && id !== "self";
+    }}
+
+    function expandedTickerPlotItemIsZoomable(item) {{
+      if (!(item instanceof HTMLElement)) return false;
+      if (item.hidden) return false;
+      if (item.classList.contains("summary-ticker-item-control")) return false;
+      const id = normalizeTickerId(item.dataset.tickerId || "");
+      if (!id || id === "self") return false;
+      if (tickerNavigationTarget(id)) return false;
+      const metricTicker = item.querySelector(".metric-ticker");
+      return metricTicker instanceof HTMLElement && !metricTicker.hidden;
     }}
 
     function syncCompactTickerColumnCount(row) {{
@@ -79,6 +96,15 @@
       }}
       clearCompactTickerExpandedSlot();
       syncCompactTickerDetailAffordances();
+      requestTopbarLayoutMetricsSync();
+      if (rerenderSummary && latestState) {{
+        renderSummary(latestState);
+      }}
+    }}
+
+    function closeExpandedTickerPlotZoom({{ rerenderSummary = false }} = {{}}) {{
+      activeExpandedTickerZoomId = "";
+      syncExpandedTickerZoomAffordances();
       requestTopbarLayoutMetricsSync();
       if (rerenderSummary && latestState) {{
         renderSummary(latestState);
@@ -146,6 +172,55 @@
       }}
     }}
 
+    function toggleExpandedTickerPlotZoom(id) {{
+      const cleanId = normalizeTickerId(id);
+      if (!cleanId || cleanId === "self") return;
+      if (!expandedTickerZoomModeActive()) return;
+      if (activeExpandedTickerZoomId === cleanId) {{
+        closeExpandedTickerPlotZoom({{ rerenderSummary: true }});
+        return;
+      }}
+      activeExpandedTickerZoomId = cleanId;
+      syncExpandedTickerZoomAffordances();
+      requestTopbarLayoutMetricsSync();
+      if (latestState) {{
+        renderSummary(latestState);
+      }}
+    }}
+
+    function syncExpandedTickerZoomAffordances() {{
+      const row = document.querySelector(".summary-ticker-row");
+      if (!(row instanceof HTMLElement)) return;
+      const expanded = expandedTickerZoomModeActive();
+      let activeZoomStillVisible = false;
+      for (const item of Array.from(row.querySelectorAll(".summary-ticker-item[data-ticker-id]"))) {{
+        if (!(item instanceof HTMLElement)) continue;
+        const id = normalizeTickerId(item.dataset.tickerId || "");
+        const zoomable = expanded && expandedTickerPlotItemIsZoomable(item);
+        if (zoomable && id === activeExpandedTickerZoomId) {{
+          activeZoomStillVisible = true;
+        }}
+        item.classList.toggle("is-expanded-plot-zoom", zoomable && id === activeExpandedTickerZoomId);
+        if (!zoomable) {{
+          if (!compactTickerDetailModeActive() && !tickerNavigationTarget(id) && id !== "self") {{
+            item.removeAttribute("role");
+            item.removeAttribute("tabindex");
+            item.removeAttribute("aria-pressed");
+            item.removeAttribute("aria-label");
+          }}
+          continue;
+        }}
+        item.setAttribute("role", "button");
+        item.tabIndex = 0;
+        item.setAttribute("aria-pressed", id === activeExpandedTickerZoomId ? "true" : "false");
+        const labelText = tickerLabelText(id) || id;
+        item.setAttribute("aria-label", `${{id === activeExpandedTickerZoomId ? "Zoom out" : "Zoom in"}} ${{labelText}} plot`);
+      }}
+      if (expanded && activeExpandedTickerZoomId && !activeZoomStillVisible) {{
+        activeExpandedTickerZoomId = "";
+      }}
+    }}
+
     function syncCompactTickerDetailAffordances() {{
       const row = document.querySelector(".summary-ticker-row");
       if (!(row instanceof HTMLElement)) return;
@@ -181,6 +256,7 @@
         item.setAttribute("aria-label", `${{id === activeCompactTickerDetailId ? "Collapse" : "Show"}} ${{labelText}} ticker detail`);
       }}
       syncCompactTickerColumnCount(row);
+      syncExpandedTickerZoomAffordances();
     }}
 
     function bindCompactTickerDetailTrayControls() {{
@@ -202,7 +278,11 @@
             }}
           }}
           if (!compactTickerDetailItemIsExpandable(item)) return;
-          if (!compactTickerDetailModeActive()) return;
+          if (!compactTickerDetailModeActive()) {{
+            if (!expandedTickerPlotItemIsZoomable(item)) return;
+            toggleExpandedTickerPlotZoom(item.dataset.tickerId || "");
+            return;
+          }}
           toggleCompactTickerDetail(item.dataset.tickerId || "");
         }});
         row.addEventListener("keydown", (ev) => {{
@@ -220,7 +300,12 @@
             }}
           }}
           if (!compactTickerDetailItemIsExpandable(item)) return;
-          if (!compactTickerDetailModeActive()) return;
+          if (!compactTickerDetailModeActive()) {{
+            if (!expandedTickerPlotItemIsZoomable(item)) return;
+            ev.preventDefault();
+            toggleExpandedTickerPlotZoom(item.dataset.tickerId || "");
+            return;
+          }}
           ev.preventDefault();
           toggleCompactTickerDetail(item.dataset.tickerId || "");
         }});
@@ -245,6 +330,7 @@
       }}
 
       syncCompactTickerDetailAffordances();
+      syncExpandedTickerZoomAffordances();
     }}
 
     function normalizeWeeklySummaryMetric(raw) {{
@@ -717,6 +803,7 @@
       if (normalized === "expanded") {{
         closeCompactTickerDetail();
       }} else {{
+        closeExpandedTickerPlotZoom();
         syncCompactTickerDetailAffordances();
       }}
       updateSummaryTickerExpandControl();

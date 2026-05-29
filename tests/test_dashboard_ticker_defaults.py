@@ -278,13 +278,17 @@ def test_compact_tickers_expand_selected_card_below_fixed_row() -> None:
     assert 'id="summary-ticker-expanded-slot"' in html
     assert 'function bindCompactTickerDetailTrayControls() {' in js
     assert 'function toggleCompactTickerDetail(id) {' in js
+    assert 'function toggleExpandedTickerPlotZoom(id) {' in js
     assert 'function compactTickerExpandedSlot() {' in js
     assert 'function renderCompactTickerExpandedSlot(sourceItem, cleanId) {' in js
     assert 'function stripClonedTickerIds(root) {' in js
+    assert 'function expandedTickerPlotItemIsZoomable(item) {' in js
     assert 'return !!id && id !== "self";' in js
     assert 'topbarElement.classList.add("has-compact-ticker-detail");' in js
     assert 'item.classList.remove("is-compact-detail-open");' in js
     assert 'item.classList.toggle("is-compact-detail-source", expandable && id === activeCompactTickerDetailId);' in js
+    assert 'item.classList.toggle("is-expanded-plot-zoom", zoomable && id === activeExpandedTickerZoomId);' in js
+    assert 'toggleExpandedTickerPlotZoom(item.dataset.tickerId || "");' in js
     assert 'clone.classList.add("is-compact-detail-open", "summary-ticker-expanded-card");' in js
     assert "stripClonedTickerIds(clone);" in js
     assert "slot.replaceChildren(clone);" in js
@@ -329,6 +333,8 @@ def test_compact_tickers_expand_selected_card_below_fixed_row() -> None:
     assert '[data-theme="dark"] .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open:hover,' in css
     assert '[data-theme="dark"] .topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open:focus-visible {' in css
     assert ".topbar.has-compact-ticker-detail:not(.ticker-expanded) .summary-ticker-item.is-compact-detail-open .metric-ticker {" in css
+    assert '.topbar.ticker-expanded .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]) {' in css
+    assert ".topbar.ticker-expanded .summary-ticker-item.is-expanded-plot-zoom {" in css
 
 
 def test_metric_state_classes_only_set_ticker_accents() -> None:
@@ -356,7 +362,7 @@ def test_dashboard_js_merges_summary_hydration_with_persisted_ticker_series() ->
         node_history_max_points=240,
     )
 
-    assert 'function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerWindowMs) {' in js
+    assert 'function mergeMetricTickerSeries(metricKey, incomingSeries, cutoffMs = Date.now() - metricTickerRetentionWindowMs()) {' in js
     assert 'const existing = Array.isArray(metricTickerSeries.get(cleanKey))' in js
     assert 'const mergedByBucket = new Map();' in js
     assert 'const merged = Array.from(mergedByBucket.values())' in js

@@ -1662,6 +1662,18 @@
       row-gap: 4px;
       align-items: start;
     }}
+    .topbar.ticker-expanded .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]) {{
+      cursor: pointer;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):hover,
+    .topbar.ticker-expanded .summary-ticker-item[data-ticker-id]:not([data-ticker-id="self"]):focus-visible {{
+      border-color: color-mix(in srgb, var(--line) 78%, var(--ink) 22%);
+      background: color-mix(in srgb, var(--panel) 93%, var(--line) 7%);
+      outline: none;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item.is-expanded-plot-zoom {{
+      flex: 2 1 min(420px, 100%);
+    }}
     .topbar.ticker-expanded .summary-ticker-density-toggle {{
       flex: 0 0 var(--topbar-corner-reserve, 36px);
       width: var(--topbar-corner-reserve, 36px);
@@ -1670,6 +1682,9 @@
     }}
     .topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item {{
       flex-basis: min(300px, 100%);
+    }}
+    .topbar.ticker-expanded.ticker-wrap-balanced .summary-ticker-item.is-expanded-plot-zoom {{
+      flex-basis: min(480px, 100%);
     }}
     .topbar.ticker-expanded .summary-ticker-item-bots {{
       flex-grow: 0;
@@ -1928,6 +1943,13 @@
       grid-row: 1 / span 2;
       width: 100%;
       height: 30px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item.is-expanded-plot-zoom .metric-ticker {{
+      grid-template-columns: auto minmax(170px, 1fr);
+      column-gap: 10px;
+    }}
+    .topbar.ticker-expanded .summary-ticker-item.is-expanded-plot-zoom .metric-ticker-chart {{
+      height: 56px;
     }}
     .topbar.ticker-expanded .summary-ticker-item .metric-ticker-chart path {{
       stroke-width: 1.6;
