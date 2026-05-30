@@ -7,7 +7,7 @@ from meshdash.html_js import build_dashboard_js
 
 
 def test_chat_unread_collection_tracks_messages_across_mesh_channels() -> None:
-    unread_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.unread.tmpl").read_text()
+    unread_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.unread.tmpl").read_text(encoding="utf-8")
 
     assert "function collectChatMessageEntries(state) {{" in unread_src
     assert "if (!messageMatchesActiveMeshChannel(msg)) continue;" not in unread_src

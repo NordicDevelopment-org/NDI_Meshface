@@ -80,7 +80,7 @@ def dashboard_html(dashboard_html_factory: Callable[..., str]) -> str:
 @pytest.fixture(scope="session")
 def template_text() -> Callable[[str], str]:
     def _read(relative_path: str) -> str:
-        return (REPO_ROOT / relative_path).read_text()
+        return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
     return _read
 

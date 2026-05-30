@@ -98,6 +98,7 @@ def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -
     tabs_index = html.index('class="chat-node-details-tabs"')
     tag_index = html.index('id="chat-node-details-tab-tag"')
     details_index = html.index('id="chat-node-details-tab-details"')
+    telemetry_index = html.index('id="chat-node-details-tab-telemetry"')
     history_index = html.index('id="chat-node-details-tab-history"')
     location_index = html.index('id="chat-node-details-tab-location"')
     chat_index = html.index('id="chat-node-details-tab-chat"')
@@ -106,7 +107,7 @@ def test_render_html_places_messages_before_details_and_notes_in_drawer_tabs() -
     messages_index = html.index('id="chat-node-details-tab-messages"')
 
     assert head_index < tag_index < tabs_index
-    assert messages_index < details_index < history_index < location_index < chat_index < links_index < notes_index
+    assert messages_index < details_index < telemetry_index < history_index < location_index < chat_index < links_index < notes_index
 
 
 def test_render_html_places_tag_title_pin_and_mute_actions_in_drawer_header() -> None:

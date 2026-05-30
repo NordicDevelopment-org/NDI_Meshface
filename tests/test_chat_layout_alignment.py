@@ -8,6 +8,10 @@ from meshdash.html_js import build_dashboard_js
 from meshdash.html_sections import build_html_shell
 
 
+def read_template(path: str) -> str:
+    return Path(path).read_text(encoding="utf-8")
+
+
 def test_chat_layout_spacing_matches_tighter_network_style() -> None:
     css = build_dashboard_css(theme_css="")
     chat_channel_wrap_section = css.split(
@@ -556,7 +560,7 @@ def test_chat_text_renderer_wraps_inline_emoji_for_subtle_feed_contrast() -> Non
 
 
 def test_chat_feed_author_names_do_not_encode_status_color() -> None:
-    feed_src = Path("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl").read_text()
+    feed_src = read_template("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl")
     css = build_dashboard_css(theme_css="")
 
     assert '<span class="chat-name">${{escAttr(fromMeta.label)}}</span>' in feed_src
@@ -566,7 +570,7 @@ def test_chat_feed_author_names_do_not_encode_status_color() -> None:
 
 
 def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
-    js_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+    js_src = read_template("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl")
 
     assert "function syncChatNodeNavigatorSearchBounds() {" in js_src
     assert 'document.querySelector(".chat-left-bottom-bar")' in js_src
@@ -581,7 +585,7 @@ def test_chat_node_search_syncs_to_live_navigator_row_bounds() -> None:
 
 
 def test_chat_unread_node_click_routes_into_messages_tab(assert_tokens_present) -> None:
-    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
+    peers_src = read_template("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl")
 
     assert_tokens_present(peers_src, [
         'const unreadDirectCount = Math.max(0, Math.trunc(Number(member.dataset.unreadDirectCount) || 0));',
@@ -597,9 +601,9 @@ def test_chat_unread_node_click_routes_into_messages_tab(assert_tokens_present) 
 
 
 def test_chat_click_selection_keeps_same_node_selected(assert_tokens_present) -> None:
-    bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
-    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
-    selection_src = Path("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl").read_text()
+    bindings_src = read_template("meshdash/assets/dashboard.js.chat.events.bindings.tmpl")
+    peers_src = read_template("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl")
+    selection_src = read_template("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl")
 
     assert 'selectNode(nodeId, true, false);' in bindings_src
     assert "function chatFeedSelectionKeyForItem(item) {" in bindings_src
@@ -620,8 +624,8 @@ def test_chat_click_selection_keeps_same_node_selected(assert_tokens_present) ->
 
 
 def test_selected_node_clicks_toggle_off_across_views() -> None:
-    selection_src = Path("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl").read_text()
-    graph_src = Path("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl").read_text()
+    selection_src = read_template("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl")
+    graph_src = read_template("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl")
 
     select_start = selection_src.index("function selectNode(nodeId, shouldFocus = true, toggleIfSelected = true) {{")
     select_end = selection_src.index("selectedNodeId = normalized;", select_start)
@@ -640,7 +644,7 @@ def test_selected_node_clicks_toggle_off_across_views() -> None:
 
 
 def test_clear_node_selection_hides_drawer_before_optional_map_redraw() -> None:
-    selection_src = Path("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl").read_text()
+    selection_src = read_template("meshdash/assets/dashboard.js.chat.events.map_selection.tmpl")
     clear_start = selection_src.index("function clearNodeSelection() {{")
     clear_end = selection_src.index("function bindNodeRowClicks()", clear_start)
     clear_block = selection_src[clear_start:clear_end]
@@ -652,8 +656,8 @@ def test_clear_node_selection_hides_drawer_before_optional_map_redraw() -> None:
 
 
 def test_chat_node_list_uses_same_tint_seed_family_as_feed() -> None:
-    peers_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl").read_text()
-    feed_src = Path("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl").read_text()
+    peers_src = read_template("meshdash/assets/dashboard.js.chat.state.messaging.peers.tmpl")
+    feed_src = read_template("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl")
 
     assert "const tintSeedNode = (" in peers_src
     assert 'nodesById.get(normalizeNodeId(nodeId))' in peers_src
@@ -665,10 +669,10 @@ def test_chat_node_list_uses_same_tint_seed_family_as_feed() -> None:
 
 
 def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> None:
-    emoji_src = Path("meshdash/assets/dashboard.js.chat.state.messaging.emoji_ui.tmpl").read_text()
-    bindings_src = Path("meshdash/assets/dashboard.js.chat.events.bindings.tmpl").read_text()
-    feed_src = Path("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl").read_text()
-    layout_src = Path("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl").read_text()
+    emoji_src = read_template("meshdash/assets/dashboard.js.chat.state.messaging.emoji_ui.tmpl")
+    bindings_src = read_template("meshdash/assets/dashboard.js.chat.events.bindings.tmpl")
+    feed_src = read_template("meshdash/assets/dashboard.js.chat.render.feed_items.tmpl")
+    layout_src = read_template("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl")
     css = build_dashboard_css(theme_css="")
 
     assert "function syncChatReactionAnchorLabels() {{" in emoji_src
@@ -742,9 +746,9 @@ def test_chat_feed_cache_tracks_chat_tail_for_reaction_rebuilds() -> None:
 
 
 def test_chat_reaction_notices_prefer_full_names_and_target_context(assert_tokens_present) -> None:
-    unread_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.unread.tmpl").read_text()
-    preview_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.message_preview_history.tmpl").read_text()
-    persist_src = Path("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.persist_track.tmpl").read_text()
+    unread_src = read_template("meshdash/assets/dashboard.js.chat.events.core.notifications.unread.tmpl")
+    preview_src = read_template("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.message_preview_history.tmpl")
+    persist_src = read_template("meshdash/assets/dashboard.js.chat.events.core.notifications.notices.persist_track.tmpl")
 
     assert "function chatResolvedNodeLabel(nodeIdRaw, nodesById, explicitName = \"\") {{" in unread_src
     assert "const preferred = node ? String(preferredNodeName(node) || \"\").trim() : \"\";" in unread_src
@@ -768,7 +772,7 @@ def test_chat_reaction_notices_prefer_full_names_and_target_context(assert_token
 
 
 def test_node_name_cache_rejects_generic_downgrades_and_accepts_history_caps() -> None:
-    src = Path("meshdash/assets/dashboard.js.chat.events.core.identity.favorites_selection.topbar_map_title.tmpl").read_text()
+    src = read_template("meshdash/assets/dashboard.js.chat.events.core.identity.favorites_selection.topbar_map_title.tmpl")
 
     assert "function isGenericNodeCacheLabel(nameRaw, nodeIdRaw) {{" in src
     assert "function rememberNodeNameCacheCandidate(nodeIdRaw, candidateRaw) {{" in src
@@ -1026,7 +1030,7 @@ def test_chat_macro_menu_removes_novelty_face_shortcuts_only() -> None:
 
 
 def test_launcher_menu_omits_header_block() -> None:
-    js = Path("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl").read_text()
+    js = read_template("meshdash/assets/dashboard.js.chat.events.core.identity.node_self.tmpl")
 
     assert 'document.getElementById("layout-view-menu-head-mark")' not in js
     assert 'document.getElementById("layout-view-menu-head-brand")' not in js
@@ -1038,7 +1042,7 @@ def test_launcher_menu_omits_header_block() -> None:
 
 
 def test_workspace_shell_records_active_layout_view_for_chat_css_hooks() -> None:
-    js = Path("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl").read_text()
+    js = read_template("meshdash/assets/dashboard.js.chat.events.core.navigation.layout.tmpl")
 
     assert "shell.dataset.layoutView = next;" in js
     assert "shell.classList.remove(`layout-view-${{name}}`);" in js

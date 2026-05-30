@@ -148,7 +148,7 @@ def test_dashboard_js_exposes_files_in_app_channel_routing_when_enabled() -> Non
 
 
 def test_dashboard_html_labels_files_destination_as_node() -> None:
-    html_template = (Path(__file__).resolve().parents[1] / "meshdash/assets/dashboard.html.tmpl").read_text()
+    html_template = (Path(__file__).resolve().parents[1] / "meshdash/assets/dashboard.html.tmpl").read_text(encoding="utf-8")
 
     assert '<span class="files-label">Destination Node</span>' in html_template
     assert 'placeholder="Select a node or enter !1234abcd"' in html_template
