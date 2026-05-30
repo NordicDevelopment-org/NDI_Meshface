@@ -79,6 +79,11 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function bindMapLinkLegendControls(legend)" in js
     assert 'data-map-link-legend-toggle="packet"' in js
     assert 'data-map-link-legend-toggle="estimated"' in js
+    assert "Map layers" in js
+    assert "Signal heatmap" in js
+    assert "Estimate heatmap" in js
+    assert "const signalHeatLegendHtml = signalHeatPointCount > 0" in js
+    assert "const estimatedCloudHeatLegendHtml = showEstimatedCloudHeat" in js
     assert "Estimated links" in js
     assert 'renderMapLinkLegend(nodes, mapRenderEdges, estimatedPositions, linkOverlay);' in js
     assert 'mapElement.style.setProperty("--map-link-legend-space"' in js
@@ -172,6 +177,8 @@ def test_dashboard_css_positions_map_link_legend_below_zoom() -> None:
     assert ".map-link-legend-input {" in css
     assert ".map-link-legend-swatch.is-node-linked::before {" in css
     assert ".map-link-legend-swatch.is-link-heat::before {" in css
+    assert ".map-link-legend-swatch.is-signal-heat::before" in css
+    assert ".map-link-legend-swatch.is-cloud-heat::before" in css
 
 
 def test_dashboard_js_keeps_leaflet_tile_layers_removable_on_theme_swap() -> None:

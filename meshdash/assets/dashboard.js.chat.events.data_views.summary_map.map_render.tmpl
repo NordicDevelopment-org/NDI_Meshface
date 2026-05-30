@@ -283,10 +283,52 @@
       const estimatedCount = cloudLinks.length > 0 ? cloudLinks.length : lines.length;
       const modeParts = mapLinkLayerModeParts(mapLinkLayerMode);
       const estimatedLinksEnabled = !!modeParts.estimatedLinks;
+      const signalHeatModeConfig = resolveSignalHeatModeConfig();
+      const signalHeatModeLabel = String(signalHeatModeConfig && signalHeatModeConfig.label ? signalHeatModeConfig.label : "Coverage");
+      const signalHeatBuckets = (
+        signalHeatmapEnabled
+        && signalHeatmapMode !== "none"
+        && supportsSignalHeatmap()
+      )
+        ? collectSignalHeatmapBuckets(nodes, resolveSignalHeatProfile())
+        : [];
+      const signalHeatPointCount = signalHeatBuckets.reduce((count, bucket) => (
+        count + (Array.isArray(bucket) ? bucket.length : 0)
+      ), 0);
+      const signalHeatLegendHtml = signalHeatPointCount > 0
+        ? `
+          <div class="map-link-legend-item is-info is-heatmap" style="--map-link-legend-color:#d9951a;" title="Warm heatmap: positioned nodes with recent SNR/RSSI signal data. Mode: ${{escAttr(signalHeatModeLabel)}}.">
+            <span class="map-link-legend-swatch is-signal-heat" aria-hidden="true"></span>
+            <span class="map-link-legend-name">Signal heatmap</span>
+            <span class="map-link-legend-count">${{signalHeatPointCount}}</span>
+          </div>
+        `
+        : "";
+      const showEstimatedCloudHeat = !!(
+        cloudsEnabled
+        && linkDensity
+        && linkDensity.enabled
+        && Number(linkDensity.corePointCount) > 0
+      );
+      const estimatedCloudHeatCount = Math.max(
+        0,
+        Math.trunc(Number(linkDensity && (linkDensity.cloudCount || linkDensity.corePointCount)) || 0)
+      );
+      const estimatedCloudHeatLegendHtml = showEstimatedCloudHeat
+        ? `
+          <div class="map-link-legend-item is-info is-heatmap" style="--map-link-legend-color:#5fa4ff;" title="Blue heatmap: estimated node clouds and estimated link density from history or live evidence.">
+            <span class="map-link-legend-swatch is-cloud-heat" aria-hidden="true"></span>
+            <span class="map-link-legend-name">Estimate heatmap</span>
+            <span class="map-link-legend-count">${{estimatedCloudHeatCount}}</span>
+          </div>
+        `
+        : "";
       legend.hidden = false;
       legend.innerHTML = `
-        <div class="map-link-legend-title">Map links</div>
+        <div class="map-link-legend-title">Map layers</div>
         <div class="map-link-legend-list">
+          ${{signalHeatLegendHtml}}
+          ${{estimatedCloudHeatLegendHtml}}
           <div class="map-link-legend-item is-info" style="--map-link-legend-color:#35b96f;" title="Nodes with direct GPS or fixed position data">
             <span class="map-link-legend-swatch is-node-actual" aria-hidden="true"></span>
             <span class="map-link-legend-name">Real nodes</span>

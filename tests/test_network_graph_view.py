@@ -613,6 +613,24 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert "[data-theme=\"dark\"] .network-graph-mode-control {" in css
     assert "[data-theme=\"dark\"] .network-graph-layout-select," in css
     assert "[data-theme=\"dark\"] .network-graph-mode-select {" in css
+    assert "color-scheme: light;" in css
+    assert "color-scheme: dark;" in css
+    assert ".network-graph-layout-select option," in css
+    assert ".network-graph-mode-select option {" in css
+    assert ".network-graph-layout-select option:checked," in css
+    assert ".network-graph-mode-select option:checked {" in css
+    assert "[data-theme=\"dark\"] .network-graph-layout-select option," in css
+    assert "[data-theme=\"dark\"] .network-graph-mode-select option {" in css
+    assert ".layout.view-network .history-select-chip-hide-label .history-metric-select option," in css
+    assert ".layout.view-network .map-heatmap-mode option {" in css
+    assert "[data-theme=\"dark\"] .layout.view-network .history-select-chip-hide-label .history-metric-select option," in css
+    assert "[data-theme=\"dark\"] .layout.view-network .map-heatmap-mode option {" in css
+    assert "color: var(--ink);" in css
+    assert "background: color-mix(in srgb, var(--panel) 92%, var(--bg) 8%);" in css
+    assert "background: color-mix(in srgb, var(--panel) 76%, var(--accent) 24%);" in css
+    assert "color: var(--workspace-shell-text);" in css
+    assert "background: var(--workspace-shell-bg-alt);" in css
+    assert "background: var(--workspace-shell-active-bg);" in css
     assert "position: absolute;" in graph_legend_css
     assert "bottom: 14px;" in graph_legend_css
     assert "pointer-events: auto;" in graph_legend_css

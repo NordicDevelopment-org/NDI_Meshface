@@ -5627,6 +5627,7 @@
     [data-theme="dark"] .layout.view-network .map-heatmap-mode {{
       background: transparent;
       border-color: transparent;
+      color-scheme: dark;
       color: inherit;
     }}
     [data-theme="dark"] .network-overview-primary-controls .history-metric-label,
@@ -6102,9 +6103,20 @@
     }}
     [data-theme="dark"] .network-graph-layout-select,
     [data-theme="dark"] .network-graph-mode-select {{
+      color-scheme: dark;
       background: color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, var(--workspace-shell-active-bg) 12%);
       border-color: var(--workspace-shell-border-muted);
       color: var(--workspace-shell-text);
+    }}
+    [data-theme="dark"] .network-graph-layout-select option,
+    [data-theme="dark"] .network-graph-mode-select option {{
+      color: var(--workspace-shell-text);
+      background: var(--workspace-shell-bg-alt);
+    }}
+    [data-theme="dark"] .network-graph-layout-select option:checked,
+    [data-theme="dark"] .network-graph-mode-select option:checked {{
+      color: var(--workspace-shell-active-text);
+      background: var(--workspace-shell-active-bg);
     }}
     [data-theme="dark"] .network-graph-chip-label {{
       color: var(--workspace-shell-text-soft);
