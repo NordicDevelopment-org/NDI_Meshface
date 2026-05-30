@@ -132,6 +132,7 @@ class DashboardTracker:
         ping_service = build_ping_bot_service(
             send_lock=send_lock,
             public_start_enabled=public_start_enabled,
+            get_delivery_state_fn=self.get_delivery_state,
         )
         with self._lock:
             self._ping_bot_service = ping_service

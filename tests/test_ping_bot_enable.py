@@ -1,5 +1,7 @@
+import time
 from types import SimpleNamespace
 
+from meshdash.services_ping_bot import build_ping_bot_service
 from meshdash.tracker_runtime_impl import DashboardTracker
 
 
@@ -16,6 +18,19 @@ class _FakeInterface:
         packet = SimpleNamespace(id=1700 + len(self.sent))
         self.sent.append({"text": text, "kwargs": dict(kwargs), "packet": packet})
         return packet
+
+
+class _FlakyInterface(_FakeInterface):
+    def __init__(self, *, fail_call_indexes: set[int]) -> None:
+        super().__init__()
+        self._fail_call_indexes = set(int(value) for value in fail_call_indexes)
+        self.call_count = 0
+
+    def sendText(self, text: str, **kwargs: object) -> object:
+        self.call_count += 1
+        if self.call_count in self._fail_call_indexes:
+            raise RuntimeError("radio busy")
+        return super().sendText(text, **kwargs)
 
 
 def _text_packet(
@@ -81,7 +96,31 @@ def test_dashboard_tracker_repeats_direct_ping_reply_when_count_is_requested() -
     assert runtime["ok"] is True
     assert runtime["ping"]["enabled"] is True
 
+    set_delivery_state_fn = getattr(tracker, "_set_delivery_state_fn", None)
+    assert callable(set_delivery_state_fn)
+
     tracker.on_receive(_text_packet("ping 5", hop_start=7, hop_limit=4), iface)
+
+    for index in range(1, 6):
+        deadline = time.monotonic() + 1.0
+        while len(iface.sent) < index and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert len(iface.sent) >= index
+        sent_packet = iface.sent[index - 1].get("packet")
+        sent_message_id = getattr(sent_packet, "id", None)
+        applied = False
+        apply_deadline = time.monotonic() + 1.0
+        while not applied and time.monotonic() < apply_deadline:
+            applied = bool(
+                set_delivery_state_fn(
+                    sent_message_id,
+                    "ack",
+                    ack_from_id="!01020304",
+                )
+            )
+            if not applied:
+                time.sleep(0.01)
+        assert applied is True
 
     assert len(iface.sent) == 5
     assert [str(item["text"]).strip() for item in iface.sent] == ["1/5", "2/5", "3/5", "4/5", "5/5"]
@@ -97,7 +136,31 @@ def test_dashboard_tracker_caps_direct_ping_repeat_count() -> None:
     runtime = tracker.set_ping_bot_enabled(True, send_lock=None)
     assert runtime["ok"] is True
 
+    set_delivery_state_fn = getattr(tracker, "_set_delivery_state_fn", None)
+    assert callable(set_delivery_state_fn)
+
     tracker.on_receive(_text_packet("ping 100"), iface)
+
+    for index in range(1, 26):
+        deadline = time.monotonic() + 1.0
+        while len(iface.sent) < index and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert len(iface.sent) >= index
+        sent_packet = iface.sent[index - 1].get("packet")
+        sent_message_id = getattr(sent_packet, "id", None)
+        applied = False
+        apply_deadline = time.monotonic() + 1.0
+        while not applied and time.monotonic() < apply_deadline:
+            applied = bool(
+                set_delivery_state_fn(
+                    sent_message_id,
+                    "ack",
+                    ack_from_id="!01020304",
+                )
+            )
+            if not applied:
+                time.sleep(0.01)
+        assert applied is True
 
     assert len(iface.sent) == 25
     assert str(iface.sent[0]["text"]).strip() == "1/25"
@@ -206,3 +269,38 @@ def test_dashboard_tracker_keeps_ping_off_when_only_zork_enabled() -> None:
     assert runtime["ok"] is True
     assert runtime["zork"]["enabled"] is True
     assert runtime["ping"]["enabled"] is False
+
+
+def test_ping_bot_paces_small_repeat_bursts() -> None:
+    iface = _FakeInterface()
+    sleeps: list[float] = []
+    service = build_ping_bot_service(
+        repeat_delay_seconds=0.5,
+        repeat_max_paced_count=8,
+        repeat_send_retry_limit=0,
+        repeat_send_retry_delay_seconds=0,
+        sleep_fn=sleeps.append,
+    )
+
+    handled = service.handle_packet(_text_packet("ping 5"), iface)
+
+    assert handled is True
+    assert [str(item["text"]).strip() for item in iface.sent] == ["1/5", "2/5", "3/5", "4/5", "5/5"]
+    assert sleeps == [0.5, 0.5, 0.5, 0.5]
+
+
+def test_ping_bot_retries_repeat_send_when_radio_send_fails_once() -> None:
+    iface = _FlakyInterface(fail_call_indexes={2})
+    service = build_ping_bot_service(
+        repeat_delay_seconds=0,
+        repeat_max_paced_count=8,
+        repeat_send_retry_limit=1,
+        repeat_send_retry_delay_seconds=0,
+        sleep_fn=lambda _seconds: None,
+    )
+
+    handled = service.handle_packet(_text_packet("ping 3"), iface)
+
+    assert handled is True
+    assert iface.call_count == 4
+    assert [str(item["text"]).strip() for item in iface.sent] == ["1/3", "2/3", "3/3"]

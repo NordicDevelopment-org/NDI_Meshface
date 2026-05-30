@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import math
 import threading
-from typing import Optional
+import time
+from typing import Callable, Optional
 
 from .helpers import to_float as _to_float, to_int as _to_int
 from .nodes_identity import (
@@ -16,6 +17,16 @@ _BROADCAST_NUM = 0xFFFFFFFF
 _PING_HEADS = {"ping", "test"}
 _NATURAL_PING_TRIGGERS = {"can you see this", "can you see this?"}
 _MAX_DIRECT_PING_REPEAT_COUNT = 25
+_LIVE_REPEAT_DELAY_SECONDS = 0.35
+_LIVE_REPEAT_MAX_PACED_COUNT = 8
+_LIVE_REPEAT_SEND_RETRY_LIMIT = 2
+_LIVE_REPEAT_SEND_RETRY_DELAY_SECONDS = 0.2
+_LIVE_REPEAT_WAIT_FOR_ACK = True
+_LIVE_REPEAT_ACK_WAIT_SECONDS = 8.0
+_LIVE_REPEAT_ACK_POLL_SECONDS = 0.25
+_LIVE_REPEAT_ACK_RETRY_LIMIT = 1
+_LIVE_REPEAT_ASYNC = True
+_ACKED_DELIVERY_STATES = {"ack", "acked", "delivered"}
 
 
 def _normalize_node_id(value: object) -> str:
@@ -339,10 +350,32 @@ class PingBotService:
         *,
         send_lock: object | None = None,
         public_start_enabled: bool = True,
+        repeat_delay_seconds: float = _LIVE_REPEAT_DELAY_SECONDS,
+        repeat_max_paced_count: int = _LIVE_REPEAT_MAX_PACED_COUNT,
+        repeat_send_retry_limit: int = _LIVE_REPEAT_SEND_RETRY_LIMIT,
+        repeat_send_retry_delay_seconds: float = _LIVE_REPEAT_SEND_RETRY_DELAY_SECONDS,
+        repeat_wait_for_ack: bool = _LIVE_REPEAT_WAIT_FOR_ACK,
+        repeat_ack_wait_seconds: float = _LIVE_REPEAT_ACK_WAIT_SECONDS,
+        repeat_ack_poll_seconds: float = _LIVE_REPEAT_ACK_POLL_SECONDS,
+        repeat_ack_retry_limit: int = _LIVE_REPEAT_ACK_RETRY_LIMIT,
+        repeat_async: bool = _LIVE_REPEAT_ASYNC,
+        get_delivery_state_fn: Callable[[object], object] | None = None,
+        sleep_fn: Callable[[float], None] = time.sleep,
     ) -> None:
         self._send_lock = send_lock if send_lock is not None else threading.Lock()
         self._mode_lock = threading.Lock()
         self._public_start_enabled = bool(public_start_enabled)
+        self._repeat_delay_seconds = max(0.0, float(repeat_delay_seconds))
+        self._repeat_max_paced_count = max(1, int(repeat_max_paced_count))
+        self._repeat_send_retry_limit = max(0, int(repeat_send_retry_limit))
+        self._repeat_send_retry_delay_seconds = max(0.0, float(repeat_send_retry_delay_seconds))
+        self._repeat_wait_for_ack = bool(repeat_wait_for_ack)
+        self._repeat_ack_wait_seconds = max(0.0, float(repeat_ack_wait_seconds))
+        self._repeat_ack_poll_seconds = max(0.05, float(repeat_ack_poll_seconds))
+        self._repeat_ack_retry_limit = max(0, int(repeat_ack_retry_limit))
+        self._repeat_async = bool(repeat_async)
+        self._get_delivery_state_fn = get_delivery_state_fn
+        self._sleep_fn = sleep_fn if callable(sleep_fn) else time.sleep
 
     def set_public_start_enabled(self, enabled: object) -> bool:
         next_value = bool(enabled)
@@ -435,26 +468,52 @@ class PingBotService:
             response_texts = [response_text]
         channel_index = _packet_channel_index(packet)
         reply_id = _packet_id(packet)
-        for response_text in response_texts:
-            sent_packet = self._send_text(
-                iface,
-                text=response_text,
-                destination_id=from_id,
-                channel_index=channel_index,
-                reply_id=reply_id,
-            )
-            sent_message_id = _sent_packet_id(sent_packet)
-            if record_local_chat_fn is not None:
-                record_local_chat_fn(
+        if len(response_texts) <= 1:
+            response_text = response_texts[0] if response_texts else ""
+            if response_text:
+                self._send_ping_reply_with_send_retries(
+                    iface,
                     text=response_text,
-                    from_id=local_node_id,
-                    to_id=from_id,
+                    destination_id=from_id,
+                    local_node_id=local_node_id,
                     channel_index=channel_index,
-                    message_id=sent_message_id,
                     reply_id=reply_id,
-                    ack_requested=True,
-                    bot_command="ping",
+                    retry_of=None,
+                    record_local_chat_fn=record_local_chat_fn,
                 )
+            return True
+
+        should_async_repeat = (
+            len(response_texts) > 1
+            and self._repeat_async
+            and self._should_wait_for_repeat_ack()
+        )
+        if should_async_repeat:
+            thread = threading.Thread(
+                target=self._send_repeat_responses,
+                kwargs={
+                    "iface": iface,
+                    "responses": response_texts,
+                    "destination_id": from_id,
+                    "local_node_id": local_node_id,
+                    "channel_index": channel_index,
+                    "reply_id": reply_id,
+                    "record_local_chat_fn": record_local_chat_fn,
+                },
+                daemon=True,
+            )
+            thread.start()
+            return True
+
+        self._send_repeat_responses(
+            iface=iface,
+            responses=response_texts,
+            destination_id=from_id,
+            local_node_id=local_node_id,
+            channel_index=channel_index,
+            reply_id=reply_id,
+            record_local_chat_fn=record_local_chat_fn,
+        )
         return True
 
     def handle_local_chat(
@@ -498,15 +557,213 @@ class PingBotService:
                     channelIndex=channel_index,
                 )
 
+    def _sleep_between_repeat_messages(self) -> None:
+        if self._repeat_delay_seconds > 0:
+            self._sleep_fn(self._repeat_delay_seconds)
+
+    def _sleep_between_repeat_retries(self) -> None:
+        if self._repeat_send_retry_delay_seconds > 0:
+            self._sleep_fn(self._repeat_send_retry_delay_seconds)
+
+    def _send_repeat_responses(
+        self,
+        *,
+        iface: object,
+        responses: list[str],
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> None:
+        pace_repeat_messages = (
+            len(responses) > 1 and len(responses) <= self._repeat_max_paced_count
+        )
+        for index, response_text in enumerate(responses):
+            if index > 0 and pace_repeat_messages:
+                self._sleep_between_repeat_messages()
+            if not self._send_ping_reply_until_acked(
+                iface,
+                text=response_text,
+                destination_id=destination_id,
+                local_node_id=local_node_id,
+                channel_index=channel_index,
+                reply_id=reply_id,
+                record_local_chat_fn=record_local_chat_fn,
+            ):
+                return
+
+    def _send_ping_reply_until_acked(
+        self,
+        iface: object,
+        *,
+        text: str,
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> bool:
+        attempt_message_ids: list[int] = []
+        original_message_id: Optional[int] = None
+        for attempt_index in range(self._repeat_ack_retry_limit + 1):
+            retry_of = original_message_id if attempt_index > 0 else None
+            send_ok, sent_message_id = self._send_ping_reply_with_send_retries(
+                iface,
+                text=text,
+                destination_id=destination_id,
+                local_node_id=local_node_id,
+                channel_index=channel_index,
+                reply_id=reply_id,
+                retry_of=retry_of,
+                record_local_chat_fn=record_local_chat_fn,
+            )
+            if not send_ok:
+                return False
+            if original_message_id is None and sent_message_id is not None:
+                original_message_id = sent_message_id
+            if sent_message_id is not None and sent_message_id > 0:
+                attempt_message_ids.append(int(sent_message_id))
+            if not self._should_wait_for_repeat_ack():
+                return True
+            if self._wait_for_repeat_ack(attempt_message_ids):
+                return True
+        return not self._should_wait_for_repeat_ack()
+
+    def _should_wait_for_repeat_ack(self) -> bool:
+        return bool(self._repeat_wait_for_ack and self._get_delivery_state_fn is not None)
+
+    def _wait_for_repeat_ack(self, message_ids: list[int]) -> bool:
+        if not message_ids:
+            return True
+        if self._any_delivery_is_acked(message_ids):
+            return True
+        if self._repeat_ack_wait_seconds <= 0:
+            return False
+        deadline = time.monotonic() + self._repeat_ack_wait_seconds
+        while time.monotonic() < deadline:
+            if self._any_delivery_is_acked(message_ids):
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return self._any_delivery_is_acked(message_ids)
+            self._sleep_fn(min(self._repeat_ack_poll_seconds, remaining))
+        return self._any_delivery_is_acked(message_ids)
+
+    def _any_delivery_is_acked(self, message_ids: list[int]) -> bool:
+        return any(self._delivery_is_acked(message_id) for message_id in message_ids)
+
+    def _delivery_is_acked(self, message_id: object) -> bool:
+        getter = self._get_delivery_state_fn
+        if getter is None:
+            return False
+        try:
+            state = getter(message_id)
+        except Exception:
+            return False
+        if isinstance(state, dict):
+            raw_state = state.get("delivery_state") or state.get("state")
+        else:
+            raw_state = state
+        return str(raw_state or "").strip().lower() in _ACKED_DELIVERY_STATES
+
+    def _send_ping_reply_with_send_retries(
+        self,
+        iface: object,
+        *,
+        text: str,
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        retry_of: Optional[int] = None,
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> tuple[bool, Optional[int]]:
+        for attempt_index in range(self._repeat_send_retry_limit + 1):
+            try:
+                sent_message_id = self._send_ping_reply(
+                    iface,
+                    text=text,
+                    destination_id=destination_id,
+                    local_node_id=local_node_id,
+                    channel_index=channel_index,
+                    reply_id=reply_id,
+                    retry_of=retry_of,
+                    record_local_chat_fn=record_local_chat_fn,
+                )
+            except Exception:
+                if attempt_index < self._repeat_send_retry_limit:
+                    self._sleep_between_repeat_retries()
+                    continue
+                return False, None
+            return True, sent_message_id
+        return False, None
+
+    def _send_ping_reply(
+        self,
+        iface: object,
+        *,
+        text: str,
+        destination_id: str,
+        local_node_id: str,
+        channel_index: int,
+        reply_id: Optional[int],
+        retry_of: Optional[int] = None,
+        record_local_chat_fn: RecordLocalChatFn | None = None,
+    ) -> Optional[int]:
+        sent_packet = self._send_text(
+            iface,
+            text=text,
+            destination_id=destination_id,
+            channel_index=channel_index,
+            reply_id=reply_id,
+        )
+        sent_message_id = _sent_packet_id(sent_packet)
+        if record_local_chat_fn is not None:
+            record_local_chat_fn(
+                text=text,
+                from_id=local_node_id,
+                to_id=destination_id,
+                channel_index=channel_index,
+                message_id=sent_message_id,
+                reply_id=reply_id,
+                ack_requested=True,
+                retry_of=retry_of,
+                bot_command="ping",
+            )
+        return sent_message_id
+
 
 def build_ping_bot_service(
     *,
     send_lock: object | None = None,
     public_start_enabled: bool = True,
+    repeat_delay_seconds: float = _LIVE_REPEAT_DELAY_SECONDS,
+    repeat_max_paced_count: int = _LIVE_REPEAT_MAX_PACED_COUNT,
+    repeat_send_retry_limit: int = _LIVE_REPEAT_SEND_RETRY_LIMIT,
+    repeat_send_retry_delay_seconds: float = _LIVE_REPEAT_SEND_RETRY_DELAY_SECONDS,
+    repeat_wait_for_ack: bool = _LIVE_REPEAT_WAIT_FOR_ACK,
+    repeat_ack_wait_seconds: float = _LIVE_REPEAT_ACK_WAIT_SECONDS,
+    repeat_ack_poll_seconds: float = _LIVE_REPEAT_ACK_POLL_SECONDS,
+    repeat_ack_retry_limit: int = _LIVE_REPEAT_ACK_RETRY_LIMIT,
+    repeat_async: bool = _LIVE_REPEAT_ASYNC,
+    get_delivery_state_fn: Callable[[object], object] | None = None,
+    sleep_fn: Callable[[float], None] = time.sleep,
 ) -> PingBotService:
     return PingBotService(
         send_lock=send_lock,
         public_start_enabled=public_start_enabled,
+        repeat_delay_seconds=repeat_delay_seconds,
+        repeat_max_paced_count=repeat_max_paced_count,
+        repeat_send_retry_limit=repeat_send_retry_limit,
+        repeat_send_retry_delay_seconds=repeat_send_retry_delay_seconds,
+        repeat_wait_for_ack=repeat_wait_for_ack,
+        repeat_ack_wait_seconds=repeat_ack_wait_seconds,
+        repeat_ack_poll_seconds=repeat_ack_poll_seconds,
+        repeat_ack_retry_limit=repeat_ack_retry_limit,
+        repeat_async=repeat_async,
+        get_delivery_state_fn=get_delivery_state_fn,
+        sleep_fn=sleep_fn,
     )
 
 
