@@ -116,6 +116,12 @@ def initialize_history_store_runtime(
     store._bbs_host_settings_updated_unix = 0
     store._bbs_host_posts = []
     store._bbs_host_posts_updated_unix = 0
+    store._bot_runtime_settings = {
+        "zork_enabled": False,
+        "ping_enabled": False,
+        "ping_message_only": False,
+    }
+    store._bot_runtime_settings_updated_unix = 0
 
     # Only create a separate read connection when we're using the default
     # connection opener *and* the DB path is file-backed. In-memory SQLite

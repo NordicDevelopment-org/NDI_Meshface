@@ -51,8 +51,10 @@ from .history_store_settings import (
     append_bbs_post as _append_bbs_post_helper,
     load_bbs_posts as _load_bbs_posts_helper,
     load_bbs_settings as _load_bbs_settings_helper,
+    load_bot_runtime_settings as _load_bot_runtime_settings_helper,
     load_custom_telemetry_settings as _load_custom_telemetry_settings_helper,
     save_bbs_settings as _save_bbs_settings_helper,
+    save_bot_runtime_settings as _save_bot_runtime_settings_helper,
     save_custom_telemetry_settings as _save_custom_telemetry_settings_helper,
 )
 from .history_store_database_stats import (
@@ -264,11 +266,17 @@ class HistoryStore:
     def get_bbs_settings(self) -> dict[str, object]:
         return _load_bbs_settings_helper(self)
 
+    def get_bot_runtime_settings(self) -> dict[str, object]:
+        return _load_bot_runtime_settings_helper(self)
+
     def get_bbs_posts(self) -> dict[str, object]:
         return _load_bbs_posts_helper(self)
 
     def set_bbs_settings(self, settings: object) -> dict[str, object]:
         return _save_bbs_settings_helper(self, settings=settings)
+
+    def set_bot_runtime_settings(self, settings: object) -> dict[str, object]:
+        return _save_bot_runtime_settings_helper(self, settings=settings)
 
     def append_bbs_post(self, post: object) -> dict[str, object]:
         return _append_bbs_post_helper(self, post=post)

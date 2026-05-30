@@ -35,6 +35,8 @@ class HistoryStoreRuntimeState(HistoryStoreWriteState, Protocol):
     _bbs_host_settings_updated_unix: int
     _bbs_host_posts: list[dict[str, object]]
     _bbs_host_posts_updated_unix: int
+    _bot_runtime_settings: dict[str, object]
+    _bot_runtime_settings_updated_unix: int
     _custom_telemetry_rules: list[dict[str, object]]
     _custom_telemetry_updated_unix: int
 

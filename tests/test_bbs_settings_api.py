@@ -16,7 +16,9 @@ from meshdash.history_store_settings import (
     append_bbs_post,
     load_bbs_posts,
     load_bbs_settings,
+    load_bot_runtime_settings,
     save_bbs_settings,
+    save_bot_runtime_settings,
 )
 from meshdash.html_js import build_dashboard_js
 from meshdash.http_api import make_http_handler
@@ -119,6 +121,51 @@ def test_bbs_settings_store_preserves_runtime_fields_when_settings_change() -> N
         "channel_index": 4,
         "started_unix": 1234,
     }
+
+
+def test_bot_runtime_settings_store_defaults_to_bots_disabled() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    loaded = load_bot_runtime_settings(store)
+
+    assert loaded["ok"] is True
+    assert loaded["settings"] == {
+        "zork_enabled": False,
+        "ping_enabled": False,
+        "ping_message_only": False,
+    }
+    assert loaded["updated_unix"] == 0
+
+
+def test_bot_runtime_settings_store_round_trips_and_normalizes_values() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    saved = save_bot_runtime_settings(
+        store,
+        settings={
+            "zork_enabled": "yes",
+            "ping_enabled": 1,
+            "ping_message_only": "true",
+        },
+    )
+
+    assert saved["ok"] is True
+    assert saved["settings"] == {
+        "zork_enabled": True,
+        "ping_enabled": True,
+        "ping_message_only": True,
+    }
+    assert int(saved["updated_unix"]) > 0
+
+    loaded = load_bot_runtime_settings(store)
+
+    assert loaded["ok"] is True
+    assert loaded["settings"] == saved["settings"]
+    assert int(loaded["updated_unix"]) > 0
 
 
 def test_bbs_post_store_round_trips_and_truncates() -> None:
