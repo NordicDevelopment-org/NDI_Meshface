@@ -3970,6 +3970,7 @@
       const localNodeId = normalizeNodeId(data && data.localNodeId || "");
       const fromId = normalizeNodeId(fromNodeId || "");
       const toId = normalizeNodeId(toNodeId || "");
+      const focusedNodeId = normalizeNodeId(networkRoutesListFocusNodeId || "");
       const layout = networkRoutesScopedPositionMap(scoped);
       const positions = layout.positions instanceof Map ? layout.positions : new Map();
       const denseRoute = scoped.path.length > 6 || scoped.nodeIds.length > 14;
@@ -4080,7 +4081,17 @@
           style="--route-scope-edge-width:${{width.toFixed(1)}};"
         ><title>${{escAttr(title)}}</title></line>`;
       }}).join("");
-      const nodeHtml = scoped.nodeIds.map((nodeId) => {{
+      const orderedScopedNodeIds = Array.isArray(scoped.nodeIds) ? scoped.nodeIds.slice() : [];
+      if (isSelectableNodeId(focusedNodeId)) {{
+        const focusIndex = orderedScopedNodeIds.findIndex(
+          (nodeId) => normalizeNodeId(nodeId || "") === focusedNodeId
+        );
+        if (focusIndex >= 0) {{
+          const [focusId] = orderedScopedNodeIds.splice(focusIndex, 1);
+          orderedScopedNodeIds.push(focusId);
+        }}
+      }}
+      const nodeHtml = orderedScopedNodeIds.map((nodeId) => {{
         const clean = normalizeNodeId(nodeId || "");
         const point = positions.get(clean);
         if (!point) return "";
@@ -4088,6 +4099,7 @@
         const isFrom = clean && clean === fromId;
         const isTo = clean && clean === toId;
         const isLocal = clean && clean === localNodeId;
+        const isFocused = isSelectableNodeId(focusedNodeId) && clean === focusedNodeId;
         const index = scoped.pathIndex.has(clean) ? scoped.pathIndex.get(clean) : -1;
         const labelPlan = labelPlansByNodeId.get(clean) || null;
         const showLabel = labelPlan
@@ -4143,6 +4155,7 @@
           isFrom ? "is-from" : "",
           isTo ? "is-to" : "",
           isLocal ? "is-local" : "",
+          isFocused ? "is-focused" : "",
         ].filter(Boolean).join(" ");
         const title = `${{name}} (${{clean}})`;
         const emojiBoxSize = Math.max(22, Math.round(radius * 2.15));
