@@ -2718,6 +2718,20 @@
       }}
 
       const body = Object.assign({{ destination: nodeId }}, tool.requestBody || {{}});
+      if (tool.id === "traceroute") {{
+        const resolvedTimeoutMs = (
+          Number.isFinite(Number(networkRoutesLiveTraceTimeoutMs))
+            ? Math.max(1000, Math.trunc(Number(networkRoutesLiveTraceTimeoutMs)))
+            : 30000
+        );
+        body.timeout_ms = resolvedTimeoutMs;
+        const resolvedHopLimit = (typeof resolveLiveTracerouteHopLimit === "function")
+          ? resolveLiveTracerouteHopLimit(nodeId, {{ state: latestState }})
+          : 7;
+        if (Number.isFinite(Number(resolvedHopLimit)) && Number(resolvedHopLimit) > 0) {{
+          body.hop_limit = Math.max(1, Math.trunc(Number(resolvedHopLimit)));
+        }}
+      }}
       try {{
         const payload = await postNetworkToolCommand(body);
         const lines = chatNodeTelemetryExtractConsoleLines(payload);

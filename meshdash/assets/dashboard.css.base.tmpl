@@ -7291,6 +7291,90 @@
       min-height: 0;
       overflow: hidden;
     }}
+    .network-routes-split-layout {{
+      --network-routes-split: 0.56;
+      display: grid;
+      grid-template-rows:
+        minmax(176px, calc(var(--network-routes-split) * (100% - var(--splitter-size))))
+        var(--splitter-size)
+        minmax(132px, calc((1 - var(--network-routes-split)) * (100% - var(--splitter-size))));
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }}
+    .network-routes-split-pane {{
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }}
+    .network-routes-split-pane.is-top {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .network-routes-split-pane.is-top .network-route-scope {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+    .network-routes-split-pane.is-top .network-route-scope-svg {{
+      flex: 1 1 auto;
+      height: 100%;
+      min-height: 0;
+    }}
+    .network-routes-split-pane.is-bottom {{
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }}
+    .network-routes-split-divider {{
+      position: relative;
+      width: 100%;
+      height: var(--splitter-size);
+      min-height: 6px;
+      border: 1px solid #d1e0cb;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      overflow: hidden;
+    }}
+    .network-routes-split-divider::before {{
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      height: 2px;
+      border-radius: 1px;
+      background: #b8cab9;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }}
+    .network-routes-split-divider:hover::before,
+    .network-routes-split-divider.active::before {{
+      background: #2f855a;
+    }}
+    .network-routes-split-divider:focus-visible {{
+      outline: 2px solid color-mix(in srgb, var(--accent) 60%, var(--panel) 40%);
+      outline-offset: -1px;
+    }}
+    .network-routes-split-layout.is-dragging {{
+      user-select: none;
+    }}
+    [data-theme="dark"] .network-routes-split-divider {{
+      border-color: var(--ui-border);
+      background: linear-gradient(90deg, #1a2430, #16202c);
+    }}
+    [data-theme="dark"] .network-routes-split-divider::before {{
+      background: #44566a;
+    }}
+    [data-theme="dark"] .network-routes-split-divider:hover::before,
+    [data-theme="dark"] .network-routes-split-divider.active::before {{
+      background: #79c0ff;
+    }}
     .network-route-result-head {{
       display: flex;
       align-items: center;
@@ -7523,7 +7607,7 @@
       display: flex;
       flex: 1 1 auto;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
       min-height: 0;
       margin: 0;
@@ -7535,11 +7619,11 @@
     .network-route-hop {{
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 7px;
+      gap: 5px;
       min-width: 0;
-      padding: 9px 10px;
+      padding: 6px 8px;
       border: 1px solid rgba(188, 214, 195, 0.82);
-      border-radius: 8px;
+      border-radius: 7px;
       background:
         linear-gradient(90deg, rgba(91, 181, 127, 0.12), rgba(255, 255, 255, 0) 40%),
         rgba(255, 255, 255, 0.72);
@@ -7557,9 +7641,9 @@
     }}
     .network-route-hop-node {{
       display: grid;
-      grid-template-columns: 30px minmax(0, 1fr);
+      grid-template-columns: 24px minmax(0, 1fr);
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       min-width: 0;
       padding: 0;
       border: 0;
@@ -7578,82 +7662,80 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      height: 28px;
+      width: 22px;
+      height: 22px;
       border-radius: 999px;
       background: color-mix(in srgb, var(--accent) 26%, white 74%);
       color: color-mix(in srgb, var(--ink) 72%, var(--accent) 28%);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       line-height: 1;
     }}
     .network-route-hop-main {{
       display: flex;
-      flex-direction: column;
-      gap: 2px;
+      align-items: center;
+      gap: 6px;
       min-width: 0;
+      white-space: nowrap;
     }}
     .network-route-hop-main strong {{
+      flex: 0 1 28%;
+      min-width: 56px;
+      max-width: 34%;
       overflow: hidden;
       color: var(--ink);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
-      line-height: 1.25;
+      line-height: 1.15;
       text-overflow: ellipsis;
       white-space: nowrap;
     }}
-    .network-route-hop-main > span {{
+    .network-route-hop-id {{
+      flex: 0 1 18%;
+      min-width: 58px;
+      max-width: 22%;
       overflow: hidden;
       color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 10px;
-      line-height: 1.25;
+      font-size: 9px;
+      line-height: 1.15;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .network-route-hop-link-meta {{
+      flex: 1 1 auto;
+      min-width: 70px;
+      overflow: hidden;
+      color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
+      font-size: 9px;
+      line-height: 1.2;
       text-overflow: ellipsis;
       white-space: nowrap;
     }}
     .network-route-self-label {{
       display: inline-flex;
       align-items: center;
-      min-height: 14px;
-      margin-left: 5px;
-      padding: 0 5px;
+      min-height: 11px;
+      padding: 0 4px;
       border-radius: 999px;
       background: color-mix(in srgb, var(--accent-2) 18%, white 82%);
       color: color-mix(in srgb, var(--ink) 78%, var(--accent-2) 22%);
-      font-size: 9px;
+      font-size: 8px;
       font-weight: 800;
       line-height: 1.2;
-      vertical-align: 1px;
+      flex: 0 0 auto;
     }}
     .network-route-edge {{
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 4px 8px;
+      display: block;
       min-width: 0;
-      padding-left: 40px;
-    }}
-    .network-route-edge-label {{
-      color: color-mix(in srgb, var(--muted) 72%, var(--ink) 28%);
-      font-size: 10px;
-      font-weight: 800;
-      line-height: 1.2;
-      text-transform: uppercase;
-    }}
-    .network-route-edge-meta {{
-      overflow: hidden;
-      color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
-      font-size: 10px;
-      line-height: 1.2;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      padding-left: 33px;
     }}
     .network-route-edge-bar {{
-      grid-column: 1 / -1;
       position: relative;
       display: block;
       width: 100%;
-      height: 4px;
-      min-height: 4px;
+      height: 3px;
+      min-height: 3px;
       border-radius: 999px;
       background: rgba(166, 190, 173, 0.28);
       overflow: hidden;
@@ -7832,8 +7914,20 @@
         height: 230px;
         min-height: 230px;
       }}
+      .network-routes-split-layout {{
+        grid-template-rows:
+          minmax(208px, calc(var(--network-routes-split) * (100% - var(--splitter-size))))
+          var(--splitter-size)
+          minmax(136px, calc((1 - var(--network-routes-split)) * (100% - var(--splitter-size))));
+      }}
       .network-route-pill {{
         max-width: 180px;
+      }}
+      .network-route-hop-main strong {{
+        max-width: 42%;
+      }}
+      .network-route-hop-id {{
+        max-width: 28%;
       }}
       .network-route-edge {{
         padding-left: 0;
