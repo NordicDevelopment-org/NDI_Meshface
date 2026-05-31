@@ -53,6 +53,7 @@
       flex-wrap: wrap;
       gap: 6px;
       min-height: 0;
+      position: relative;
     }}
     .chat-send-channel-wrap {{
       --chat-send-channel-fill: #0072b2;
@@ -293,6 +294,35 @@
     }}
     .chat-reply-clear-btn:hover {{
       background: #edf6f0;
+    }}
+    .chat-input-inline-ghost {{
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #5f7c6c;
+      font-size: 11px;
+      line-height: 1.25;
+      opacity: 0.68;
+    }}
+    .chat-input-inline-ghost[hidden] {{
+      display: none !important;
+    }}
+    .chat-input-inline-ghost-prefix {{
+      visibility: hidden;
+    }}
+    .chat-input-inline-ghost-suffix {{
+      opacity: 0.92;
+    }}
+    [data-theme="dark"] .chat-input-inline-ghost {{
+      color: color-mix(in srgb, var(--workspace-shell-text-soft) 88%, var(--workspace-shell-border-muted) 12%);
+      opacity: 0.72;
+    }}
+    .chat-composer-input-row > #chat-input {{
+      position: relative;
+      z-index: 1;
     }}
     #chat-input {{
       --chat-send-channel-fill: #0072b2;
@@ -4058,6 +4088,13 @@
     [data-theme="dark"] .card.chat .chat-hop-watermark-inline {{
       color: #96b6a5;
       opacity: 0.52;
+    }}
+    [data-theme="dark"] .card.chat button.chat-hop-watermark-inline.chat-hop-reply-btn:hover {{
+      opacity: 0.86;
+      color: #d6eee2;
+    }}
+    [data-theme="dark"] .card.chat button.chat-hop-watermark-inline.chat-hop-reply-btn:focus-visible {{
+      outline: 2px solid rgba(126, 178, 149, 0.58);
     }}
     [data-theme="dark"] .card.chat .chat-feed-item.channel-tinted {{
       border-left: 2px dotted rgba(var(--chat-feed-channel-rgb), 0.84);

@@ -406,16 +406,11 @@
         const deliveryChip = (isLocalEcho && deliveryLabel)
           ? `<span class="chat-delivery-pill state-${{escAttr(deliveryState)}}" title="${{escAttr(deliveryTitle)}}">${{escAttr(deliveryLabel)}}</span>`
           : "";
-        const hopWatermarkTimeText = formatLocalChatTime12Hour(msgTimeUnix, rawTimeText || "n/a", nowUnix);
-        const hasHopWatermarkTime = !!(hopWatermarkTimeText && hopWatermarkTimeText !== "n/a");
-        const hopWatermarkText = hasHop
-          ? `${{hopNum}} hop${{hopWatermarkTimeText && hopWatermarkTimeText !== "n/a" ? ` ${{hopWatermarkTimeText}}` : ""}}`
-          : (hasHopWatermarkTime ? hopWatermarkTimeText : "");
-        const hopWatermarkTitle = hasHop
-          ? `${{hopLabel}}${{hasHopWatermarkTime ? ` • ${{hopWatermarkTimeText}}` : ""}}`
-          : (hasHopWatermarkTime ? `Time: ${{hopWatermarkTimeText}}` : "");
-        const hopWatermarkInline = (hasHop || hasHopWatermarkTime)
-          ? `<span class="chat-hop-watermark-inline" title="${{escAttr(hopWatermarkTitle)}}">${{escAttr(hopWatermarkText)}}</span>`
+        const hopReplyTemplate = hasHop
+          ? `${{hopNum}} Hop${{hopNum === 1 ? "" : "s"}}`
+          : "";
+        const hopReplyInline = hasHop
+          ? `<button type="button" class="chat-hop-watermark-inline chat-hop-reply-btn" data-hop-reply-template="${{escAttr(hopReplyTemplate)}}" data-hop-count="${{escAttr(String(hopNum))}}" title="${{escAttr(`Reply with: ${{hopReplyTemplate}}`)}}" aria-label="${{escAttr(`Reply with ${{hopReplyTemplate}}`)}}"><span class="chat-hop-reply-icon" aria-hidden="true">↩</span><span class="chat-hop-reply-text">${{escAttr(hopLabel)}}</span></button>`
           : "";
         const portnumRaw = String(msg.portnum ?? packetSummary.portnum ?? "").trim();
         const portnumText = portnumRaw || "n/a";
@@ -440,7 +435,7 @@
         const reactionRowParts = [];
         if (reactionSummary) reactionRowParts.push(reactionSummary);
         if (replyButton) reactionRowParts.push(replyButton);
-        if (hopWatermarkInline) reactionRowParts.push(hopWatermarkInline);
+        if (hopReplyInline) reactionRowParts.push(hopReplyInline);
         if (retryButton) reactionRowParts.push(retryButton);
         const tailButtons = [];
         if (whoisButton) tailButtons.push(whoisButton);
@@ -562,6 +557,14 @@
               <span class="chat-feed-colon">:</span>
               <span class="chat-feed-text chat-feed-text-inline${{textEmojiOnlyClass}}">${{textHtml || "&nbsp;"}}</span>`;
         const sideParts = [];
+        if (timeText && timeText !== "n/a") {{
+          const timeTitle = (
+            rawTimeText && rawTimeText !== timeText
+              ? `Time: ${{timeText}} • raw ${{rawTimeText}}`
+              : `Time: ${{timeText}}`
+          );
+          sideParts.push(`<span class="chat-feed-time" title="${{escAttr(timeTitle)}}">${{escAttr(timeText)}}</span>`);
+        }}
         if (deliveryChip) sideParts.push(deliveryChip);
         const sideHtml = (!monitorMode && sideParts.length > 0)
           ? `<span class="chat-feed-side">${{sideParts.join("")}}</span>`

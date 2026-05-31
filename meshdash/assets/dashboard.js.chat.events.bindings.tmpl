@@ -29,6 +29,217 @@
       chatFeedRepeatToggleNodeId = "";
     }}
 
+    function chatHopReplyLocationIsValid(lat, lon) {{
+      if (typeof isValidLatLonRange === "function" && !isValidLatLonRange(lat, lon)) return false;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return false;
+      if (Math.abs(lat) < 1e-9 && Math.abs(lon) < 1e-9) return false;
+      return true;
+    }}
+
+    function chatHopReplyCityCacheKey(location) {{
+      if (!location || typeof location !== "object") return "";
+      const lat = Number(location.lat);
+      const lon = Number(location.lon);
+      if (!chatHopReplyLocationIsValid(lat, lon)) return "";
+      return `${{lat.toFixed(4)}},${{lon.toFixed(4)}}`;
+    }}
+
+    function chatHopReplyCachedCityText(location) {{
+      const key = chatHopReplyCityCacheKey(location);
+      if (!key || !(nodeCityHintCache instanceof Map)) return "";
+      return String(nodeCityHintCache.get(key) || "").trim();
+    }}
+
+    function chatHopReplyLocationSuffixText(rawCityText) {{
+      const clean = String(rawCityText || "").replace(/\\s+/g, " ").trim();
+      if (!clean) return "";
+      const parts = clean.split(",").map((part) => String(part || "").trim()).filter(Boolean);
+      const city = String(parts[0] || "").trim();
+      const state = String(parts[1] || "").trim();
+      if (!city) return "";
+      if (state) return ` to ${{city}}, ${{state}}`;
+      return ` to ${{city}}`;
+    }}
+
+    function chatHopReplySourceNodeFromState(sourceNodeId, state = latestState) {{
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
+      const cleanNodeId = normalizeNodeId(sourceNodeId || "");
+      if (!cleanNodeId || !nodes.length) return null;
+      return nodes.find((node) => normalizeNodeId(node && node.id) === cleanNodeId) || null;
+    }}
+
+    async function resolveChatHopReplyLocationSuffixForNode(sourceNodeId, state = latestState, item = null) {{
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const cleanNodeId = normalizeNodeId(sourceNodeId || "");
+      if (!cleanNodeId) return "";
+      const sourceNode = chatHopReplySourceNodeFromState(cleanNodeId, safeState);
+      const locationMeta = (typeof resolveNodeCityLocationMeta === "function")
+        ? resolveNodeCityLocationMeta(cleanNodeId, safeState, sourceNode || item || null, {{
+            allowEstimate: true,
+            estimateMode: "both",
+          }})
+        : null;
+      const location = (locationMeta && locationMeta.location && typeof locationMeta.location === "object")
+        ? locationMeta.location
+        : null;
+      if (!location) return "";
+      let cityText = chatHopReplyCachedCityText(location);
+      if (!cityText && typeof nearestOfflineCityHintFromCoords === "function") {{
+        const lat = Number(location.lat);
+        const lon = Number(location.lon);
+        if (chatHopReplyLocationIsValid(lat, lon)) {{
+          try {{
+            cityText = String(
+              await nearestOfflineCityHintFromCoords(lat, lon, botCityHintMaxDistanceKm)
+            ).trim();
+            const key = chatHopReplyCityCacheKey(location);
+            if (key && nodeCityHintCache instanceof Map) {{
+              nodeCityHintCache.set(key, cityText);
+            }}
+          }} catch (_err) {{
+            cityText = "";
+          }}
+        }}
+      }}
+      return chatHopReplyLocationSuffixText(cityText);
+    }}
+
+    async function resolveChatHopReplyLocationSuffix(_sourceNodeId, state = latestState, _item = null) {{
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const localNodeId = normalizeNodeId(
+        (typeof resolveLocalNodeId === "function")
+          ? resolveLocalNodeId(safeState)
+          : ""
+      );
+      if (!localNodeId) return "";
+      return resolveChatHopReplyLocationSuffixForNode(localNodeId, safeState, null);
+    }}
+
+    function clearChatHopReplyLocationAutocomplete() {{
+      chatHopReplyAutocompleteToken += 1;
+      chatHopReplyAutocompletePrefix = "";
+      chatHopReplyAutocompleteSuffix = "";
+      renderChatHopReplyLocationGhost();
+    }}
+
+    function syncChatHopReplyLocationAutocompleteInputState(valueRaw) {{
+      const prefix = String(chatHopReplyAutocompletePrefix || "").trim();
+      if (!prefix) return;
+      const value = String(valueRaw || "");
+      if (value !== prefix) {{
+        clearChatHopReplyLocationAutocomplete();
+      }} else {{
+        renderChatHopReplyLocationGhost();
+      }}
+    }}
+
+    function renderChatHopReplyLocationGhost(inputEl = null) {{
+      const input = inputEl instanceof HTMLInputElement
+        ? inputEl
+        : document.getElementById("chat-input");
+      const ghost = document.getElementById("chat-input-inline-ghost");
+      const ghostPrefix = document.getElementById("chat-input-inline-ghost-prefix");
+      const ghostSuffix = document.getElementById("chat-input-inline-ghost-suffix");
+      if (!(input instanceof HTMLInputElement) || !(ghost instanceof HTMLElement) || !(ghostPrefix instanceof HTMLElement) || !(ghostSuffix instanceof HTMLElement)) {{
+        return;
+      }}
+      const prefix = String(chatHopReplyAutocompletePrefix || "").trim();
+      const suffix = String(chatHopReplyAutocompleteSuffix || "");
+      const value = String(input.value || "");
+      const shouldShow = !!prefix && !!suffix && value === prefix;
+      if (!shouldShow) {{
+        ghost.hidden = true;
+        ghostPrefix.textContent = "";
+        ghostSuffix.textContent = "";
+        return;
+      }}
+      ghostPrefix.textContent = prefix;
+      ghostSuffix.textContent = suffix;
+      const row = input.closest(".chat-composer-input-row");
+      if (!(row instanceof HTMLElement)) {{
+        ghost.hidden = true;
+        return;
+      }}
+      const rowRect = row.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+      const inputStyle = window.getComputedStyle(input);
+      const padLeft = Number.parseFloat(inputStyle.paddingLeft || "0") || 0;
+      const padRight = Number.parseFloat(inputStyle.paddingRight || "0") || 0;
+      const contentWidth = Math.max(0, inputRect.width - padLeft - padRight);
+      const insetLeft = Math.max(0, (inputRect.left - rowRect.left) + padLeft);
+      const insetTop = Math.max(0, inputRect.top - rowRect.top);
+      ghost.style.left = `${{insetLeft}}px`;
+      ghost.style.top = `${{insetTop}}px`;
+      ghost.style.height = `${{Math.max(0, inputRect.height)}}px`;
+      ghost.style.maxWidth = `${{contentWidth}}px`;
+      ghost.style.fontFamily = inputStyle.fontFamily;
+      ghost.style.fontSize = inputStyle.fontSize;
+      ghost.style.fontWeight = inputStyle.fontWeight;
+      ghost.style.letterSpacing = inputStyle.letterSpacing;
+      ghost.style.lineHeight = inputStyle.lineHeight;
+      ghost.style.textTransform = inputStyle.textTransform;
+      ghost.hidden = false;
+    }}
+
+    function prepareChatHopReplyLocationAutocomplete(prefixText, sourceNodeId, state = latestState, item = null) {{
+      const prefix = String(prefixText || "").trim();
+      chatHopReplyAutocompleteToken += 1;
+      const token = chatHopReplyAutocompleteToken;
+      chatHopReplyAutocompletePrefix = prefix;
+      chatHopReplyAutocompleteSuffix = "";
+      renderChatHopReplyLocationGhost();
+      if (!prefix) return;
+      void resolveChatHopReplyLocationSuffix(sourceNodeId, state, item)
+        .then((suffix) => {{
+          if (token !== chatHopReplyAutocompleteToken) return;
+          const rawSuffix = String(suffix || "");
+          if (!rawSuffix.trim()) return;
+          chatHopReplyAutocompleteSuffix = rawSuffix.startsWith(" ")
+            ? rawSuffix
+            : ` ${{rawSuffix}}`;
+          renderChatHopReplyLocationGhost();
+        }})
+        .catch(() => {{
+          renderChatHopReplyLocationGhost();
+        }});
+    }}
+
+    function applyChatHopReplyLocationAutocomplete(inputEl = null) {{
+      const input = inputEl instanceof HTMLInputElement
+        ? inputEl
+        : document.getElementById("chat-input");
+      if (!(input instanceof HTMLInputElement)) return false;
+      const prefix = String(chatHopReplyAutocompletePrefix || "").trim();
+      const suffix = String(chatHopReplyAutocompleteSuffix || "");
+      if (!prefix || !suffix) return false;
+      const value = String(input.value || "");
+      if (value !== prefix) return false;
+      const selectionStart = Number(input.selectionStart);
+      const selectionEnd = Number(input.selectionEnd);
+      if (
+        Number.isFinite(selectionStart)
+        && Number.isFinite(selectionEnd)
+        && (selectionStart !== value.length || selectionEnd !== value.length)
+      ) {{
+        return false;
+      }}
+      const maxLength = Math.max(0, Math.trunc(Number(input.maxLength) || 0));
+      const nextValue = `${{prefix}}${{suffix}}`;
+      if (maxLength > 0 && nextValue.length > maxLength) {{
+        setChatSendStatus("Cannot append location: message is at the length limit.", true);
+        return false;
+      }}
+      input.value = nextValue;
+      const tail = input.value.length;
+      input.focus();
+      input.setSelectionRange(tail, tail);
+      input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+      clearChatHopReplyLocationAutocomplete();
+      return true;
+    }}
+
     function chatFeedSelectionKeyForItem(item) {{
       if (!(item instanceof HTMLElement)) return "";
       const messageKey = String(item.dataset.messageKey || "").trim();
@@ -142,6 +353,41 @@
             selectNode(item.dataset.nodeId || "", false, false);
           }}
           setChatReplyTarget(replyId, replyName, replyText);
+          return;
+        }}
+
+        const hopReplyBtn = target.closest(".chat-hop-reply-btn");
+        if (hopReplyBtn instanceof HTMLButtonElement) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const replyId = Number(item.dataset.messageId || "");
+          const replyName = item.dataset.replyName || "Unknown node";
+          const replyText = item.dataset.replyText || "";
+          if (chatMainDirectModeEnabled && activeChatChannel === "direct" && item.classList.contains("chat-selectable")) {{
+            selectNode(item.dataset.nodeId || "", false, false);
+          }}
+          if (Number.isInteger(replyId) && replyId > 0) {{
+            setChatReplyTarget(replyId, replyName, replyText);
+          }} else {{
+            clearChatReplyTarget();
+          }}
+          const input = document.getElementById("chat-input");
+          if (!(input instanceof HTMLInputElement)) {{
+            setChatSendStatus("Cannot prepare hop reply: chat input is unavailable.", true);
+            return;
+          }}
+          const templateText = String(hopReplyBtn.dataset.hopReplyTemplate || "").trim();
+          if (!templateText) {{
+            setChatSendStatus("Cannot prepare hop reply: hop count is unavailable.", true);
+            return;
+          }}
+          const sourceNodeId = normalizeNodeId(item.dataset.fromNodeId || item.dataset.nodeId || "");
+          prepareChatHopReplyLocationAutocomplete(templateText, sourceNodeId, latestState, item);
+          input.value = templateText;
+          input.focus();
+          input.setSelectionRange(templateText.length, templateText.length);
+          input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+          setChatSendStatus(`Prepared reply template: ${{templateText}} (Tab adds location if available)`);
           return;
         }}
 

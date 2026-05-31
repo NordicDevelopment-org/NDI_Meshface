@@ -269,6 +269,9 @@ def test_chat_compose_notices_float_above_composer_shell() -> None:
 
 def test_chat_composer_uses_200_byte_mesh_limit(dashboard_html: str, dashboard_js: str) -> None:
     assert 'id="chat-input"' in dashboard_html
+    assert 'id="chat-input-inline-ghost"' in dashboard_html
+    assert 'id="chat-input-inline-ghost-prefix"' in dashboard_html
+    assert 'id="chat-input-inline-ghost-suffix"' in dashboard_html
     assert 'maxlength="200"' in dashboard_html
     assert "const chatMessageMaxBytes = Math.max(1, Math.trunc(Number(200) || 0));" in dashboard_js
     assert "const fileTransferChatMaxBytes = chatMessageMaxBytes;" in dashboard_js
@@ -904,6 +907,8 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "left: var(--chat-feed-node-emoji-tail-inset);" in css
     assert '[data-theme="dark"] .card.chat .chat-feed-item.has-node-emoji::after {' in css
     assert ".chat-hop-watermark-inline {" in css
+    assert ".chat-hop-reply-icon {" in css
+    assert ".chat-hop-reply-text {" in css
     assert "font-size: 10px;" in css
     assert "font-weight: 700;" in css
     assert "font-variant-numeric: tabular-nums;" in css
@@ -925,17 +930,28 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert 'data-node-emoji="${escAttr(nodeVisualEmoji)}"' in js
     assert "function formatLocalChatTime12Hour(" in js
     assert 'const meridiem = hour24 >= 12 ? "PM" : "AM";' in js
-    assert 'const hasHopWatermarkTime = !!(hopWatermarkTimeText && hopWatermarkTimeText !== "n/a");' in js
-    assert 'const hopWatermarkInline = (hasHop || hasHopWatermarkTime)' in js
-    assert 'const hopWatermarkTimeText = formatLocalChatTime12Hour(msgTimeUnix, rawTimeText || "n/a", nowUnix);' in js
-    assert 'const hopWatermarkText = hasHop' in js
-    assert 'Time: ${hopWatermarkTimeText}' in js
+    assert 'const hopReplyTemplate = hasHop' in js
+    assert 'const hopReplyInline = hasHop' in js
+    assert 'data-hop-reply-template="${escAttr(hopReplyTemplate)}"' in js
+    assert 'class="chat-hop-reply-icon"' in js
+    assert 'class="chat-hop-reply-text"' in js
+    assert "function prepareChatHopReplyLocationAutocomplete(prefixText, sourceNodeId, state = latestState, item = null) {" in js
+    assert "function resolveChatHopReplyLocationSuffixForNode(sourceNodeId, state = latestState, item = null) {" in js
+    assert "const localNodeId = normalizeNodeId(" in js
+    assert "resolveLocalNodeId(safeState)" in js
+    assert "const sourceSuffix = await resolveChatHopReplyLocationSuffixForNode(sourceNodeId, safeState, item);" not in js
+    assert "chatHopReplyAutocompleteSuffix = rawSuffix.startsWith(\" \")" in js
+    assert "function applyChatHopReplyLocationAutocomplete(inputEl = null) {" in js
+    assert "function renderChatHopReplyLocationGhost(inputEl = null) {" in js
+    assert 'ev.key === "Tab"' in js
+    assert 'applyChatHopReplyLocationAutocomplete(input)' in js
+    assert 'Prepared reply template: ${templateText} (Tab adds location if available)' in js
     assert '${hopNum} hop' in js
-    assert 'if (hopWatermarkInline) reactionRowParts.push(hopWatermarkInline);' in js
+    assert 'if (hopReplyInline) reactionRowParts.push(hopReplyInline);' in js
     assert 'const routingMetadataLabel = hasRoutingMetadata' in js
     assert 'messageTooltipParts.push(`Routing: ${routingMetadataLabel}`);' in js
-    assert 'class="chat-hop-watermark-inline"' in js
-    assert "<span class=\"chat-feed-time\"" not in js
+    assert 'class="chat-hop-watermark-inline chat-hop-reply-btn"' in js
+    assert "<span class=\"chat-feed-time\"" in js
 
 
 def test_chat_reply_preview_links_jump_to_original_packet() -> None:

@@ -620,11 +620,39 @@
         input.dataset.bound = "1";
         input.maxLength = chatComposerMaxBytes;
         input.addEventListener("input", () => {{
+          if (typeof syncChatHopReplyLocationAutocompleteInputState === "function") {{
+            syncChatHopReplyLocationAutocompleteInputState(input.value);
+          }}
+          if (typeof renderChatHopReplyLocationGhost === "function") {{
+            renderChatHopReplyLocationGhost(input);
+          }}
           if (typeof renderChatTextMacroPreview === "function") {{
             renderChatTextMacroPreview(input.value);
           }}
         }});
+        input.addEventListener("focus", () => {{
+          if (typeof renderChatHopReplyLocationGhost === "function") {{
+            renderChatHopReplyLocationGhost(input);
+          }}
+        }});
+        input.addEventListener("blur", () => {{
+          if (typeof renderChatHopReplyLocationGhost === "function") {{
+            renderChatHopReplyLocationGhost(input);
+          }}
+        }});
         input.addEventListener("keydown", (ev) => {{
+          if (
+            ev.key === "Tab"
+            && !ev.shiftKey
+            && !ev.altKey
+            && !ev.ctrlKey
+            && !ev.metaKey
+            && typeof applyChatHopReplyLocationAutocomplete === "function"
+            && applyChatHopReplyLocationAutocomplete(input)
+          ) {{
+            ev.preventDefault();
+            return;
+          }}
           if (ev.key === "Enter" && !ev.shiftKey) {{
             ev.preventDefault();
             sendChatMessage({{ preserveFocus: true }});
@@ -633,6 +661,18 @@
         if (typeof renderChatTextMacroPreview === "function") {{
           renderChatTextMacroPreview(input.value);
         }}
+        if (typeof renderChatHopReplyLocationGhost === "function") {{
+          renderChatHopReplyLocationGhost(input);
+        }}
+      }}
+      if (document.body.dataset.chatHopReplyGhostResizeBound !== "1") {{
+        document.body.dataset.chatHopReplyGhostResizeBound = "1";
+        window.addEventListener("resize", () => {{
+          const chatInput = document.getElementById("chat-input");
+          if (typeof renderChatHopReplyLocationGhost === "function") {{
+            renderChatHopReplyLocationGhost(chatInput instanceof HTMLInputElement ? chatInput : null);
+          }}
+        }});
       }}
       const macroPreview = document.getElementById("chat-macro-preview");
       if (macroPreview instanceof HTMLElement && macroPreview.dataset.bound !== "1") {{

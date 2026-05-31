@@ -7650,8 +7650,9 @@
       flex: 0 0 auto;
       margin-left: auto;
       display: inline-flex;
-      align-items: center;
-      gap: 5px;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
       min-width: 0;
     }}
     .chat-feed-time {{
@@ -7803,6 +7804,35 @@
       opacity: 0.58;
       white-space: nowrap;
       user-select: none;
+    }}
+    button.chat-hop-watermark-inline.chat-hop-reply-btn {{
+      appearance: none;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font-family: inherit;
+      color: inherit;
+      cursor: pointer;
+      gap: 3px;
+    }}
+    .chat-hop-reply-icon {{
+      font-size: 11px;
+      line-height: 1;
+      opacity: 0.9;
+    }}
+    .chat-hop-reply-text {{
+      font-size: inherit;
+      line-height: inherit;
+    }}
+    button.chat-hop-watermark-inline.chat-hop-reply-btn:hover {{
+      opacity: 0.84;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }}
+    button.chat-hop-watermark-inline.chat-hop-reply-btn:focus-visible {{
+      outline: 2px solid rgba(90, 135, 108, 0.34);
+      outline-offset: 1px;
+      border-radius: 4px;
     }}
     .chat-whois-btn {{
       border: 1px solid #bccddd;
