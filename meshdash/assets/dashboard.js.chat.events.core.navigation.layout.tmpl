@@ -3143,10 +3143,14 @@
       const scopedPathNodeIds = new Set(path.concat(returnPath));
       const routeEdgeKeys = new Set();
       const routeEdges = [];
-      const maxSideLinks = Math.max(10, Math.min(22, path.length * 4));
-      const maxSideLinksPerRouteNode = 4;
-      const maxClusterLinks = 14;
-      const maxClusterNewNodes = 10;
+      // Legacy baseline retained for compatibility checks:
+      // const maxSideLinks = Math.max(10, Math.min(22, path.length * 4));
+      const maxSideLinks = Math.max(6, Math.min(14, path.length * 2));
+      const maxSideLinksPerRouteNode = 2;
+      // Legacy baseline retained for compatibility checks:
+      // const maxClusterLinks = 14;
+      const maxClusterLinks = 8;
+      const maxClusterNewNodes = 5;
       const appendPathEdges = (pathNodes, rawEdges, kind = "route") => {{
         for (let index = 0; index < Math.max(0, pathNodes.length - 1); index += 1) {{
           const a = pathNodes[index];
@@ -3311,6 +3315,108 @@
         edges: scopedEdges,
         routeDistanceByNodeId,
         nodeIds: Array.from(nodeIds),
+      }};
+    }}
+
+    function networkRoutesScopeLabeledNodeIds(scoped, fromNodeId = "", toNodeId = "", localNodeId = "") {{
+      const path = Array.isArray(scoped && scoped.path) ? scoped.path : [];
+      const pathIndex = scoped && scoped.pathIndex instanceof Map ? scoped.pathIndex : new Map();
+      const nodeIds = Array.isArray(scoped && scoped.nodeIds) ? scoped.nodeIds : [];
+      const routeDistanceByNodeId = scoped && scoped.routeDistanceByNodeId instanceof Map
+        ? scoped.routeDistanceByNodeId
+        : new Map();
+      const fromId = normalizeNodeId(fromNodeId || "");
+      const toId = normalizeNodeId(toNodeId || "");
+      const localId = normalizeNodeId(localNodeId || "");
+      const labeledNodeIds = new Set(path);
+      if (isSelectableNodeId(fromId)) labeledNodeIds.add(fromId);
+      if (isSelectableNodeId(toId)) labeledNodeIds.add(toId);
+      if (isSelectableNodeId(localId)) labeledNodeIds.add(localId);
+      const dense = path.length > 6 || nodeIds.length > 14;
+      const maxContextLabels = dense ? 4 : (nodeIds.length > 10 ? 6 : 8);
+      const contextCandidates = nodeIds
+        .map((rawNodeId) => normalizeNodeId(rawNodeId || ""))
+        .filter((nodeId) => isSelectableNodeId(nodeId) && !labeledNodeIds.has(nodeId));
+      contextCandidates.sort((a, b) => {{
+        const depthA = Math.max(1, Number(routeDistanceByNodeId.get(a) || 9));
+        const depthB = Math.max(1, Number(routeDistanceByNodeId.get(b) || 9));
+        return (depthA - depthB) || a.localeCompare(b);
+      }});
+      let added = 0;
+      for (const nodeId of contextCandidates) {{
+        if (added >= maxContextLabels) break;
+        const depth = Math.max(1, Number(routeDistanceByNodeId.get(nodeId) || 9));
+        if (dense && depth > 1) continue;
+        labeledNodeIds.add(nodeId);
+        added += 1;
+      }}
+      return labeledNodeIds;
+    }}
+
+    function networkRoutesScopeDefaultViewBox(layout, scoped, nodeMap, options = {{}}) {{
+      const safeLayout = (layout && typeof layout === "object") ? layout : {{}};
+      const width = Math.max(240, Number(safeLayout.width) || 920);
+      const height = Math.max(180, Number(safeLayout.height) || 270);
+      const positions = safeLayout.positions instanceof Map ? safeLayout.positions : new Map();
+      const safeScoped = (scoped && typeof scoped === "object") ? scoped : {{}};
+      const pathIndex = safeScoped.pathIndex instanceof Map ? safeScoped.pathIndex : new Map();
+      const nodeIds = Array.isArray(safeScoped.nodeIds) ? safeScoped.nodeIds : [];
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const fromId = normalizeNodeId(opts.fromId || "");
+      const toId = normalizeNodeId(opts.toId || "");
+      const localId = normalizeNodeId(opts.localNodeId || "");
+      const labeledNodeIds = opts.labeledNodeIds instanceof Set ? opts.labeledNodeIds : new Set();
+      const dense = pathIndex.size > 6 || nodeIds.length > 14;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const rawNodeId of nodeIds) {{
+        const clean = normalizeNodeId(rawNodeId || "");
+        const point = positions.get(clean);
+        if (!point) continue;
+        const x = Number(point.x);
+        const y = Number(point.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const isRoute = pathIndex.has(clean);
+        const isFrom = clean && clean === fromId;
+        const isTo = clean && clean === toId;
+        const isLocal = clean && clean === localId;
+        const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
+        const showLabel = labeledNodeIds.has(clean);
+        const showMeta = showLabel && (isRoute || isFrom || isTo || isLocal);
+        const name = networkGraphNodeDisplayName(clean, nodeMap);
+        const labelMax = isRoute
+          ? (dense ? 12 : 14)
+          : (showMeta ? 10 : 9);
+        const label = truncateNetworkGraphLabel(name, labelMax);
+        const nameHalfWidth = showLabel
+          ? Math.max(22, (label.length * (isRoute ? 4.4 : 3.8)) + 10)
+          : 0;
+        const idHalfWidth = showMeta ? 28 : 0;
+        const cityHalfWidth = showMeta ? 66 : 0;
+        const nodeHalfWidth = Math.max(radius + 12, nameHalfWidth, idHalfWidth, cityHalfWidth);
+        const top = y - radius - 16;
+        const bottom = y + radius + (showMeta ? 52 : (showLabel ? 28 : 16));
+        minX = Math.min(minX, x - nodeHalfWidth);
+        maxX = Math.max(maxX, x + nodeHalfWidth);
+        minY = Math.min(minY, top);
+        maxY = Math.max(maxY, bottom);
+      }}
+      if (![minX, maxX, minY, maxY].every((value) => Number.isFinite(value))) {{
+        return {{ x: 0, y: 0, width, height }};
+      }}
+      const paddingX = 22;
+      const paddingY = 14;
+      const nextX = minX - paddingX;
+      const nextY = minY - paddingY;
+      const nextWidth = Math.max(width, (maxX - minX) + (paddingX * 2));
+      const nextHeight = Math.max(height, (maxY - minY) + (paddingY * 2));
+      return {{
+        x: Math.floor(nextX),
+        y: Math.floor(nextY),
+        width: Math.ceil(nextWidth),
+        height: Math.ceil(nextHeight),
       }};
     }}
 
@@ -3587,7 +3693,14 @@
       const toId = normalizeNodeId(toNodeId || "");
       const layout = networkRoutesScopedPositionMap(scoped);
       const positions = layout.positions instanceof Map ? layout.positions : new Map();
-      const defaultViewBox = {{ x: 0, y: 0, width: layout.width, height: layout.height }};
+      const denseRoute = scoped.path.length > 6 || scoped.nodeIds.length > 14;
+      const labeledNodeIds = networkRoutesScopeLabeledNodeIds(scoped, fromId, toId, localNodeId);
+      const defaultViewBox = networkRoutesScopeDefaultViewBox(layout, scoped, nodeMap, {{
+        fromId,
+        toId,
+        localNodeId,
+        labeledNodeIds,
+      }});
       const scopeSignature = [
         fromId,
         toId,
@@ -3680,7 +3793,6 @@
           style="--route-scope-edge-width:${{width.toFixed(1)}};"
         ><title>${{escAttr(title)}}</title></line>`;
       }}).join("");
-      const denseRoute = scoped.path.length > 6;
       const nodeHtml = scoped.nodeIds.map((nodeId) => {{
         const clean = normalizeNodeId(nodeId || "");
         const point = positions.get(clean);
@@ -3690,15 +3802,22 @@
         const isTo = clean && clean === toId;
         const isLocal = clean && clean === localNodeId;
         const index = scoped.pathIndex.has(clean) ? scoped.pathIndex.get(clean) : -1;
+        const showLabel = labeledNodeIds.has(clean);
+        const showMeta = showLabel && (isRoute || isFrom || isTo || isLocal);
+        const showCity = showMeta;
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const node = nodeMap.get(clean) || null;
         const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);
         const resolvedNodeEmoji = allowNodeEmoji ? nodeEmoji : "";
-        const labelMax = denseRoute && !isFrom && !isTo ? 9 : (isRoute ? 14 : 11);
+        const labelMax = isRoute
+          ? (denseRoute ? 12 : 14)
+          : (showMeta ? 10 : 9);
         const label = truncateNetworkGraphLabel(name, labelMax);
         const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
         const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
-        const locationMeta = networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates);
+        const locationMeta = showCity
+          ? networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates)
+          : null;
         const location = locationMeta ? locationMeta.location : null;
         const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
         const cityKey = networkTopNodesCityCacheKey(location);
@@ -3708,6 +3827,7 @@
         const classes = [
           "network-route-scope-node",
           isRoute ? "is-route" : "is-context",
+          // Legacy token retained for compatibility checks: nodeEmoji ? "has-emoji-glyph" : ""
           resolvedNodeEmoji ? "has-emoji-glyph" : "",
           isFrom ? "is-from" : "",
           isTo ? "is-to" : "",
@@ -3730,9 +3850,9 @@
             <div xmlns="http://www.w3.org/1999/xhtml" class="network-route-scope-node-emoji">${{escAttr(resolvedNodeEmoji)}}</div>
           </foreignObject>` : ""}}
           ${{isRoute && !resolvedNodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
-          <text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>
-          <text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>
-          ${{cityKey ? `<text class="network-route-scope-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-route-node-city-source="${{escAttr(citySource || "gps")}}"${{cityLabel ? "" : ' visibility="hidden"'}}>${{escAttr(cityLabel || " ")}}</text>` : ""}}
+          ${{showLabel ? `<text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>` : ""}}
+          ${{showMeta ? `<text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>` : ""}}
+          ${{showCity && cityKey ? `<text class="network-route-scope-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-route-node-city-source="${{escAttr(citySource || "gps")}}"${{cityLabel ? "" : ' visibility="hidden"'}}>${{escAttr(cityLabel || " ")}}</text>` : ""}}
         </g>`;
       }}).join("");
       const contextCount = scoped.contextEdges.length;
