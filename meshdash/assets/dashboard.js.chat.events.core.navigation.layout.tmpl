@@ -2179,8 +2179,12 @@
           const nodeId = normalizeNodeId(row.getAttribute("data-route-node-id") || "");
           if (!isSelectableNodeId(nodeId)) return false;
           networkRoutesListFocusNodeId = nodeId;
+          const fromScopeGraph = !!(target instanceof Element && target.closest(".network-route-scope-node"));
+          if (fromScopeGraph) {{
+            renderNetworkRoutes(latestState);
+            return true;
+          }}
           selectNode(nodeId, true, false);
-          renderNetworkRoutes(latestState);
           return true;
         }};
         const activateRouteEdgeTarget = (target) => {{
@@ -2207,15 +2211,18 @@
           const target = event.target instanceof Element ? event.target : null;
           if (networkRoutesScopeSuppressClick) {{
             networkRoutesScopeSuppressClick = false;
-            return;
+            const nodeTarget = target instanceof Element
+              ? target.closest(".network-route-scope-node")
+              : null;
+            if (!(nodeTarget instanceof Element)) return;
           }}
-          if (activateRouteEdgeTarget(target)) return;
-          activateRouteNodeTarget(target);
+          if (activateRouteNodeTarget(target)) return;
+          activateRouteEdgeTarget(target);
         }});
         result.addEventListener("keydown", (event) => {{
           if (!(event instanceof KeyboardEvent) || (event.key !== "Enter" && event.key !== " ")) return;
           const target = event.target instanceof Element ? event.target : null;
-          if (activateRouteEdgeTarget(target) || activateRouteNodeTarget(target)) {{
+          if (activateRouteNodeTarget(target) || activateRouteEdgeTarget(target)) {{
             event.preventDefault();
           }}
         }});
@@ -2480,30 +2487,20 @@
       const path = Array.isArray(route && route.path) ? route.path : [];
       const edges = Array.isArray(route && route.edges) ? route.edges : [];
       const maxWeight = edges.reduce((max, edge) => Math.max(max, Number(edge && edge.weight) || 0), 0);
-      let orderedPath = path.slice();
-      const focusNodeId = normalizeNodeId(networkRoutesListFocusNodeId || "");
-      if (isSelectableNodeId(focusNodeId) && orderedPath.length > 1) {{
-        const focusIndex = orderedPath.findIndex((nodeId) => normalizeNodeId(nodeId || "") === focusNodeId);
-        if (focusIndex > 0) {{
-          orderedPath = [orderedPath[focusIndex], ...orderedPath.slice(0, focusIndex), ...orderedPath.slice(focusIndex + 1)];
-        }}
-      }}
-      return `<ol class="network-route-hop-list">${{orderedPath.map((nodeId, index) => {{
+      return `<ol class="network-route-hop-list">${{path.map((nodeId, index) => {{
         const clean = normalizeNodeId(nodeId || "");
-        const routeIndex = path.findIndex((entry) => normalizeNodeId(entry || "") === clean);
-        const hopDisplayIndex = routeIndex >= 0 ? routeIndex + 1 : index + 1;
-        const edge = routeIndex >= 0 && routeIndex < edges.length ? edges[routeIndex] : null;
+        const edge = index < edges.length ? edges[index] : null;
         const isLocal = clean && clean === normalizeNodeId(localNodeId || "");
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const edgeWeight = Math.max(0, Number(edge && edge.weight) || 0);
         const edgePct = maxWeight > 0 ? Math.max(4, Math.min(100, (edgeWeight / maxWeight) * 100)) : 0;
         const edgeMeta = edge ? networkRoutesEdgeMetaText(edge) : "";
         const linkMeta = edge
-          ? `Link ${{String(routeIndex + 1)}}${{edgeMeta ? ` - ${{edgeMeta}}` : ""}}`
+          ? `Link ${{String(index + 1)}}${{edgeMeta ? ` - ${{edgeMeta}}` : ""}}`
           : "Destination";
         return `<li class="network-route-hop${{isLocal ? " is-local" : ""}}" data-route-node-id="${{escAttr(clean)}}">
           <button class="network-route-hop-node" type="button" data-route-node-id="${{escAttr(clean)}}" title="${{escAttr(`${{name}} (${{clean}})`)}}">
-            <span class="network-route-hop-index">${{escAttr(String(hopDisplayIndex))}}</span>
+            <span class="network-route-hop-index">${{escAttr(String(index + 1))}}</span>
             <span class="network-route-hop-main">
               <strong>${{escAttr(name)}}</strong>
               ${{isLocal ? `<span class="network-route-self-label">self</span>` : ""}}
@@ -3499,7 +3496,8 @@
       }}
       const cityFull = String(safe.cityLabelFull || "").trim();
       const showMetaBase = !!safe.showMetaBase;
-      const isPriority = !!safe.isRoute || !!safe.isFrom || !!safe.isTo || !!safe.isLocal;
+      const isFocused = !!safe.isFocused;
+      const isPriority = isFocused || !!safe.isRoute || !!safe.isFrom || !!safe.isTo || !!safe.isLocal;
       const variants = [];
       const seen = new Set();
       const pushVariant = (nameMax, metaEnabled, cityEnabled, cityMax = 0, allowOverlap = false, cityUnitsPerChar = 2.55) => {{
@@ -3527,6 +3525,12 @@
         }});
       }};
       if (isPriority) {{
+        if (isFocused) {{
+          pushVariant(160, true, true, 120, false, 2.55);
+          pushVariant(160, true, true, 96, false, 2.55);
+          pushVariant(160, true, false, 0, false, 2.55);
+          pushVariant(120, true, false, 0, false, 2.55);
+        }}
         pushVariant(120, true, true, 96, false, 2.55);
         pushVariant(120, true, true, 72, false, 2.55);
         pushVariant(120, true, true, 56, false, 2.55);
@@ -3572,6 +3576,7 @@
       const routeLocationEstimates = opts.routeLocationEstimates instanceof Map
         ? opts.routeLocationEstimates
         : new Map();
+      const focusedNodeId = normalizeNodeId(networkRoutesListFocusNodeId || "");
       const pathIndex = safeScoped.pathIndex instanceof Map ? safeScoped.pathIndex : new Map();
       const routeDistanceByNodeId = safeScoped.routeDistanceByNodeId instanceof Map
         ? safeScoped.routeDistanceByNodeId
@@ -3584,7 +3589,8 @@
         if (!isSelectableNodeId(clean)) continue;
         const point = safePositions.get(clean);
         if (!point) continue;
-        if (!labeledNodeIds.has(clean)) continue;
+        const isFocused = isSelectableNodeId(focusedNodeId) && clean === focusedNodeId;
+        if (!labeledNodeIds.has(clean) && !isFocused) continue;
         const isRoute = pathIndex.has(clean);
         const isFrom = clean && clean === fromId;
         const isTo = clean && clean === toId;
@@ -3600,7 +3606,9 @@
         const cityTextRaw = showMetaBase ? String(networkTopNodesCityText(location) || "").trim() : "";
         const cityLabelFull = cityTextRaw && citySource === "estimated" ? `~ ${{cityTextRaw}}` : cityTextRaw;
         const depth = Math.max(1, Number(routeDistanceByNodeId.get(clean) || 1));
-        const priority = (isFrom || isTo)
+        const priority = isFocused
+          ? 900
+          : (isFrom || isTo)
           ? 500
           : (isLocal
             ? 450
@@ -3614,6 +3622,7 @@
           isFrom,
           isTo,
           isLocal,
+          isFocused,
           showMetaBase,
           nameFull,
           cityLabelFull,
@@ -3866,6 +3875,10 @@
       }}, {{ passive: false }});
       svg.addEventListener("pointerdown", (event) => {{
         if (Number(event.button) !== 0) return;
+        const nodeTarget = event.target instanceof Element
+          ? event.target.closest(".network-route-scope-node")
+          : null;
+        if (nodeTarget instanceof Element) return;
         const currentViewBox = networkRoutesScopeViewBoxFrom(svg.getAttribute("viewBox"));
         networkRoutesScopePointerDrag = {{
           pointerId: Number(event.pointerId),
