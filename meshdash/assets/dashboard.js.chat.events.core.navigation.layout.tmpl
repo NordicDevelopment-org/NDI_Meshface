@@ -2239,6 +2239,9 @@
       );
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const localNodeId = normalizeNodeId(resolveLocalNodeId(safeState) || "");
+      const searchQuery = (typeof globalNodeSearchQuery === "function")
+        ? globalNodeSearchQuery()
+        : "";
       const nodeMap = buildNetworkGraphNodeMap(nodes, historyCaps, filteredRawEdges, {{
         includeAllLiveNodes: true,
         pinnedNodeIds: [
@@ -2247,6 +2250,8 @@
           networkRoutesFromNodeId,
           networkRoutesToNodeId,
         ],
+        historyMode: edgeMode,
+        searchQuery,
       }});
       const combinedEdges = combineNetworkGraphEdges(filteredRawEdges, nodeMap, {{ mode: edgeMode }});
       const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
@@ -3320,36 +3325,22 @@
 
     function networkRoutesScopeLabeledNodeIds(scoped, fromNodeId = "", toNodeId = "", localNodeId = "") {{
       const path = Array.isArray(scoped && scoped.path) ? scoped.path : [];
-      const pathIndex = scoped && scoped.pathIndex instanceof Map ? scoped.pathIndex : new Map();
       const nodeIds = Array.isArray(scoped && scoped.nodeIds) ? scoped.nodeIds : [];
-      const routeDistanceByNodeId = scoped && scoped.routeDistanceByNodeId instanceof Map
-        ? scoped.routeDistanceByNodeId
-        : new Map();
       const fromId = normalizeNodeId(fromNodeId || "");
       const toId = normalizeNodeId(toNodeId || "");
       const localId = normalizeNodeId(localNodeId || "");
-      const labeledNodeIds = new Set(path);
+      const labeledNodeIds = new Set();
+      for (const rawNodeId of nodeIds) {{
+        const clean = normalizeNodeId(rawNodeId || "");
+        if (isSelectableNodeId(clean)) labeledNodeIds.add(clean);
+      }}
+      for (const routeNodeId of path) {{
+        const clean = normalizeNodeId(routeNodeId || "");
+        if (isSelectableNodeId(clean)) labeledNodeIds.add(clean);
+      }}
       if (isSelectableNodeId(fromId)) labeledNodeIds.add(fromId);
       if (isSelectableNodeId(toId)) labeledNodeIds.add(toId);
       if (isSelectableNodeId(localId)) labeledNodeIds.add(localId);
-      const dense = path.length > 6 || nodeIds.length > 14;
-      const maxContextLabels = dense ? 4 : (nodeIds.length > 10 ? 6 : 8);
-      const contextCandidates = nodeIds
-        .map((rawNodeId) => normalizeNodeId(rawNodeId || ""))
-        .filter((nodeId) => isSelectableNodeId(nodeId) && !labeledNodeIds.has(nodeId));
-      contextCandidates.sort((a, b) => {{
-        const depthA = Math.max(1, Number(routeDistanceByNodeId.get(a) || 9));
-        const depthB = Math.max(1, Number(routeDistanceByNodeId.get(b) || 9));
-        return (depthA - depthB) || a.localeCompare(b);
-      }});
-      let added = 0;
-      for (const nodeId of contextCandidates) {{
-        if (added >= maxContextLabels) break;
-        const depth = Math.max(1, Number(routeDistanceByNodeId.get(nodeId) || 9));
-        if (dense && depth > 1) continue;
-        labeledNodeIds.add(nodeId);
-        added += 1;
-      }}
       return labeledNodeIds;
     }}
 
@@ -3471,7 +3462,7 @@
         ? networkRoutesScopeApproxTextHalfWidth(plan.idLabel, 2.8, 24)
         : 0;
       const cityHalf = plan.showCity
-        ? networkRoutesScopeApproxTextHalfWidth(plan.cityLabel, 3.1, 24)
+        ? networkRoutesScopeApproxTextHalfWidth(plan.cityLabel, plan.cityUnitsPerChar, 18)
         : 0;
       const halfWidth = Math.max(nameHalf, idHalf, cityHalf, safeRadius + 10);
       const top = centerY + safeRadius + 4;
@@ -3502,14 +3493,15 @@
       const isPriority = !!safe.isRoute || !!safe.isFrom || !!safe.isTo || !!safe.isLocal;
       const variants = [];
       const seen = new Set();
-      const pushVariant = (nameMax, metaEnabled, cityEnabled, cityMax = 48, allowOverlap = false) => {{
+      const pushVariant = (nameMax, metaEnabled, cityEnabled, cityMax = 0, allowOverlap = false, cityUnitsPerChar = 2.55) => {{
         const rawName = truncateNetworkGraphLabel(fullName, Math.max(4, Math.trunc(Number(nameMax) || fullName.length)));
         const nameLabel = String(rawName || "").trim();
         if (!nameLabel) return;
         const showMeta = !!(metaEnabled && showMetaBase);
         const showCity = !!(showMeta && cityEnabled && cityFull);
+        const maxCityChars = Math.max(0, Math.trunc(Number(cityMax) || 0));
         const cityLabel = showCity
-          ? String(truncateNetworkGraphLabel(cityFull, Math.max(6, Math.trunc(Number(cityMax) || cityFull.length))) || "").trim()
+          ? String((maxCityChars > 0 ? truncateNetworkGraphLabel(cityFull, Math.max(6, maxCityChars)) : cityFull) || "").trim()
           : "";
         const key = `${{nameLabel}}|${{showMeta ? 1 : 0}}|${{showCity ? cityLabel : ""}}|${{allowOverlap ? 1 : 0}}`;
         if (seen.has(key)) return;
@@ -3520,13 +3512,18 @@
           showCity: !!(showCity && cityLabel),
           nameLabel,
           cityLabel: showCity ? cityLabel : "",
+          cityMaxChars: showCity ? maxCityChars : 0,
+          cityUnitsPerChar: Math.max(2.1, Number(cityUnitsPerChar) || 2.55),
           allowOverlap: !!allowOverlap,
         }});
       }};
       if (isPriority) {{
-        pushVariant(96, true, true, 48, false);
-        pushVariant(96, true, true, 28, false);
-        pushVariant(96, true, false, 0, false);
+        pushVariant(120, true, true, 96, false, 2.55);
+        pushVariant(120, true, true, 72, false, 2.55);
+        pushVariant(120, true, true, 56, false, 2.55);
+        pushVariant(120, true, true, 42, false, 2.55);
+        pushVariant(120, true, true, 32, false, 2.55);
+        pushVariant(120, true, false, 0, false, 2.55);
         pushVariant(36, true, false, 0, false);
         pushVariant(26, true, false, 0, false);
         pushVariant(20, true, false, 0, false);
@@ -3546,6 +3543,8 @@
           showCity: false,
           nameLabel: "",
           cityLabel: "",
+          cityMaxChars: 0,
+          cityUnitsPerChar: 2.55,
           allowOverlap: false,
         }});
       }}
@@ -3590,8 +3589,7 @@
         const location = locationMeta ? locationMeta.location : null;
         const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
         const cityTextRaw = showMetaBase ? String(networkTopNodesCityText(location) || "").trim() : "";
-        const cityText = cityTextRaw ? truncateNetworkGraphLabel(cityTextRaw, 42) : "";
-        const cityLabelFull = cityText && citySource === "estimated" ? `~ ${{cityText}}` : cityText;
+        const cityLabelFull = cityTextRaw && citySource === "estimated" ? `~ ${{cityTextRaw}}` : cityTextRaw;
         const depth = Math.max(1, Number(routeDistanceByNodeId.get(clean) || 1));
         const priority = (isFrom || isTo)
           ? 500
@@ -3667,6 +3665,8 @@
           showCity: !!(chosen && chosen.showCity),
           nameLabel: String(chosen && chosen.nameLabel || ""),
           cityLabel: String(chosen && chosen.cityLabel || ""),
+          cityMaxChars: Math.max(0, Number(chosen && chosen.cityMaxChars) || 0),
+          cityUnitsPerChar: Math.max(2.1, Number(chosen && chosen.cityUnitsPerChar) || 2.55),
           idLabel: String(candidate.idLabel || ""),
           citySource: String(candidate.citySource || ""),
           locationMeta: candidate.locationMeta || null,
@@ -4104,7 +4104,13 @@
         const location = locationMeta ? locationMeta.location : null;
         const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
         const cityKey = networkTopNodesCityCacheKey(location);
-        const cityText = truncateNetworkGraphLabel(networkTopNodesCityText(location), 20);
+        const cityTextRaw = String(networkTopNodesCityText(location) || "").trim();
+        const cityMaxChars = Math.max(0, Math.trunc(Number(labelPlan && labelPlan.cityMaxChars) || 0));
+        // Legacy token retained for compatibility checks:
+        // const cityText = truncateNetworkGraphLabel(networkTopNodesCityText(location), 20);
+        const cityText = cityMaxChars > 0
+          ? truncateNetworkGraphLabel(cityTextRaw, Math.max(6, cityMaxChars))
+          : cityTextRaw;
         // Legacy token retained for compatibility checks:
         // const cityLabel = cityText && citySource === "estimated" ? `~ ${cityText}` : cityText;
         const cityLabel = (labelPlan && showCity && labelPlan.cityLabel)
@@ -4139,7 +4145,7 @@
           ${{isRoute && !resolvedNodeEmoji ? `<text class="network-route-scope-node-index" y="4">${{escAttr(String(index + 1))}}</text>` : ""}}
           ${{showLabel ? `<text class="network-route-scope-node-label" y="${{escAttr(String(radius + 14))}}">${{escAttr(label)}}</text>` : ""}}
           ${{showMeta ? `<text class="network-route-scope-node-id" y="${{escAttr(String(radius + 26))}}">${{escAttr(idLabel)}}</text>` : ""}}
-          ${{showCity && cityKey ? `<text class="network-route-scope-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-route-node-city-source="${{escAttr(citySource || "gps")}}"${{cityLabel ? "" : ' visibility="hidden"'}}>${{escAttr(cityLabel || " ")}}</text>` : ""}}
+          ${{showCity && cityKey ? `<text class="network-route-scope-node-city${{citySource === "estimated" ? " is-estimated" : ""}}" y="${{escAttr(String(cityY))}}" data-route-node-city-key="${{escAttr(cityKey)}}" data-route-node-city-lat="${{escAttr(location.lat.toFixed(6))}}" data-route-node-city-lon="${{escAttr(location.lon.toFixed(6))}}" data-route-node-city-source="${{escAttr(citySource || "gps")}}" data-route-node-city-max-chars="${{escAttr(String(cityMaxChars))}}"${{cityLabel ? "" : ' visibility="hidden"'}}>${{escAttr(cityLabel || " ")}}</text>` : ""}}
         </g>`;
       }}).join("");
       const contextCount = scoped.contextEdges.length;
@@ -4167,7 +4173,13 @@
 
     function applyNetworkRoutesScopeNodeCityText(el, text) {{
       if (!(el instanceof Element)) return;
-      const clean = truncateNetworkGraphLabel(String(text || "").trim(), 20);
+      const raw = String(text || "").trim();
+      const maxChars = Math.max(0, Math.trunc(Number(el.getAttribute("data-route-node-city-max-chars")) || 0));
+      // Legacy token retained for compatibility checks:
+      // const clean = truncateNetworkGraphLabel(String(text || "").trim(), 20);
+      const clean = maxChars > 0
+        ? truncateNetworkGraphLabel(raw, Math.max(6, maxChars))
+        : raw;
       const source = String(el.getAttribute("data-route-node-city-source") || "").trim().toLowerCase();
       const display = clean && source === "estimated" ? `~ ${{clean}}` : clean;
       el.textContent = display || " ";
@@ -7345,6 +7357,9 @@
         networkGraphEdgeMode
       );
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, networkGraphEdgeMode);
+      const searchQuery = (typeof globalNodeSearchQuery === "function")
+        ? globalNodeSearchQuery()
+        : "";
       const nodeMap = buildNetworkGraphNodeMap(liveNodes, historyCaps, filteredRawEdges, {{
         includeAllLiveNodes: normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) !== "live",
         pinnedNodeIds: [
@@ -7352,6 +7367,8 @@
           selectedNodeId,
           resolveLocalNodeId(latestState),
         ],
+        historyMode: networkGraphEdgeMode,
+        searchQuery,
       }});
       while (networkGraphRootHistory.length) {{
         const previousId = normalizeNodeId(networkGraphRootHistory.pop() || "");
@@ -7670,12 +7687,27 @@
           .map((nodeId) => normalizeNodeId(nodeId))
           .filter((nodeId) => isSelectableNodeId(nodeId))
         : [];
+      const requestedNodeIds = Array.isArray(options && options.requestedNodeIds)
+        ? options.requestedNodeIds
+          .map((nodeId) => normalizeNodeId(nodeId))
+          .filter((nodeId) => isSelectableNodeId(nodeId))
+        : [];
 
       const historyCapsById = new Map(
         Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {{}})
           .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
           .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
       );
+      const searchQuery = normalizeSearchQuery(
+        options && typeof options === "object" ? (options.searchQuery || "") : ""
+      );
+      const historyMode = (
+        options
+        && typeof options === "object"
+        && Object.prototype.hasOwnProperty.call(options, "historyMode")
+      )
+        ? options.historyMode
+        : networkGraphEdgeMode;
 
       const ensureNode = (nodeId) => {{
         const clean = normalizeNodeId(nodeId || "");
@@ -7689,6 +7721,15 @@
 
       for (const nodeId of pinnedNodeIds) {{
         ensureNode(nodeId);
+      }}
+      for (const nodeId of requestedNodeIds) {{
+        ensureNode(nodeId);
+      }}
+      if (searchQuery) {{
+        const queryMatches = networkGraphHistorySearchNodeIds(historyCapsById, searchQuery, historyMode);
+        for (const nodeId of queryMatches) {{
+          ensureNode(nodeId);
+        }}
       }}
 
       for (const edge of (Array.isArray(rawEdges) ? rawEdges : [])) {{
@@ -7832,6 +7873,60 @@
       const extraCaps = networkGraphHistoryCapsCache.get(mode);
       if (!extraCaps || typeof extraCaps !== "object") return baseCaps;
       return Object.assign({{}}, extraCaps, baseCaps);
+    }}
+
+    function networkGraphHistoryModeMaxAgeSeconds(modeName = networkGraphEdgeMode) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      if (mode === "live") return 2 * 60 * 60;
+      if (mode === "6h") return 6 * 60 * 60;
+      if (mode === "12h") return 12 * 60 * 60;
+      if (mode === "24h") return 24 * 60 * 60;
+      if (mode === "72h") return 72 * 60 * 60;
+      if (mode === "7d") return 7 * 24 * 60 * 60;
+      if (mode === "14d") return 14 * 24 * 60 * 60;
+      if (mode === "30d") return 30 * 24 * 60 * 60;
+      return Number.POSITIVE_INFINITY;
+    }}
+
+    function networkGraphHistorySearchNodeIds(historyCapsRaw, searchQuery, modeName = networkGraphEdgeMode, options = {{}}) {{
+      const query = normalizeSearchQuery(searchQuery);
+      if (!query) return [];
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const nowUnix = Number.isFinite(Number(opts.nowUnix))
+        ? Math.trunc(Number(opts.nowUnix))
+        : Math.floor(Date.now() / 1000);
+      const maxAgeSeconds = networkGraphHistoryModeMaxAgeSeconds(modeName);
+      const entries = historyCapsRaw instanceof Map
+        ? Array.from(historyCapsRaw.entries())
+        : Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {{}});
+      const out = [];
+      for (const [rawNodeId, rawCaps] of entries) {{
+        const nodeId = normalizeNodeId(rawNodeId || "");
+        if (!isSelectableNodeId(nodeId)) continue;
+        const caps = (rawCaps && typeof rawCaps === "object") ? rawCaps : null;
+        const lastSeenUnixRaw = Number(caps && caps.last_seen_unix);
+        const lastSeenUnix = Number.isFinite(lastSeenUnixRaw) && lastSeenUnixRaw > 0
+          ? Math.trunc(lastSeenUnixRaw)
+          : 0;
+        if (Number.isFinite(maxAgeSeconds)) {{
+          if (lastSeenUnix <= 0) continue;
+          if ((nowUnix - lastSeenUnix) > maxAgeSeconds) continue;
+        }}
+        const longName = String(caps && caps.last_long_name || "").trim();
+        const shortName = String(caps && caps.last_short_name || "").trim();
+        const displayName = longName || shortName || nodeId;
+        const matched = (typeof matchesIdOrNameQuery === "function")
+          ? matchesIdOrNameQuery(nodeId, displayName, query, {{
+              node: null,
+              extraValues: [longName, shortName],
+              includeNotes: false,
+            }})
+          : (`${{nodeId}} ${{displayName}} ${{longName}} ${{shortName}}`).toLowerCase().includes(query);
+        if (!matched) continue;
+        out.push(nodeId);
+      }}
+      out.sort((left, right) => left.localeCompare(right));
+      return out;
     }}
 
     function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode) {{
@@ -9508,13 +9603,14 @@
       }};
     }}
 
-    function buildNetworkGraphSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode) {{
+    function buildNetworkGraphSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "") {{
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNetworkGraphEdgeMode(edgeMode));
       hash = hashMixStr(hash, normalizeNetworkGraphLayoutMode(networkGraphLayoutMode));
       hash = hashMixStr(hash, normalizeNodeId(networkGraphRootNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));
       hash = hashMixStr(hash, normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || ""));
+      hash = hashMixStr(hash, normalizeSearchQuery(searchQuery));
 
       const safeNodes = Array.isArray(nodes) ? nodes : [];
       hash = hashMixInt(hash, safeNodes.length);
@@ -9587,12 +9683,16 @@
       );
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
+      const searchQuery = (typeof globalNodeSearchQuery === "function")
+        ? globalNodeSearchQuery()
+        : "";
       const graphSourceSignature = buildNetworkGraphSourceSignature(
         nodes,
         historyCaps,
         filteredRawEdges,
         safeState,
-        edgeMode
+        edgeMode,
+        searchQuery
       );
       const canReuseGraphData = (
         networkGraphViewState.renderSourceSignature === graphSourceSignature
@@ -9609,6 +9709,8 @@
               selectedNodeId,
               resolveLocalNodeId(safeState),
             ],
+            historyMode: edgeMode,
+            searchQuery,
           }});
 
       const combinedEdges = canReuseGraphData

@@ -1009,14 +1009,75 @@
       }});
     }}
 
+    function chatNodeNavigatorHistoryCapsDisplayName(caps, fallbackNodeId = "") {{
+      const safeCaps = (caps && typeof caps === "object") ? caps : null;
+      const longName = String(safeCaps && safeCaps.last_long_name || "").trim();
+      if (longName) return longName;
+      const shortName = String(safeCaps && safeCaps.last_short_name || "").trim();
+      if (shortName) return shortName;
+      return String(fallbackNodeId || "").trim();
+    }}
+
+    function chatNodeNavigatorNetworkHistoryModeForSearch() {{
+      const layout = String(activeLayoutView || "").trim().toLowerCase();
+      if (layout !== "network") return "max";
+      const subview = (typeof normalizeNetworkSubview === "function")
+        ? normalizeNetworkSubview(activeNetworkSubview)
+        : String(activeNetworkSubview || "").trim().toLowerCase();
+      if (subview === "routes") {{
+        return (typeof normalizeNetworkGraphEdgeMode === "function")
+          ? normalizeNetworkGraphEdgeMode(networkRoutesWindow)
+          : String(networkRoutesWindow || "7d").trim().toLowerCase();
+      }}
+      if (subview === "graph") {{
+        return (typeof normalizeNetworkGraphEdgeMode === "function")
+          ? normalizeNetworkGraphEdgeMode(networkGraphEdgeMode)
+          : String(networkGraphEdgeMode || "7d").trim().toLowerCase();
+      }}
+      return "max";
+    }}
+
+    function chatNodeNavigatorHistoryCapsSearchNodeIds(historyCapsById, searchQuery, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const capsMap = historyCapsById instanceof Map ? historyCapsById : new Map();
+      const query = normalizeSearchQuery(searchQuery);
+      if (!query || capsMap.size <= 0) return [];
+      const historyMode = chatNodeNavigatorNetworkHistoryModeForSearch();
+      if (typeof networkGraphHistorySearchNodeIds === "function") {{
+        return networkGraphHistorySearchNodeIds(capsMap, query, historyMode, {{ nowUnix }});
+      }}
+      const matches = [];
+      for (const [nodeId, caps] of capsMap.entries()) {{
+        const cleanNodeId = normalizeNodeId(nodeId || "");
+        if (!isSelectableNodeId(cleanNodeId)) continue;
+        const longName = String(caps && caps.last_long_name || "").trim();
+        const shortName = String(caps && caps.last_short_name || "").trim();
+        const displayName = chatNodeNavigatorHistoryCapsDisplayName(caps, cleanNodeId);
+        const matched = (typeof matchesIdOrNameQuery === "function")
+          ? matchesIdOrNameQuery(cleanNodeId, displayName, query, {{
+              node: null,
+              extraValues: [longName, shortName],
+              includeNotes: false,
+            }})
+          : (`${{cleanNodeId}} ${{displayName}} ${{longName}} ${{shortName}}`).toLowerCase().includes(query);
+        if (!matched) continue;
+        matches.push(cleanNodeId);
+      }}
+      matches.sort((a, b) => a.localeCompare(b));
+      return matches;
+    }}
+
     function buildChatNodeNavigatorDefaultRoster(
       state,
       nodesById,
       historyCapsById,
       resolveChatNodeFreshnessFn,
-      nowUnix = Math.floor(Date.now() / 1000)
+      nowUnix = Math.floor(Date.now() / 1000),
+      options = null
     ) {{
       const safeState = state && typeof state === "object" ? state : {{}};
+      const rosterOpts = options && typeof options === "object" ? options : {{}};
+      const searchQuery = normalizeSearchQuery(rosterOpts.searchQuery || "");
+      const includeHistoricalOnDemand = searchQuery.length > 0 && rosterOpts.includeHistoricalOnDemand !== false;
       const traffic = (safeState.traffic && typeof safeState.traffic === "object")
         ? safeState.traffic
         : {{}};
@@ -1107,6 +1168,18 @@
       if (activeChatChannel === "direct" && historyCapsById instanceof Map) {{
         for (const nodeId of historyCapsById.keys()) {{
           touchNodeById(nodeId, {{
+            p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
+          }});
+        }}
+      }}
+      if (activeChatChannel !== "direct" && includeHistoricalOnDemand && historyCapsById instanceof Map) {{
+        const historySearchNodeIds = chatNodeNavigatorHistoryCapsSearchNodeIds(historyCapsById, searchQuery, nowUnix);
+        for (const nodeId of historySearchNodeIds) {{
+          const caps = historyCapsById.get(nodeId) || null;
+          const lastSeenUnix = Math.trunc(Number(caps && caps.last_seen_unix) || 0);
+          touchNodeById(nodeId, {{
+            name: chatNodeNavigatorHistoryCapsDisplayName(caps, nodeId),
+            lastMessageUnix: lastSeenUnix > 0 ? lastSeenUnix : null,
             p2pPinned: manualDirectPeerIds.has(normalizeNodeId(nodeId)),
           }});
         }}
@@ -1800,6 +1873,7 @@
       const unreadDirectByPeer = normalizeChatNodeNavigatorUnreadDirectByPeer(opts.unreadDirectByPeer);
       const pinDirectHistory = normalizeChatNodeNavigatorPinDirectHistoryPref(chatNodeNavigatorPinDirectHistory);
       const directHistoryPeerIds = chatNodeNavigatorDirectHistoryPeerIds(safeState);
+      const rosterQuery = globalNodeSearchQuery();
       const rosterSource = Array.isArray(opts.rosterAll)
         ? opts.rosterAll.slice()
         : buildChatNodeNavigatorDefaultRoster(
@@ -1807,7 +1881,11 @@
             nodesById,
             historyCapsById,
             resolveChatNodeFreshnessFn,
-            nowUnix
+            nowUnix,
+            {{
+              searchQuery: rosterQuery,
+              includeHistoricalOnDemand: true,
+            }}
           );
       const rosterAll = typeof sortChatNodeNavigatorParticipants === "function"
         ? sortChatNodeNavigatorParticipants(
@@ -1818,7 +1896,6 @@
             unreadDirectByPeer
           )
         : rosterSource;
-      const rosterQuery = globalNodeSearchQuery();
       const rosterFiltered = rosterAll.filter((item) => (
         matchesIdOrNameQuery(item && item.id, item && item.name, rosterQuery, {{
           node: nodesById.get(normalizeNodeId(item && item.id)),

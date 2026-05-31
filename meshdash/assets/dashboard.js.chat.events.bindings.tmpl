@@ -484,6 +484,20 @@
       }}
       if (activeLayoutView === "network") {{
         renderNodes(safeState.nodes || []);
+        const subview = (typeof normalizeNetworkSubview === "function")
+          ? normalizeNetworkSubview(activeNetworkSubview)
+          : String(activeNetworkSubview || "").trim().toLowerCase();
+        if (
+          subview === "graph"
+          && !(typeof networkSubviewUsesMap === "function" && networkSubviewUsesMap(subview))
+          && typeof renderNetworkGraphView === "function"
+        ) {{
+          renderNetworkGraphView(safeState);
+        }} else if (subview === "routes" && typeof renderNetworkRoutes === "function") {{
+          renderNetworkRoutes(safeState);
+        }} else if (subview === "top10" && typeof renderNetworkTopNodes === "function") {{
+          renderNetworkTopNodes(safeState);
+        }}
       }}
       if (activeLayoutView === "saved") {{
         renderFavorites(safeState);

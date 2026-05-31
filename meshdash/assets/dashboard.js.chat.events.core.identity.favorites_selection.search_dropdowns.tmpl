@@ -135,7 +135,13 @@
       const safeState = state && typeof state === "object" ? state : {{}};
       const opts = options && typeof options === "object" ? options : {{}};
       const includeHiddenNodes = opts.includeHiddenNodes === true;
+      const normalizedQuery = normalizeSearchQuery(query);
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
+      const historyCapsById = new Map(
+        Object.entries((safeState.history_caps && typeof safeState.history_caps === "object") ? safeState.history_caps : {{}})
+          .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
+          .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
+      );
       const nodeById = new Map();
       for (const node of nodes) {{
         const nodeId = normalizeNodeId(node && node.id);
@@ -167,13 +173,42 @@
         }});
       }}
       pushNodeId(selectedNodeId || "");
+      if (normalizedQuery) {{
+        const layout = String(activeLayoutView || "").trim().toLowerCase();
+        const subview = (typeof normalizeNetworkSubview === "function")
+          ? normalizeNetworkSubview(activeNetworkSubview)
+          : String(activeNetworkSubview || "").trim().toLowerCase();
+        const historyMode = layout === "network"
+          ? (
+              subview === "routes"
+                ? ((typeof normalizeNetworkGraphEdgeMode === "function") ? normalizeNetworkGraphEdgeMode(networkRoutesWindow) : String(networkRoutesWindow || "7d"))
+                : (subview === "graph"
+                  ? ((typeof normalizeNetworkGraphEdgeMode === "function") ? normalizeNetworkGraphEdgeMode(networkGraphEdgeMode) : String(networkGraphEdgeMode || "7d"))
+                  : "max")
+            )
+          : "max";
+        const historySearchNodeIds = (typeof networkGraphHistorySearchNodeIds === "function")
+          ? networkGraphHistorySearchNodeIds(historyCapsById, normalizedQuery, historyMode)
+          : [];
+        for (const nodeId of historySearchNodeIds) {{
+          pushNodeId(nodeId);
+        }}
+      }}
 
       const maxRows = Math.max(1, Number(limit) || 250);
       const results = [];
       for (const nodeId of orderedNodeIds) {{
         const node = nodeById.get(nodeId);
-        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || `Node ${{nodeId}}`;
-        if (!matchesIdOrNameQuery(nodeId, name, query, {{ node }})) continue;
+        const caps = historyCapsById.get(nodeId) || null;
+        const capsLongName = String(caps && caps.last_long_name || "").trim();
+        const capsShortName = String(caps && caps.last_short_name || "").trim();
+        const historyName = capsLongName || capsShortName;
+        const name = preferredNodeName(node) || nodeNameCache.get(nodeId) || historyName || `Node ${{nodeId}}`;
+        if (!matchesIdOrNameQuery(nodeId, name, normalizedQuery, {{
+          node,
+          extraValues: [capsLongName, capsShortName],
+          includeNotes: false,
+        }})) continue;
         results.push({{
           nodeId,
           name: String(name || nodeId),
