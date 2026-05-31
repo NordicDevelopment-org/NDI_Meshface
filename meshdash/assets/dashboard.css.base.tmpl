@@ -7293,6 +7293,7 @@
     }}
     .network-routes-split-layout {{
       --network-routes-split: 0.56;
+      --network-routes-split-gap: 8px;
       display: grid;
       grid-template-rows:
         minmax(176px, calc(var(--network-routes-split) * (100% - var(--splitter-size))))
@@ -7313,6 +7314,7 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
+      padding-bottom: var(--network-routes-split-gap);
     }}
     .network-routes-split-pane.is-top .network-route-scope {{
       flex: 1 1 auto;
@@ -7327,15 +7329,16 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
+      padding-top: var(--network-routes-split-gap);
     }}
     .network-routes-split-divider {{
       position: relative;
       width: 100%;
       height: var(--splitter-size);
       min-height: 6px;
-      border: 1px solid #d1e0cb;
+      border: 1px solid var(--network-pane-divider-border, #d1e0cb);
       border-radius: 8px;
-      background: linear-gradient(90deg, #f4faf3, #edf5ea);
+      background: var(--network-pane-divider-bg, linear-gradient(90deg, #f4faf3, #edf5ea));
       cursor: row-resize;
       touch-action: none;
       user-select: none;
@@ -7349,13 +7352,13 @@
       top: 50%;
       height: 2px;
       border-radius: 1px;
-      background: #b8cab9;
+      background: var(--network-pane-divider-line, #b8cab9);
       transform: translateY(-50%);
       pointer-events: none;
     }}
     .network-routes-split-divider:hover::before,
     .network-routes-split-divider.active::before {{
-      background: #2f855a;
+      background: var(--network-pane-divider-line-active, #2f855a);
     }}
     .network-routes-split-divider:focus-visible {{
       outline: 2px solid color-mix(in srgb, var(--accent) 60%, var(--panel) 40%);
@@ -7363,17 +7366,6 @@
     }}
     .network-routes-split-layout.is-dragging {{
       user-select: none;
-    }}
-    [data-theme="dark"] .network-routes-split-divider {{
-      border-color: var(--ui-border);
-      background: linear-gradient(90deg, #1a2430, #16202c);
-    }}
-    [data-theme="dark"] .network-routes-split-divider::before {{
-      background: #44566a;
-    }}
-    [data-theme="dark"] .network-routes-split-divider:hover::before,
-    [data-theme="dark"] .network-routes-split-divider.active::before {{
-      background: #79c0ff;
     }}
     .network-route-result-head {{
       display: flex;
