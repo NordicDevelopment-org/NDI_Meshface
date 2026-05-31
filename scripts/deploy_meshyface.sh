@@ -201,6 +201,43 @@ if [[ ! -x "${REMOTE_PYTHON}" ]]; then
   exit 1
 fi
 attempt=1
+listener_ready=0
+while [[ "${attempt}" -le "${MAX_ATTEMPTS}" ]]; do
+  listener_state="$("${REMOTE_PYTHON}" - "${DASH_PORT}" <<'PY'
+import socket
+import sys
+
+port = int(str(sys.argv[1]).strip() or "8877")
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.settimeout(1.5)
+try:
+    sock.connect(("127.0.0.1", port))
+except OSError as exc:
+    print(f"__NOT_LISTENING__:{exc}")
+    raise SystemExit(0)
+finally:
+    try:
+        sock.close()
+    except Exception:
+        pass
+
+print("__LISTENING__")
+PY
+)"
+  if [[ "${listener_state}" == "__LISTENING__" ]]; then
+    listener_ready=1
+    break
+  fi
+  echo "[deploy] waiting for dashboard listener (${attempt}/${MAX_ATTEMPTS})" >&2
+  attempt=$((attempt + 1))
+  sleep "${SLEEP_SECONDS}"
+done
+if [[ "${listener_ready}" -ne 1 ]]; then
+  echo "runtime verification failed: dashboard listener did not open on 127.0.0.1:${DASH_PORT}" >&2
+  exit 1
+fi
+
+attempt=1
 while [[ "${attempt}" -le "${MAX_ATTEMPTS}" ]]; do
   observed_hash="$("${REMOTE_PYTHON}" - "${DASH_PORT}" <<'PY'
 import json
@@ -214,6 +251,15 @@ url = f"http://127.0.0.1:{port}/api/version?cb={int(time.time() * 1000)}"
 try:
     with urllib.request.urlopen(url, timeout=4) as response:
         payload = json.loads(response.read().decode("utf-8", "replace"))
+except urllib.error.URLError as exc:
+    reason = getattr(exc, "reason", None)
+    if isinstance(reason, ConnectionRefusedError):
+        print("__NOT_READY__:connection refused")
+    elif isinstance(reason, TimeoutError):
+        print("__NOT_READY__:timeout")
+    else:
+        print(f"__ERROR__:{exc}")
+    raise SystemExit(0)
 except Exception as exc:
     print(f"__ERROR__:{exc}")
     raise SystemExit(0)
@@ -226,7 +272,9 @@ PY
     echo "[deploy] runtime hash verified: ${observed_hash}"
     exit 0
   fi
-  if [[ "${observed_hash}" == __ERROR__:* ]]; then
+  if [[ "${observed_hash}" == __NOT_READY__:* ]]; then
+    echo "[deploy] waiting for /api/version (${attempt}/${MAX_ATTEMPTS}): warming up (${observed_hash#__NOT_READY__:})" >&2
+  elif [[ "${observed_hash}" == __ERROR__:* ]]; then
     echo "[deploy] waiting for /api/version (${attempt}/${MAX_ATTEMPTS}): ${observed_hash#__ERROR__:}" >&2
   else
     observed_display="${observed_hash:-<empty>}"
