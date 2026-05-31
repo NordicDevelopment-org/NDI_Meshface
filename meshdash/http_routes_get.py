@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from importlib import import_module
+import os
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -193,12 +194,14 @@ def _build_version_payload(state_payload: object) -> dict[str, object]:
         revision_map.get("title")
         or f"Dashboard revision: version {version}, commit {commit}"
     )
+    deploy_payload_hash = str(os.environ.get("MESH_DASH_DEPLOY_PAYLOAD_HASH") or "").strip()
     return {
         "ok": True,
         "version": version,
         "commit": commit,
         "label": label,
         "title": title,
+        "deploy_payload_hash": deploy_payload_hash or None,
     }
 
 

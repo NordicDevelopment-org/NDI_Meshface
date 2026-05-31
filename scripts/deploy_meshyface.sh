@@ -179,6 +179,67 @@ scp_cmd() {
   scp "${SCP_OPTS[@]}" "$@"
 }
 
+verify_remote_runtime_payload_hash() {
+  local expected_hash="$1"
+  local max_attempts="${2:-25}"
+  local sleep_seconds="${3:-1}"
+  if [[ -z "${expected_hash}" ]]; then
+    echo "runtime verification failed: expected hash is empty" >&2
+    return 1
+  fi
+  echo "[deploy] verifying runtime payload hash via /api/version"
+  ssh_cmd "${TARGET}" "\
+EXPECTED_HASH='${expected_hash}' \
+DASH_PORT='${DASH_PORT}' \
+REMOTE_PYTHON='${REMOTE_PYTHON}' \
+MAX_ATTEMPTS='${max_attempts}' \
+SLEEP_SECONDS='${sleep_seconds}' \
+bash -s" <<'REMOTE'
+set -euo pipefail
+if [[ ! -x "${REMOTE_PYTHON}" ]]; then
+  echo "runtime verification failed: remote python missing at ${REMOTE_PYTHON}" >&2
+  exit 1
+fi
+attempt=1
+while [[ "${attempt}" -le "${MAX_ATTEMPTS}" ]]; do
+  observed_hash="$("${REMOTE_PYTHON}" - "${DASH_PORT}" <<'PY'
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+
+port = str(sys.argv[1]).strip() or "8877"
+url = f"http://127.0.0.1:{port}/api/version?cb={int(time.time() * 1000)}"
+try:
+    with urllib.request.urlopen(url, timeout=4) as response:
+        payload = json.loads(response.read().decode("utf-8", "replace"))
+except Exception as exc:
+    print(f"__ERROR__:{exc}")
+    raise SystemExit(0)
+
+value = str(payload.get("deploy_payload_hash") or "").strip()
+print(value)
+PY
+)"
+  if [[ "${observed_hash}" == "${EXPECTED_HASH}" ]]; then
+    echo "[deploy] runtime hash verified: ${observed_hash}"
+    exit 0
+  fi
+  if [[ "${observed_hash}" == __ERROR__:* ]]; then
+    echo "[deploy] waiting for /api/version (${attempt}/${MAX_ATTEMPTS}): ${observed_hash#__ERROR__:}" >&2
+  else
+    observed_display="${observed_hash:-<empty>}"
+    echo "[deploy] waiting for runtime hash (${attempt}/${MAX_ATTEMPTS}): observed=${observed_display} expected=${EXPECTED_HASH}" >&2
+  fi
+  attempt=$((attempt + 1))
+  sleep "${SLEEP_SECONDS}"
+done
+echo "runtime verification failed: /api/version did not report expected deploy_payload_hash=${EXPECTED_HASH}" >&2
+exit 1
+REMOTE
+}
+
 compute_local_deploy_payload_hash() {
   (
     cd "${ROOT_DIR}" || exit 1
@@ -763,6 +824,7 @@ MESH_DASH_GAMES_ENABLE=${GAMES_ENABLE}
 MESH_DASH_FILE_TRANSFER_ENABLE=${FILE_TRANSFER_ENABLE}
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=${FILE_TRANSFER_MAX_BYTES}
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=${ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER}
+MESH_DASH_DEPLOY_PAYLOAD_HASH=${remote_payload_hash}
 PYTHONUNBUFFERED=${PYTHON_UNBUFFERED}
 EOF"
 fi
@@ -788,6 +850,8 @@ else
 sudo systemctl restart '${SERVICE_NAME}' && \
 SYSTEMD_PAGER=cat sudo systemctl --no-pager -l status '${SERVICE_NAME}'"
 fi
+
+verify_remote_runtime_payload_hash "${remote_payload_hash}"
 
 target_host="${TARGET#*@}"
 if [[ "${HARD_REBOOT}" -eq 1 ]]; then
