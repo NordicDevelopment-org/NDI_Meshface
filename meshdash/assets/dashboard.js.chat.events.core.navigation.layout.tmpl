@@ -3366,6 +3366,7 @@
       const toId = normalizeNodeId(opts.toId || "");
       const localId = normalizeNodeId(opts.localNodeId || "");
       const labeledNodeIds = opts.labeledNodeIds instanceof Set ? opts.labeledNodeIds : new Set();
+      const labelPlans = opts.labelPlans instanceof Map ? opts.labelPlans : new Map();
       const dense = pathIndex.size > 6 || nodeIds.length > 14;
       let minX = Infinity;
       let maxX = -Infinity;
@@ -3383,21 +3384,40 @@
         const isTo = clean && clean === toId;
         const isLocal = clean && clean === localId;
         const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
-        const showLabel = labeledNodeIds.has(clean);
-        const showMeta = showLabel && (isRoute || isFrom || isTo || isLocal);
+        const labelPlan = labelPlans.get(clean) || null;
+        const showLabel = labelPlan
+          ? !!labelPlan.showName
+          : labeledNodeIds.has(clean);
+        const showMeta = labelPlan
+          ? !!labelPlan.showMeta
+          : (showLabel && (isRoute || isFrom || isTo || isLocal));
+        const showCity = labelPlan
+          ? !!labelPlan.showCity
+          : showMeta;
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const labelMax = isRoute
           ? (dense ? 12 : 14)
           : (showMeta ? 10 : 9);
-        const label = truncateNetworkGraphLabel(name, labelMax);
+        const label = showLabel
+          ? String(
+              labelPlan && labelPlan.nameLabel
+                ? labelPlan.nameLabel
+                : truncateNetworkGraphLabel(name, labelMax)
+            )
+          : "";
         const nameHalfWidth = showLabel
           ? Math.max(22, (label.length * (isRoute ? 4.4 : 3.8)) + 10)
           : 0;
         const idHalfWidth = showMeta ? 28 : 0;
-        const cityHalfWidth = showMeta ? 66 : 0;
+        const cityLabel = (showCity && labelPlan && labelPlan.cityLabel)
+          ? String(labelPlan.cityLabel || "")
+          : "";
+        const cityHalfWidth = showCity
+          ? Math.max(26, (cityLabel.length * 3.1) + 8)
+          : 0;
         const nodeHalfWidth = Math.max(radius + 12, nameHalfWidth, idHalfWidth, cityHalfWidth);
         const top = y - radius - 16;
-        const bottom = y + radius + (showMeta ? 52 : (showLabel ? 28 : 16));
+        const bottom = y + radius + (showCity ? 52 : (showMeta ? 40 : (showLabel ? 28 : 16)));
         minX = Math.min(minX, x - nodeHalfWidth);
         maxX = Math.max(maxX, x + nodeHalfWidth);
         minY = Math.min(minY, top);
@@ -3418,6 +3438,246 @@
         width: Math.ceil(nextWidth),
         height: Math.ceil(nextHeight),
       }};
+    }}
+
+    function networkRoutesScopeRectsIntersect(left, right) {{
+      const a = (left && typeof left === "object") ? left : null;
+      const b = (right && typeof right === "object") ? right : null;
+      if (!a || !b) return false;
+      return !(
+        Number(a.maxX) <= Number(b.minX)
+        || Number(a.minX) >= Number(b.maxX)
+        || Number(a.maxY) <= Number(b.minY)
+        || Number(a.minY) >= Number(b.maxY)
+      );
+    }}
+
+    function networkRoutesScopeApproxTextHalfWidth(text, unitsPerChar = 3.8, minWidth = 0) {{
+      const clean = String(text || "").trim();
+      if (!clean) return Math.max(0, Number(minWidth) || 0);
+      const chars = clean.length;
+      const width = (chars * Math.max(2.4, Number(unitsPerChar) || 3.8)) + 6;
+      return Math.max(Math.max(0, Number(minWidth) || 0), width);
+    }}
+
+    function networkRoutesScopeLabelBox(point, radius, plan) {{
+      if (!point || typeof point !== "object" || !plan || !plan.showName) return null;
+      const centerX = Number(point.x);
+      const centerY = Number(point.y);
+      if (!Number.isFinite(centerX) || !Number.isFinite(centerY)) return null;
+      const safeRadius = Math.max(0, Number(radius) || 0);
+      const nameHalf = networkRoutesScopeApproxTextHalfWidth(plan.nameLabel, plan.nameUnitsPerChar, 20);
+      const idHalf = plan.showMeta
+        ? networkRoutesScopeApproxTextHalfWidth(plan.idLabel, 2.8, 24)
+        : 0;
+      const cityHalf = plan.showCity
+        ? networkRoutesScopeApproxTextHalfWidth(plan.cityLabel, 3.1, 24)
+        : 0;
+      const halfWidth = Math.max(nameHalf, idHalf, cityHalf, safeRadius + 10);
+      const top = centerY + safeRadius + 4;
+      const bottom = centerY + safeRadius + (plan.showCity ? 42 : (plan.showMeta ? 30 : 18));
+      return {{
+        minX: centerX - halfWidth,
+        maxX: centerX + halfWidth,
+        minY: top,
+        maxY: bottom,
+      }};
+    }}
+
+    function networkRoutesScopeLabelVariants(candidate) {{
+      const safe = (candidate && typeof candidate === "object") ? candidate : {{}};
+      const fullName = String(safe.nameFull || "").trim();
+      if (!fullName) {{
+        return [{{
+          showName: false,
+          showMeta: false,
+          showCity: false,
+          nameLabel: "",
+          cityLabel: "",
+          allowOverlap: false,
+        }}];
+      }}
+      const cityFull = String(safe.cityLabelFull || "").trim();
+      const showMetaBase = !!safe.showMetaBase;
+      const isPriority = !!safe.isRoute || !!safe.isFrom || !!safe.isTo || !!safe.isLocal;
+      const variants = [];
+      const seen = new Set();
+      const pushVariant = (nameMax, metaEnabled, cityEnabled, cityMax = 48, allowOverlap = false) => {{
+        const rawName = truncateNetworkGraphLabel(fullName, Math.max(4, Math.trunc(Number(nameMax) || fullName.length)));
+        const nameLabel = String(rawName || "").trim();
+        if (!nameLabel) return;
+        const showMeta = !!(metaEnabled && showMetaBase);
+        const showCity = !!(showMeta && cityEnabled && cityFull);
+        const cityLabel = showCity
+          ? String(truncateNetworkGraphLabel(cityFull, Math.max(6, Math.trunc(Number(cityMax) || cityFull.length))) || "").trim()
+          : "";
+        const key = `${{nameLabel}}|${{showMeta ? 1 : 0}}|${{showCity ? cityLabel : ""}}|${{allowOverlap ? 1 : 0}}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        variants.push({{
+          showName: true,
+          showMeta,
+          showCity: !!(showCity && cityLabel),
+          nameLabel,
+          cityLabel: showCity ? cityLabel : "",
+          allowOverlap: !!allowOverlap,
+        }});
+      }};
+      if (isPriority) {{
+        pushVariant(96, true, true, 48, false);
+        pushVariant(96, true, true, 28, false);
+        pushVariant(96, true, false, 0, false);
+        pushVariant(36, true, false, 0, false);
+        pushVariant(26, true, false, 0, false);
+        pushVariant(20, true, false, 0, false);
+        pushVariant(15, false, false, 0, false);
+        pushVariant(11, false, false, 0, true);
+      }} else {{
+        pushVariant(96, false, false, 0, false);
+        pushVariant(34, false, false, 0, false);
+        pushVariant(24, false, false, 0, false);
+        pushVariant(18, false, false, 0, false);
+        pushVariant(14, false, false, 0, false);
+        pushVariant(10, false, false, 0, false);
+        pushVariant(8, false, false, 0, false);
+        variants.push({{
+          showName: false,
+          showMeta: false,
+          showCity: false,
+          nameLabel: "",
+          cityLabel: "",
+          allowOverlap: false,
+        }});
+      }}
+      return variants;
+    }}
+
+    function networkRoutesScopeResolveLabelPlans(scoped, positions, nodeMap, options = {{}}) {{
+      const safeScoped = (scoped && typeof scoped === "object") ? scoped : {{}};
+      const safePositions = positions instanceof Map ? positions : new Map();
+      const safeNodeMap = nodeMap instanceof Map ? nodeMap : new Map();
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const fromId = normalizeNodeId(opts.fromId || "");
+      const toId = normalizeNodeId(opts.toId || "");
+      const localNodeId = normalizeNodeId(opts.localNodeId || "");
+      const labeledNodeIds = opts.labeledNodeIds instanceof Set ? opts.labeledNodeIds : new Set();
+      const routeLocationEstimates = opts.routeLocationEstimates instanceof Map
+        ? opts.routeLocationEstimates
+        : new Map();
+      const pathIndex = safeScoped.pathIndex instanceof Map ? safeScoped.pathIndex : new Map();
+      const routeDistanceByNodeId = safeScoped.routeDistanceByNodeId instanceof Map
+        ? safeScoped.routeDistanceByNodeId
+        : new Map();
+      const nodeIds = Array.isArray(safeScoped.nodeIds) ? safeScoped.nodeIds : [];
+
+      const candidates = [];
+      for (const rawNodeId of nodeIds) {{
+        const clean = normalizeNodeId(rawNodeId || "");
+        if (!isSelectableNodeId(clean)) continue;
+        const point = safePositions.get(clean);
+        if (!point) continue;
+        if (!labeledNodeIds.has(clean)) continue;
+        const isRoute = pathIndex.has(clean);
+        const isFrom = clean && clean === fromId;
+        const isTo = clean && clean === toId;
+        const isLocal = clean && clean === localNodeId;
+        const node = safeNodeMap.get(clean) || null;
+        const nameFull = String(networkGraphNodeDisplayName(clean, safeNodeMap) || "").trim();
+        const showMetaBase = isRoute || isFrom || isTo || isLocal;
+        const locationMeta = showMetaBase
+          ? networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates)
+          : null;
+        const location = locationMeta ? locationMeta.location : null;
+        const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
+        const cityTextRaw = showMetaBase ? String(networkTopNodesCityText(location) || "").trim() : "";
+        const cityText = cityTextRaw ? truncateNetworkGraphLabel(cityTextRaw, 42) : "";
+        const cityLabelFull = cityText && citySource === "estimated" ? `~ ${{cityText}}` : cityText;
+        const depth = Math.max(1, Number(routeDistanceByNodeId.get(clean) || 1));
+        const priority = (isFrom || isTo)
+          ? 500
+          : (isLocal
+            ? 450
+            : (isRoute
+              ? 380
+              : Math.max(80, 220 - (depth * 18))));
+        candidates.push({{
+          nodeId: clean,
+          point,
+          isRoute,
+          isFrom,
+          isTo,
+          isLocal,
+          showMetaBase,
+          nameFull,
+          cityLabelFull,
+          citySource,
+          locationMeta,
+          idLabel: clean.length > 8 ? clean.slice(-8) : clean,
+          radius: isFrom || isTo ? 18 : (isRoute ? 15 : 10),
+          priority,
+          routeIndex: isRoute ? Number(pathIndex.get(clean) || 0) : 9999,
+          nameUnitsPerChar: isRoute ? 4.2 : 3.8,
+        }});
+      }}
+
+      candidates.sort((left, right) => {{
+        const priorityDelta = (Number(right.priority) || 0) - (Number(left.priority) || 0);
+        if (priorityDelta !== 0) return priorityDelta;
+        const routeDelta = (Number(left.routeIndex) || 0) - (Number(right.routeIndex) || 0);
+        if (routeDelta !== 0) return routeDelta;
+        return String(left.nodeId || "").localeCompare(String(right.nodeId || ""));
+      }});
+
+      const acceptedBoxes = [];
+      const planByNodeId = new Map();
+      for (const candidate of candidates) {{
+        const variants = networkRoutesScopeLabelVariants(candidate);
+        let chosen = variants[variants.length - 1] || {{
+          showName: false,
+          showMeta: false,
+          showCity: false,
+          nameLabel: "",
+          cityLabel: "",
+          allowOverlap: false,
+        }};
+        let chosenBox = null;
+        for (const variant of variants) {{
+          if (!variant || !variant.showName) {{
+            chosen = variant || chosen;
+            chosenBox = null;
+            break;
+          }}
+          const candidatePlan = {{
+            ...variant,
+            idLabel: candidate.idLabel,
+            nameUnitsPerChar: candidate.nameUnitsPerChar,
+          }};
+          const box = networkRoutesScopeLabelBox(candidate.point, candidate.radius, candidatePlan);
+          if (!box) continue;
+          const collides = acceptedBoxes.some((accepted) => networkRoutesScopeRectsIntersect(accepted, box));
+          if (!collides || variant.allowOverlap) {{
+            chosen = variant;
+            chosenBox = box;
+            break;
+          }}
+        }}
+        const finalPlan = {{
+          showName: !!(chosen && chosen.showName),
+          showMeta: !!(chosen && chosen.showMeta),
+          showCity: !!(chosen && chosen.showCity),
+          nameLabel: String(chosen && chosen.nameLabel || ""),
+          cityLabel: String(chosen && chosen.cityLabel || ""),
+          idLabel: String(candidate.idLabel || ""),
+          citySource: String(candidate.citySource || ""),
+          locationMeta: candidate.locationMeta || null,
+          nameUnitsPerChar: Number(candidate.nameUnitsPerChar) || 3.8,
+        }};
+        if (finalPlan.showName && chosenBox && !(chosen && chosen.allowOverlap)) {{
+          acceptedBoxes.push(chosenBox);
+        }}
+        planByNodeId.set(candidate.nodeId, finalPlan);
+      }}
+      return planByNodeId;
     }}
 
     function networkRoutesScopedPositionMap(scoped) {{
@@ -3695,11 +3955,19 @@
       const positions = layout.positions instanceof Map ? layout.positions : new Map();
       const denseRoute = scoped.path.length > 6 || scoped.nodeIds.length > 14;
       const labeledNodeIds = networkRoutesScopeLabeledNodeIds(scoped, fromId, toId, localNodeId);
+      const labelPlansByNodeId = networkRoutesScopeResolveLabelPlans(scoped, positions, nodeMap, {{
+        fromId,
+        toId,
+        localNodeId,
+        labeledNodeIds,
+        routeLocationEstimates,
+      }});
       const defaultViewBox = networkRoutesScopeDefaultViewBox(layout, scoped, nodeMap, {{
         fromId,
         toId,
         localNodeId,
         labeledNodeIds,
+        labelPlans: labelPlansByNodeId,
       }});
       const scopeSignature = [
         fromId,
@@ -3802,9 +4070,16 @@
         const isTo = clean && clean === toId;
         const isLocal = clean && clean === localNodeId;
         const index = scoped.pathIndex.has(clean) ? scoped.pathIndex.get(clean) : -1;
-        const showLabel = labeledNodeIds.has(clean);
-        const showMeta = showLabel && (isRoute || isFrom || isTo || isLocal);
-        const showCity = showMeta;
+        const labelPlan = labelPlansByNodeId.get(clean) || null;
+        const showLabel = labelPlan
+          ? !!labelPlan.showName
+          : labeledNodeIds.has(clean);
+        const showMeta = labelPlan
+          ? !!labelPlan.showMeta
+          : (showLabel && (isRoute || isFrom || isTo || isLocal));
+        const showCity = labelPlan
+          ? !!labelPlan.showCity
+          : showMeta;
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const node = nodeMap.get(clean) || null;
         const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);
@@ -3812,17 +4087,29 @@
         const labelMax = isRoute
           ? (denseRoute ? 12 : 14)
           : (showMeta ? 10 : 9);
-        const label = truncateNetworkGraphLabel(name, labelMax);
+        const label = showLabel
+          ? String(
+              labelPlan && labelPlan.nameLabel
+                ? labelPlan.nameLabel
+                : truncateNetworkGraphLabel(name, labelMax)
+            )
+          : "";
         const radius = isFrom || isTo ? 18 : (isRoute ? 15 : 10);
         const idLabel = clean.length > 8 ? clean.slice(-8) : clean;
-        const locationMeta = showCity
-          ? networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates)
-          : null;
+        const locationMeta = (labelPlan && labelPlan.locationMeta)
+          ? labelPlan.locationMeta
+          : (showCity
+            ? networkRoutesScopeNodeLocation(clean, node, latestState, routeLocationEstimates)
+            : null);
         const location = locationMeta ? locationMeta.location : null;
         const citySource = locationMeta ? String(locationMeta.source || "gps") : "";
         const cityKey = networkTopNodesCityCacheKey(location);
         const cityText = truncateNetworkGraphLabel(networkTopNodesCityText(location), 20);
-        const cityLabel = cityText && citySource === "estimated" ? `~ ${{cityText}}` : cityText;
+        // Legacy token retained for compatibility checks:
+        // const cityLabel = cityText && citySource === "estimated" ? `~ ${cityText}` : cityText;
+        const cityLabel = (labelPlan && showCity && labelPlan.cityLabel)
+          ? String(labelPlan.cityLabel || "")
+          : (cityText && citySource === "estimated" ? `~ ${{cityText}}` : cityText);
         const cityY = radius + 38;
         const classes = [
           "network-route-scope-node",
