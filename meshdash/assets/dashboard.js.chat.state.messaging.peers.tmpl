@@ -8,6 +8,12 @@
       return clean === "desc" ? "desc" : "asc";
     }}
 
+    function chatNodeNavigatorDefaultSortDirForKey(sortKeyRaw) {{
+      const sortKey = normalizeChatNodeNavigatorSortKeyPref(sortKeyRaw);
+      if (sortKey === "last_heard") return "desc";
+      return normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorDefaultSortDir);
+    }}
+
     function normalizeChatNodeNavigatorPinDirectHistoryPref(value) {{
       if (typeof parseBoolToken === "function") {{
         return parseBoolToken(value, false);
@@ -222,9 +228,13 @@
       const nextSortKey = normalizeChatNodeNavigatorSortKeyPref(
         prefs.sortKey != null ? prefs.sortKey : chatNodeNavigatorSortKey
       );
-      const nextSortDir = normalizeChatNodeNavigatorSortDirPref(
+      const hasExplicitSortDir = prefs.sortDir != null;
+      let nextSortDir = normalizeChatNodeNavigatorSortDirPref(
         prefs.sortDir != null ? prefs.sortDir : chatNodeNavigatorSortDir
       );
+      if (!hasExplicitSortDir && prefs.sortKey != null && nextSortKey !== chatNodeNavigatorSortKey) {{
+        nextSortDir = chatNodeNavigatorDefaultSortDirForKey(nextSortKey);
+      }}
       const nextPinDirectHistory = normalizeChatNodeNavigatorPinDirectHistoryPref(
         prefs.pinDirectHistory != null ? prefs.pinDirectHistory : chatNodeNavigatorPinDirectHistory
       );
@@ -558,6 +568,23 @@
         : 99;
     }}
 
+    function chatNodeNavigatorLastUpdateUnix(item, projection) {{
+      const lastSeenFromRoster = Number(item && item.lastSeenUnix);
+      if (Number.isFinite(lastSeenFromRoster) && lastSeenFromRoster > 0) {{
+        return Math.trunc(lastSeenFromRoster);
+      }}
+      const lastSeenFromProjection = Number(
+        projection
+        && projection.fields
+        && projection.fields.last_heard
+        && projection.fields.last_heard.sort
+      );
+      if (Number.isFinite(lastSeenFromProjection) && lastSeenFromProjection > 0) {{
+        return Math.trunc(lastSeenFromProjection);
+      }}
+      return 0;
+    }}
+
     function chatNodeNavigatorSortValue(item, projection, sortKeyRaw, nowUnixRaw = null) {{
       const sortKey = normalizeChatNodeNavigatorSortKeyPref(sortKeyRaw);
       const safeItem = item && typeof item === "object" ? item : {{}};
@@ -574,22 +601,14 @@
         return Number(safeItem.lastMessageUnix) || 0;
       }}
       if (sortKey === "idle") {{
-        const lastSeenFromRoster = Number(safeItem && safeItem.lastSeenUnix);
-        const lastSeenFromProjection = Number(
-          safeProjection
-          && safeProjection.fields
-          && safeProjection.fields.last_heard
-          && safeProjection.fields.last_heard.sort
-        );
-        const lastSeenUnix = Number.isFinite(lastSeenFromRoster) && lastSeenFromRoster > 0
-          ? Math.trunc(lastSeenFromRoster)
-          : (Number.isFinite(lastSeenFromProjection) && lastSeenFromProjection > 0
-            ? Math.trunc(lastSeenFromProjection)
-            : 0);
+        const lastSeenUnix = chatNodeNavigatorLastUpdateUnix(safeItem, safeProjection);
         if (!Number.isFinite(lastSeenUnix) || lastSeenUnix <= 0) {{
           return Number.MAX_SAFE_INTEGER;
         }}
         return Math.max(0, nowUnix - lastSeenUnix);
+      }}
+      if (sortKey === "last_heard") {{
+        return chatNodeNavigatorLastUpdateUnix(safeItem, safeProjection);
       }}
       const fieldId = normalizeNodeExplorerFieldId(sortKey);
       const field = fieldId && safeProjection.fields
