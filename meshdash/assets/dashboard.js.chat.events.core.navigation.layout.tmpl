@@ -2453,25 +2453,55 @@
       return {{ path, edges, cost: distances.get(target) || 0 }};
     }}
 
-    function networkRoutesEdgeMetaText(edge) {{
-      const pieces = [];
+    function networkRoutesEdgeMetaParts(edge) {{
+      const meta = {{
+        packetText: "",
+        hopsText: "",
+        snrText: "",
+        lastSeenText: "",
+      }};
       const weight = Math.max(0, Math.round(Number(edge && edge.weight) || 0));
       if (weight > 0) {{
-        pieces.push(`${{networkTopNodesNumberText(weight)}} packet${{weight === 1 ? "" : "s"}}`);
+        meta.packetText = `${{networkTopNodesNumberText(weight)}} packet${{weight === 1 ? "" : "s"}}`;
       }}
       const avgHops = Number(edge && edge.avgHops);
       if (Number.isFinite(avgHops) && avgHops > 0) {{
-        pieces.push(`${{avgHops.toFixed(avgHops >= 10 ? 0 : 1)}} avg hops`);
+        meta.hopsText = `${{avgHops.toFixed(avgHops >= 10 ? 0 : 1)}} avg hops`;
       }}
       const avgSnr = Number(edge && edge.avgSnr);
       if (Number.isFinite(avgSnr)) {{
-        pieces.push(`${{avgSnr.toFixed(1)}} dB SNR`);
+        meta.snrText = `${{avgSnr.toFixed(1)}} dB SNR`;
       }}
       const lastSeen = String(edge && edge.lastSeenLabel || "").trim();
       if (lastSeen) {{
-        pieces.push(`last ${{lastSeen}}`);
+        meta.lastSeenText = lastSeen;
       }}
+      return meta;
+    }}
+
+    function networkRoutesEdgeMetaText(edge) {{
+      const pieces = [];
+      const meta = networkRoutesEdgeMetaParts(edge);
+      if (meta.packetText) pieces.push(meta.packetText);
+      if (meta.hopsText) pieces.push(meta.hopsText);
+      if (meta.snrText) pieces.push(meta.snrText);
+      if (meta.lastSeenText) pieces.push(`last ${{meta.lastSeenText}}`);
       return pieces.join(" - ");
+    }}
+
+    function networkRoutesEdgeSnrStrengthPct(edge, fallbackWeightPct = 0) {{
+      const avgSnr = Number(edge && edge.avgSnr);
+      if (Number.isFinite(avgSnr)) {{
+        // Typical mesh SNR spans roughly -18dB (poor) to +12dB (strong).
+        const normalized = Math.max(0, Math.min(1, (avgSnr + 18) / 30));
+        const scaled = Math.round(normalized * 1000) / 10;
+        return Math.max(4, Math.min(100, scaled));
+      }}
+      const fallbackPct = Number(fallbackWeightPct);
+      if (Number.isFinite(fallbackPct) && fallbackPct > 0) {{
+        return Math.max(4, Math.min(100, fallbackPct));
+      }}
+      return 0;
     }}
 
     function networkRoutesConfidenceText(route) {{
@@ -2493,23 +2523,29 @@
         const isLocal = clean && clean === normalizeNodeId(localNodeId || "");
         const name = networkGraphNodeDisplayName(clean, nodeMap);
         const edgeWeight = Math.max(0, Number(edge && edge.weight) || 0);
-        const edgePct = maxWeight > 0 ? Math.max(4, Math.min(100, (edgeWeight / maxWeight) * 100)) : 0;
-        const edgeMeta = edge ? networkRoutesEdgeMetaText(edge) : "";
-        const linkMeta = edge
-          ? `Link ${{String(index + 1)}}${{edgeMeta ? ` - ${{edgeMeta}}` : ""}}`
-          : "Destination";
+        const edgeWeightPct = maxWeight > 0 ? Math.max(4, Math.min(100, (edgeWeight / maxWeight) * 100)) : 0;
+        const edgePct = networkRoutesEdgeSnrStrengthPct(edge, edgeWeightPct);
+        const edgeMeta = edge ? networkRoutesEdgeMetaParts(edge) : null;
+        const inlineBarHtml = edge
+          ? `<span class="network-route-edge-bar is-inline" aria-hidden="true"><span style="--route-edge-strength:${{edgePct.toFixed(1)}}%;"></span></span>`
+          : "";
+        const linkMetaHtml = edge
+          ? `<span class="network-route-hop-link-meta">
+              ${{edgeMeta && edgeMeta.packetText ? `<span class="network-route-hop-meta-item">${{escAttr(edgeMeta.packetText)}}</span>` : ""}}
+              ${{edgeMeta && edgeMeta.hopsText ? `<span class="network-route-hop-meta-item">${{escAttr(edgeMeta.hopsText)}}</span>` : ""}}
+              ${{edgeMeta && edgeMeta.snrText ? `<span class="network-route-hop-meta-item is-snr">${{escAttr(edgeMeta.snrText)}}</span>` : ""}}
+              ${{inlineBarHtml}}
+              ${{edgeMeta && edgeMeta.lastSeenText ? `<span class="network-route-hop-meta-item is-last">last ${{escAttr(edgeMeta.lastSeenText)}}</span>` : ""}}
+            </span>`
+          : `<span class="network-route-hop-link-meta"><span class="network-route-hop-meta-item is-last">Destination</span></span>`;
         return `<li class="network-route-hop${{isLocal ? " is-local" : ""}}" data-route-node-id="${{escAttr(clean)}}">
           <button class="network-route-hop-node" type="button" data-route-node-id="${{escAttr(clean)}}" title="${{escAttr(`${{name}} (${{clean}})`)}}">
             <span class="network-route-hop-index">${{escAttr(String(index + 1))}}</span>
             <span class="network-route-hop-main">
               <strong>${{escAttr(name)}}</strong>
-              ${{isLocal ? `<span class="network-route-self-label">self</span>` : ""}}
-              <span class="network-route-hop-link-meta">${{escAttr(linkMeta)}}</span>
+              ${{linkMetaHtml}}
             </span>
           </button>
-          ${{edge ? `<div class="network-route-edge">
-            <span class="network-route-edge-bar" aria-hidden="true"><span style="--route-edge-strength:${{edgePct.toFixed(1)}}%;"></span></span>
-          </div>` : ""}}
         </li>`;
       }}).join("")}}</ol>`;
     }}

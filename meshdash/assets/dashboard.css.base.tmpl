@@ -7719,12 +7719,30 @@
     .network-route-hop-link-meta {{
       flex: 1 1 auto;
       min-width: 70px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 12px;
       overflow: hidden;
       color: color-mix(in srgb, var(--muted) 76%, var(--ink) 24%);
       font-size: 9px;
       line-height: 1.2;
+      white-space: nowrap;
+    }}
+    .network-route-hop-meta-item {{
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }}
+    .network-route-hop-meta-item.is-snr {{
+      color: color-mix(in srgb, var(--ink) 72%, var(--muted) 28%);
+    }}
+    .network-route-hop-meta-item.is-last {{
+      margin-left: auto;
+      text-align: right;
+      color: color-mix(in srgb, var(--muted) 84%, var(--ink) 16%);
     }}
     .network-route-self-label {{
       display: inline-flex;
@@ -7753,6 +7771,16 @@
       border-radius: 999px;
       background: rgba(166, 190, 173, 0.28);
       overflow: hidden;
+    }}
+    .network-route-edge-bar.is-inline {{
+      flex: 0 0 64px;
+      width: 64px;
+      min-width: 64px;
+      max-width: 64px;
+      height: 4px;
+      min-height: 4px;
+      margin-left: 2px;
+      margin-right: 2px;
     }}
     .network-route-edge-bar > span {{
       display: block;

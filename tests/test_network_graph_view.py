@@ -97,8 +97,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'networkRoutesMode = normalizeNetworkRoutesMode(modeSelect.value || "inferred");' in js
     assert 'function renderNetworkRoutes(state = latestState, options = {})' in js
     assert 'function networkRoutesFindInferredPath(fromNodeId, toNodeId, adjacency)' in js
+    assert 'function networkRoutesEdgeSnrStrengthPct(edge, fallbackWeightPct = 0)' in js
     assert 'function buildNetworkRoutesScopedLinks(route, data)' in js
     assert 'const returnPath = (Array.isArray(route && route.returnPath) ? route.returnPath : [])' in js
+    assert 'const edgePct = networkRoutesEdgeSnrStrengthPct(edge, edgeWeightPct);' in js
     assert 'appendPathEdges(returnPath, returnEdgesRaw, "return");' in js
     assert 'function networkRoutesScopeNodeEmoji(nodeId, node = null)' in js
     assert 'function networkRoutesBuildLocationEstimates(data)' in js
