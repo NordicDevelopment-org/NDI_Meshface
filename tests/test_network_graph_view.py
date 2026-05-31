@@ -96,11 +96,15 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'networkRoutesModeDefs\n          .map((entry) => `<option value="${escAttr(entry.id)}">${escAttr(entry.label)}</option>`)' in js
     assert 'networkRoutesMode = normalizeNetworkRoutesMode(modeSelect.value || "inferred");' in js
     assert 'function renderNetworkRoutes(state = latestState, options = {})' in js
+    assert 'let networkRoutesScopeClickTimer = 0;' in js
     assert 'function networkRoutesFindInferredPath(fromNodeId, toNodeId, adjacency)' in js
     assert 'function networkRoutesEdgeSnrStrengthPct(edge, fallbackWeightPct = 0)' in js
+    assert 'function networkRoutesEdgeSnrBarsFromPct(rawPct)' in js
     assert 'function buildNetworkRoutesScopedLinks(route, data)' in js
     assert 'const returnPath = (Array.isArray(route && route.returnPath) ? route.returnPath : [])' in js
     assert 'const edgePct = networkRoutesEdgeSnrStrengthPct(edge, edgeWeightPct);' in js
+    assert 'const edgeSignal = networkRoutesEdgeSnrBarsFromPct(edgePct);' in js
+    assert 'class="network-route-edge-bars is-${escAttr(edgeSignal.level)}"' in js
     assert 'appendPathEdges(returnPath, returnEdgesRaw, "return");' in js
     assert 'function networkRoutesScopeNodeEmoji(nodeId, node = null)' in js
     assert 'function networkRoutesBuildLocationEstimates(data)' in js
@@ -118,6 +122,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function hydrateNetworkRoutesScopeNodeCities(root)' in js
     assert 'nearestOfflineCityHintFromCoords(lat, lon)' in js
     assert 'hydrateNetworkRoutesScopeNodeCities(result);' in js
+    assert 'result.addEventListener("dblclick", (event) => {' in js
+    assert 'activateRouteNodeTarget(target, { retargetScope: true })' in js
     assert 'const display = clean && source === "estimated" ? `~ ${clean}` : clean;' in js
     assert 'hopNodeId === "!local"' in js
     assert 'const nodeEmoji = networkRoutesScopeNodeEmoji(clean, node);' in js
@@ -610,6 +616,8 @@ def test_network_layout_uses_single_row_map_track() -> None:
     assert ".network-route-scope-node-emoji {" in css
     assert ".network-route-hop-list {" in css
     assert ".network-route-edge-bar {" in css
+    assert ".network-route-edge-bars {" in css
+    assert ".network-route-edge-cell.level-4 {" in css
     route_css_start = css.index(".network-routes-card {")
     route_css = css[route_css_start:css.index(".network-routes-toolbar {", route_css_start)]
     assert "rgba(249, 253, 249, 0.94)" in route_css

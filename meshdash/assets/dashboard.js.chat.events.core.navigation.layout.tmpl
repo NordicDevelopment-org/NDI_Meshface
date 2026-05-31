@@ -732,6 +732,7 @@
     }});
     let networkRoutesScopePointerDrag = null;
     let networkRoutesScopeSuppressClick = false;
+    let networkRoutesScopeClickTimer = 0;
     let networkRoutesSplitPointerDrag = null;
     let networkRoutesSplitRatio = networkRoutesSplitRatioDefault;
     let networkRoutesListFocusNodeId = "";
@@ -2173,17 +2174,54 @@
       const result = document.getElementById("network-routes-result");
       if (result instanceof HTMLElement && result.dataset.bound !== "1") {{
         result.dataset.bound = "1";
-        const activateRouteNodeTarget = (target) => {{
+        const clearNetworkRoutesScopeClickTimer = () => {{
+          if (!networkRoutesScopeClickTimer) return;
+          window.clearTimeout(networkRoutesScopeClickTimer);
+          networkRoutesScopeClickTimer = 0;
+        }};
+        const retargetNetworkRoutesScopeNode = (rawNodeId) => {{
+          const targetNodeId = normalizeNodeId(rawNodeId || "");
+          if (!isSelectableNodeId(targetNodeId)) return false;
+          const localSourceId = normalizeNodeId(
+            resolveNetworkRoutesSourceNodeId(latestState) || networkRoutesFromNodeId || ""
+          );
+          if (isSelectableNodeId(localSourceId)) {{
+            networkRoutesFromNodeId = localSourceId;
+          }}
+          networkRoutesListFocusNodeId = targetNodeId;
+          if (targetNodeId === networkRoutesFromNodeId) {{
+            renderNetworkRoutes(latestState);
+            return true;
+          }}
+          networkRoutesToNodeId = targetNodeId;
+          setNetworkRoutesPinnedTargetId(networkRoutesToNodeId);
+          persistPreferredNetworkRoutesNodeId(networkRoutesFromStorageKey, networkRoutesFromNodeId);
+          persistPreferredNetworkRoutesNodeId(networkRoutesToStorageKey, networkRoutesToNodeId);
+          renderNetworkRoutes(latestState);
+          return true;
+        }};
+        const activateRouteNodeTarget = (target, options = null) => {{
+          const opts = (options && typeof options === "object") ? options : {{}};
           const row = target instanceof Element ? target.closest("[data-route-node-id]") : null;
           if (!(row instanceof Element)) return false;
           const nodeId = normalizeNodeId(row.getAttribute("data-route-node-id") || "");
           if (!isSelectableNodeId(nodeId)) return false;
-          networkRoutesListFocusNodeId = nodeId;
           const fromScopeGraph = !!(target instanceof Element && target.closest(".network-route-scope-node"));
+          if (!!opts.retargetScope && fromScopeGraph) {{
+            clearNetworkRoutesScopeClickTimer();
+            return retargetNetworkRoutesScopeNode(nodeId);
+          }}
           if (fromScopeGraph) {{
-            renderNetworkRoutes(latestState);
+            clearNetworkRoutesScopeClickTimer();
+            networkRoutesScopeClickTimer = window.setTimeout(() => {{
+              networkRoutesScopeClickTimer = 0;
+              networkRoutesListFocusNodeId = nodeId;
+              renderNetworkRoutes(latestState);
+            }}, 220);
             return true;
           }}
+          clearNetworkRoutesScopeClickTimer();
+          networkRoutesListFocusNodeId = nodeId;
           selectNode(nodeId, true, false);
           return true;
         }};
@@ -2216,8 +2254,30 @@
               : null;
             if (!(nodeTarget instanceof Element)) return;
           }}
+          const scopeNodeTarget = target instanceof Element
+            ? target.closest(".network-route-scope-node")
+            : null;
+          if (scopeNodeTarget instanceof Element) {{
+            const clickCount = Math.max(1, Math.trunc(Number(event && event.detail) || 1));
+            if (clickCount >= 2 && activateRouteNodeTarget(target, {{ retargetScope: true }})) {{
+              event.preventDefault();
+              return;
+            }}
+            if (activateRouteNodeTarget(target)) return;
+            return;
+          }}
           if (activateRouteNodeTarget(target)) return;
           activateRouteEdgeTarget(target);
+        }});
+        result.addEventListener("dblclick", (event) => {{
+          const target = event.target instanceof Element ? event.target : null;
+          const scopeNodeTarget = target instanceof Element
+            ? target.closest(".network-route-scope-node")
+            : null;
+          if (!(scopeNodeTarget instanceof Element)) return;
+          if (activateRouteNodeTarget(target, {{ retargetScope: true }})) {{
+            event.preventDefault();
+          }}
         }});
         result.addEventListener("keydown", (event) => {{
           if (!(event instanceof KeyboardEvent) || (event.key !== "Enter" && event.key !== " ")) return;
@@ -2504,6 +2564,22 @@
       return 0;
     }}
 
+    function networkRoutesEdgeSnrBarsFromPct(rawPct) {{
+      const pct = Number(rawPct);
+      const bounded = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+      const bars = bounded >= 82
+        ? 4
+        : (bounded >= 58 ? 3 : (bounded >= 34 ? 2 : (bounded >= 12 ? 1 : 0)));
+      const level = bars >= 4
+        ? "excellent"
+        : (bars === 3 ? "good" : (bars === 2 ? "fair" : (bars === 1 ? "weak" : "none")));
+      return {{
+        pct: bounded,
+        bars,
+        level,
+      }};
+    }}
+
     function networkRoutesConfidenceText(route) {{
       const edges = Array.isArray(route && route.edges) ? route.edges : [];
       if (!edges.length) return "Direct";
@@ -2525,9 +2601,15 @@
         const edgeWeight = Math.max(0, Number(edge && edge.weight) || 0);
         const edgeWeightPct = maxWeight > 0 ? Math.max(4, Math.min(100, (edgeWeight / maxWeight) * 100)) : 0;
         const edgePct = networkRoutesEdgeSnrStrengthPct(edge, edgeWeightPct);
+        const edgeSignal = networkRoutesEdgeSnrBarsFromPct(edgePct);
         const edgeMeta = edge ? networkRoutesEdgeMetaParts(edge) : null;
         const inlineBarHtml = edge
-          ? `<span class="network-route-edge-bar is-inline" aria-hidden="true"><span style="--route-edge-strength:${{edgePct.toFixed(1)}}%;"></span></span>`
+          ? `<span class="network-route-edge-bars is-${{escAttr(edgeSignal.level)}}" title="${{escAttr(`Link signal strength ${{edgeSignal.bars}} of 4 bars`)}}" aria-hidden="true">
+              <span class="network-route-edge-cell level-1${{edgeSignal.bars >= 1 ? " is-on" : ""}}"></span>
+              <span class="network-route-edge-cell level-2${{edgeSignal.bars >= 2 ? " is-on" : ""}}"></span>
+              <span class="network-route-edge-cell level-3${{edgeSignal.bars >= 3 ? " is-on" : ""}}"></span>
+              <span class="network-route-edge-cell level-4${{edgeSignal.bars >= 4 ? " is-on" : ""}}"></span>
+            </span>`
           : "";
         const linkMetaHtml = edge
           ? `<span class="network-route-hop-link-meta">

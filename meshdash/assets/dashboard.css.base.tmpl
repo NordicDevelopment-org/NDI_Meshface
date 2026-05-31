@@ -7772,22 +7772,50 @@
       background: rgba(166, 190, 173, 0.28);
       overflow: hidden;
     }}
-    .network-route-edge-bar.is-inline {{
-      flex: 0 0 64px;
-      width: 64px;
-      min-width: 64px;
-      max-width: 64px;
-      height: 4px;
-      min-height: 4px;
-      margin-left: 2px;
-      margin-right: 2px;
-    }}
     .network-route-edge-bar > span {{
       display: block;
       height: 100%;
       width: var(--route-edge-strength, 0%);
       border-radius: inherit;
       background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    }}
+    .network-route-edge-bars {{
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 2px;
+      width: 28px;
+      min-width: 28px;
+      max-width: 28px;
+      margin-left: 2px;
+      margin-right: 2px;
+      line-height: 1;
+    }}
+    .network-route-edge-cell {{
+      width: 3px;
+      border-radius: 2px;
+      background: rgba(166, 190, 173, 0.3);
+      transition: background-color 0.16s ease;
+    }}
+    .network-route-edge-cell.level-1 {{ height: 4px; }}
+    .network-route-edge-cell.level-2 {{ height: 6px; }}
+    .network-route-edge-cell.level-3 {{ height: 8px; }}
+    .network-route-edge-cell.level-4 {{ height: 10px; }}
+    .network-route-edge-bars.is-none .network-route-edge-cell.is-on {{
+      background: color-mix(in srgb, #f3756a 76%, #f19c90 24%);
+    }}
+    .network-route-edge-bars.is-weak .network-route-edge-cell.is-on {{
+      background: color-mix(in srgb, #f1be67 76%, #f6d48f 24%);
+    }}
+    .network-route-edge-bars.is-fair .network-route-edge-cell.is-on {{
+      background: color-mix(in srgb, #e6d96c 76%, #ece39b 24%);
+    }}
+    .network-route-edge-bars.is-good .network-route-edge-cell.is-on {{
+      background: color-mix(in srgb, #54dd8e 78%, #84ebb0 22%);
+    }}
+    .network-route-edge-bars.is-excellent .network-route-edge-cell.is-on {{
+      background: color-mix(in srgb, #27d371 84%, #58e18f 16%);
     }}
     .network-route-compact {{
       display: flex;
