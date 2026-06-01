@@ -205,8 +205,21 @@
       setTimelineMessage("node-online-timeline", message);
     }}
 
+    function setNodeLinkQualityTimelineMessage(message) {{
+      setTimelineMessage("node-link-quality-timeline", message);
+    }}
+
     function setNodePacketsTimelineMessage(message) {{
       setTimelineMessage("node-packets-timeline", message);
+    }}
+
+    function rerenderNodeLinkQualityChartFromCache() {{
+      const chartState = historyTrendCharts.nodeLinkQuality;
+      const sourcePoints = chartState && Array.isArray(chartState.sourcePoints)
+        ? chartState.sourcePoints
+        : [];
+      const sourceNodeId = chartState ? chartState.nodeId : "";
+      renderNodeLinkQualityChart(sourcePoints, sourceNodeId);
     }}
 
     function rerenderNodeOnlineChartFromCache() {{
@@ -233,6 +246,144 @@
       const sourceWindowHours = chartState ? chartState.sourceWindowHours : null;
       const sourceNodeId = chartState ? chartState.nodeId : "";
       renderNodePacketsChart(sourcePoints, sourceWindowHours, sourceNodeId, sourcePacketSeries);
+    }}
+
+    function nodeHistoryLinkQualityPathCountFromPoint(point) {{
+      const hopsSamplesRaw = Number(point && point.hops_samples);
+      const hopsSamples = Number.isFinite(hopsSamplesRaw) ? Math.max(0, hopsSamplesRaw) : 0;
+      const packetCountRaw = Number(point && point.packet_count);
+      const packetCount = Number.isFinite(packetCountRaw) ? Math.max(0, packetCountRaw) : 0;
+      const evidence = Math.max(hopsSamples, packetCount * 0.5);
+      if (evidence >= 18) return 4;
+      if (evidence >= 9) return 3;
+      if (evidence >= 4) return 2;
+      if (evidence >= 1) return 1;
+      return 0;
+    }}
+
+    function nodeHistoryFallbackLinkQuality(hopsValue, pathCountValue, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const hopsRaw = Number(hopsValue);
+      const hops = Number.isFinite(hopsRaw) && hopsRaw >= 0
+        ? Math.max(0, Math.trunc(hopsRaw))
+        : null;
+      const pathCountRaw = Number(pathCountValue);
+      const pathCount = Number.isFinite(pathCountRaw) && pathCountRaw >= 0
+        ? Math.max(0, Math.trunc(pathCountRaw))
+        : 0;
+      const reachable = !!opts.reachable || hops != null || pathCount > 0;
+      if (!reachable) {{
+        return {{
+          bars: 0,
+          score: 0,
+        }};
+      }}
+      const hopsScore = hops == null
+        ? 42
+        : Math.max(0, Math.min(100, Math.round(100 * (1 - Math.min(1, Math.max(0, hops - 1) / 6)))));
+      const pathScore = pathCount >= 4
+        ? 100
+        : (pathCount === 3 ? 84 : (pathCount === 2 ? 66 : (pathCount === 1 ? 38 : 0)));
+      let score = Math.round((hopsScore * 0.7) + (pathScore * 0.3));
+      if (hops != null && pathCount <= 0) {{
+        score = Math.min(score, 46);
+      }}
+      if (hops != null && hops <= 2 && pathCount >= 2) {{
+        score = Math.min(100, score + 8);
+      }}
+      const bars = score >= 86
+        ? 4
+        : (score >= 64 ? 3 : (score >= 42 ? 2 : (score >= 20 ? 1 : 0)));
+      return {{
+        bars,
+        score,
+      }};
+    }}
+
+    function buildNodeLinkQualityChartRows(points) {{
+      const rows = Array.isArray(points) ? points : [];
+      const chartRows = [];
+      for (const point of rows) {{
+        if (!point || typeof point !== "object") continue;
+        const bucketUnix = normalizeNodePacketBucketUnix(point.bucket_unix);
+        if (!Number.isFinite(bucketUnix) || bucketUnix <= 0) continue;
+        const avgHopsRaw = Number(point.avg_hops);
+        const avgHops = Number.isFinite(avgHopsRaw) && avgHopsRaw >= 0
+          ? avgHopsRaw
+          : null;
+        const pathCount = nodeHistoryLinkQualityPathCountFromPoint(point);
+        const reachable = avgHops != null || pathCount > 0;
+        const inferred = (typeof chatNodeNavigatorInferLinkQuality === "function")
+          ? chatNodeNavigatorInferLinkQuality(avgHops, pathCount, {{ reachable }})
+          : nodeHistoryFallbackLinkQuality(avgHops, pathCount, {{ reachable }});
+        const scoreRaw = Number(inferred && inferred.score);
+        const barsRaw = Number(inferred && inferred.bars);
+        if (!Number.isFinite(scoreRaw) || scoreRaw < 0) continue;
+        const score = Math.max(0, Math.min(100, scoreRaw));
+        const bars = Number.isFinite(barsRaw)
+          ? Math.max(0, Math.min(4, barsRaw))
+          : 0;
+        chartRows.push({{
+          value: score,
+          series: {{
+            quality_score: score,
+            quality_bars_scaled: bars * 25,
+          }},
+          qualityScore: score,
+          qualityBars: bars,
+          avgHops,
+          pathCount,
+          hopsSamples: Number.isFinite(Number(point.hops_samples)) ? Math.max(0, Number(point.hops_samples)) : 0,
+          packetCount: Number.isFinite(Number(point.packet_count)) ? Math.max(0, Number(point.packet_count)) : 0,
+          bucketText: String(point.bucket_time || "").trim(),
+          bucketUnix,
+        }});
+      }}
+      return chartRows;
+    }}
+
+    function resolveNodeLinkQualityMetricMeta() {{
+      return {{
+        key: "node_link_quality",
+        label: "Estimated link quality (%)",
+        compareLabel: "Estimated bars (scaled)",
+        seriesOrder: ["quality_score", "quality_bars_scaled"],
+        seriesLabels: {{
+          quality_score: "Estimated quality (%)",
+          quality_bars_scaled: "Estimated bars (x25)",
+        }},
+        seriesStyles: {{
+          quality_score: {{
+            tone: "line",
+            width: 2.35,
+          }},
+          quality_bars_scaled: {{
+            tone: "compare",
+            dashed: true,
+            width: 1.95,
+          }},
+        }},
+        smoothingWindow: 5,
+      }};
+    }}
+
+    function renderNodeLinkQualityChart(points, nodeId = null) {{
+      const chartState = historyTrendCharts.nodeLinkQuality;
+      const rows = Array.isArray(points) ? points : [];
+      const currentNodeId = normalizeNodeId(nodeId || selectedNodeId || "");
+      if (currentNodeId !== String(chartState.nodeId || "")) {{
+        resetHistoryTrendZoom(chartState);
+      }}
+      chartState.nodeId = currentNodeId;
+      chartState.sourcePoints = rows;
+      const chartRows = buildNodeLinkQualityChartRows(rows);
+      const metricMeta = resolveNodeLinkQualityMetricMeta();
+      renderWeeklySummaryChartRows(
+        chartRows,
+        metricMeta,
+        "No inferred link-quality history yet for this node.",
+        {{ targetKey: "node-link-quality" }}
+      );
     }}
 
     function normalizeNodePacketBucketUnix(raw) {{
@@ -763,6 +914,16 @@
           ? "No packet activity yet in this window."
           : "No packet-rate history yet for this node.";
         renderWeeklySummaryChartRows(rows, metricMeta, emptyMessage, {{ targetKey: target.key }});
+        return;
+      }}
+      if (target && target.key === "node-link-quality") {{
+        const metricMeta = resolveNodeLinkQualityMetricMeta();
+        renderWeeklySummaryChartRows(
+          rows,
+          metricMeta,
+          "No inferred link-quality history yet for this node.",
+          {{ targetKey: target.key }}
+        );
         return;
       }}
       const metricKey = target && target.key === "network-overview"

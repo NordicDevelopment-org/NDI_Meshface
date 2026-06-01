@@ -816,7 +816,7 @@
 
     function setHistoryTab(tabName) {{
       const nextTab = String(tabName || "").trim().toLowerCase();
-      activeHistoryTab = (nextTab === "signal" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview")
+      activeHistoryTab = (nextTab === "signal" || nextTab === "link" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview")
         ? nextTab
         : "overview";
       for (const btn of document.querySelectorAll(".history-tab-btn")) {{
@@ -826,11 +826,13 @@
         btn.setAttribute("aria-selected", isActive ? "true" : "false");
       }}
       const signalPanel = document.getElementById("tab-panel-signal");
+      const linkPanel = document.getElementById("tab-panel-link");
       const onlinePanel = document.getElementById("tab-panel-online");
       const packetsPanel = document.getElementById("tab-panel-packets");
       const namesPanel = document.getElementById("tab-panel-names");
       const overviewPanel = document.getElementById("tab-panel-overview");
       if (signalPanel) signalPanel.hidden = activeHistoryTab !== "signal";
+      if (linkPanel) linkPanel.hidden = activeHistoryTab !== "link";
       if (onlinePanel) onlinePanel.hidden = activeHistoryTab !== "online";
       if (packetsPanel) packetsPanel.hidden = activeHistoryTab !== "packets";
       if (namesPanel) namesPanel.hidden = activeHistoryTab !== "names";
@@ -864,6 +866,15 @@
         nodeOnlineState.sourceWindowHours = null;
         nodeOnlineState.sourcePacketTimestamps = [];
       }}
+      const nodeLinkQualityState = historyTrendCharts.nodeLinkQuality;
+      if (nodeLinkQualityState) {{
+        if (normalizedNodeId !== String(nodeLinkQualityState.nodeId || "")) {{
+          resetHistoryTrendZoom(nodeLinkQualityState);
+        }}
+        nodeLinkQualityState.nodeId = normalizedNodeId;
+        nodeLinkQualityState.points = [];
+        nodeLinkQualityState.sourcePoints = [];
+      }}
       const nodePacketsState = historyTrendCharts.nodePackets;
       if (nodePacketsState) {{
         if (normalizedNodeId !== String(nodePacketsState.nodeId || "")) {{
@@ -890,6 +901,17 @@
         empty.textContent = "Loading historical signal points...";
       }}
       setSignalTimelineMessage("Loading timeline...");
+      const linkQualitySvg = document.getElementById("node-link-quality-chart");
+      if (linkQualitySvg) {{
+        linkQualitySvg.innerHTML = "";
+        linkQualitySvg.classList.remove("zoomed", "chart-dragging");
+      }}
+      const linkQualityEmpty = document.getElementById("node-link-quality-empty");
+      if (linkQualityEmpty) {{
+        linkQualityEmpty.hidden = false;
+        linkQualityEmpty.textContent = "Loading inferred link-quality history...";
+      }}
+      setNodeLinkQualityTimelineMessage("Loading timeline...");
       const onlineSvg = document.getElementById("node-online-chart");
       if (onlineSvg) {{
         onlineSvg.innerHTML = "";

@@ -1,7 +1,7 @@
     function resolveWeeklySummaryChartLayout(targetKey = "history") {{
       const base = historyTrendChartLayout || {{}};
       const clean = String(targetKey || "").trim().toLowerCase();
-      if (clean === "node-packets") {{
+      if (clean === "node-packets" || clean === "node-link-quality") {{
         const signalBase = signalChartLayout || {{}};
         return {{
           width: Number(signalBase.width) || 900,

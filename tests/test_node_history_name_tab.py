@@ -31,6 +31,10 @@ def test_render_html_includes_node_history_names_and_overview_tabs() -> None:
     assert 'data-tab="overview"' in html
     assert 'id="tab-panel-overview"' in html
     assert 'id="node-history-overview-host"' in html
+    assert 'id="tab-btn-link"' in html
+    assert 'data-tab="link"' in html
+    assert 'id="tab-panel-link"' in html
+    assert 'id="node-link-quality-chart"' in html
 
 
 def test_render_html_places_overview_first_in_history_tabs() -> None:
@@ -49,14 +53,16 @@ def test_render_html_places_overview_first_in_history_tabs() -> None:
 
     overview_index = html.index('id="tab-btn-overview"')
     signal_index = html.index('id="tab-btn-signal"')
+    link_index = html.index('id="tab-btn-link"')
     packets_index = html.index('id="tab-btn-packets"')
     online_index = html.index('id="tab-btn-online"')
     names_index = html.index('id="tab-btn-names"')
 
-    assert overview_index < signal_index < packets_index < online_index < names_index
+    assert overview_index < signal_index < link_index < packets_index < online_index < names_index
     assert 'class="history-tabs workspace-pillbar"' in html
     assert 'class="history-tab-btn workspace-pill-btn is-active" id="tab-btn-overview"' in html
     assert 'id="tab-btn-signal" data-tab="signal" type="button" aria-selected="false"' in html
+    assert 'id="tab-btn-link" data-tab="link" type="button" aria-selected="false"' in html
     assert 'id="tab-panel-overview" class="history-panel"' in html
     assert 'id="tab-panel-signal" class="history-panel" hidden' in html
 
@@ -69,10 +75,14 @@ def test_dashboard_js_renders_name_history_and_overview_under_history_tab() -> N
     )
 
     assert 'let activeHistoryTab = "overview";' in js
-    assert 'nextTab === "signal" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
+    assert 'nextTab === "signal" || nextTab === "link" || nextTab === "online" || nextTab === "packets" || nextTab === "names" || nextTab === "overview"' in js
     assert ': "overview";' in js
     assert 'btn.classList.toggle("is-active", isActive);' in js
     assert 'btn.setAttribute("aria-selected", isActive ? "true" : "false");' in js
+    assert 'const linkPanel = document.getElementById("tab-panel-link");' in js
+    assert 'renderNodeLinkQualityChart(signalPoints, historyNodeId);' in js
+    assert 'function resolveNodeLinkQualityMetricMeta()' in js
+    assert 'target && target.key === "node-link-quality"' in js
     assert 'const namesPanel = document.getElementById("tab-panel-names");' in js
     assert 'const overviewPanel = document.getElementById("tab-panel-overview");' in js
     assert 'renderNodeNameHistoryPanel(nameHistoryEntries);' in js
@@ -127,7 +137,7 @@ def test_drawer_history_charts_expand_for_node_detail_views() -> None:
     css = build_dashboard_css(theme_css="")
 
     block = re.search(
-        r"\.chat-node-details-history-host #signal-chart-wrap,\n    \.chat-node-details-history-host #node-online-chart-wrap,\n    \.chat-node-details-history-host #node-packets-chart-wrap \{[\s\S]*?\n    \}",
+        r"\.chat-node-details-history-host #signal-chart-wrap,\n    \.chat-node-details-history-host #node-link-quality-chart-wrap,\n    \.chat-node-details-history-host #node-online-chart-wrap,\n    \.chat-node-details-history-host #node-packets-chart-wrap \{[\s\S]*?\n    \}",
         css,
     )
     assert block

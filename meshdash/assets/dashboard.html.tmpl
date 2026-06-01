@@ -3666,6 +3666,7 @@ Ready.
           <div class="history-tabs workspace-pillbar">
             <button class="history-tab-btn workspace-pill-btn is-active" id="tab-btn-overview" data-tab="overview" type="button" aria-selected="true">Overview</button>
             <button class="history-tab-btn workspace-pill-btn" id="tab-btn-signal" data-tab="signal" type="button" aria-selected="false">Signal</button>
+            <button class="history-tab-btn workspace-pill-btn" id="tab-btn-link" data-tab="link" type="button" aria-selected="false">Link</button>
             <button class="history-tab-btn workspace-pill-btn" id="tab-btn-packets" data-tab="packets" type="button" aria-selected="false">Packets</button>
             <button class="history-tab-btn workspace-pill-btn" id="tab-btn-online" data-tab="online" type="button" aria-selected="false">Online</button>
             <button class="history-tab-btn workspace-pill-btn" id="tab-btn-names" data-tab="names" type="button" aria-selected="false">Names</button>
@@ -3682,6 +3683,17 @@ Ready.
             <div class="signal-legend">
               <span class="legend-chip is-primary">Avg SNR (dB)</span>
               <span class="legend-chip is-compare">Avg RSSI (dBm)</span>
+            </div>
+          </div>
+          <div id="tab-panel-link" class="history-panel" hidden>
+            <div id="node-link-quality-chart-wrap">
+              <svg id="node-link-quality-chart" viewBox="0 0 900 220" preserveAspectRatio="none" aria-label="Node link quality history"></svg>
+              <div id="node-link-quality-empty" class="signal-empty" hidden>No inferred link-quality history yet for this node.</div>
+            </div>
+            <div id="node-link-quality-timeline" class="signal-timeline" aria-label="Node link quality timeline"></div>
+            <div class="signal-legend">
+              <span class="legend-chip is-primary">Estimated quality score (%)</span>
+              <span class="legend-chip is-compare">Estimated bars (scaled)</span>
             </div>
           </div>
           <div id="tab-panel-packets" class="history-panel" hidden>

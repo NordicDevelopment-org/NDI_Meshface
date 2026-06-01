@@ -86,6 +86,13 @@
         "Timeline unavailable while re-rendering signal history."
       );
       resetNodeHistoryChartState(
+        "node-link-quality-chart",
+        "node-link-quality-empty",
+        "Link-quality history is temporarily unavailable for this node.",
+        "node-link-quality-timeline",
+        "Timeline unavailable while re-rendering link-quality history."
+      );
+      resetNodeHistoryChartState(
         "node-online-chart",
         "node-online-empty",
         "Online history is temporarily unavailable for this node.",
@@ -149,6 +156,18 @@
           "Timeline unavailable while re-rendering signal history."
         );
       }}
+      const linkQualityRendered = runHistoryViewRenderStep("link quality chart", () => {{
+        renderNodeLinkQualityChart(signalPoints, historyNodeId);
+      }});
+      if (!linkQualityRendered.ok) {{
+        resetNodeHistoryChartState(
+          "node-link-quality-chart",
+          "node-link-quality-empty",
+          "Link-quality history is temporarily unavailable for this node.",
+          "node-link-quality-timeline",
+          "Timeline unavailable while re-rendering link-quality history."
+        );
+      }}
       const onlineRendered = runHistoryViewRenderStep("online chart", () => {{
         renderNodeOnlineChart(
           history.points || [],
@@ -204,7 +223,7 @@
         }});
       }}
       setHistoryTab(activeHistoryTab);
-      return signalRendered.ok || onlineRendered.ok || packetsRendered.ok || namesRendered.ok || overviewRendered.ok;
+      return signalRendered.ok || linkQualityRendered.ok || onlineRendered.ok || packetsRendered.ok || namesRendered.ok || overviewRendered.ok;
     }}
 
     async function fetchNodeHistory(nodeId, opts = null) {{
