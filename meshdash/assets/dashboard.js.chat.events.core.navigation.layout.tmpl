@@ -877,7 +877,8 @@
     function loadPreferredNetworkRoutesMode() {{
       try {{
         const raw = window.localStorage.getItem(networkRoutesModeStorageKey) || "inferred";
-        return normalizeNetworkRoutesMode(raw);
+        const mode = normalizeNetworkRoutesMode(raw);
+        return mode === "live" ? "inferred" : mode;
       }} catch (_err) {{
         return "inferred";
       }}
