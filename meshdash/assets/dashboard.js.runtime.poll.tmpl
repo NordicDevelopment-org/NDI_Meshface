@@ -237,6 +237,9 @@
         );
         const state = applyNodeVisibilityFiltersToState(rawState);
         latestState = state;
+        if (typeof refreshMapNodeFilterControl === "function") {{
+          refreshMapNodeFilterControl(rawState);
+        }}
         syncSelectedNodeWithVisibilityFilters();
         syncNodeTagsWithMeshtasticFavorites(rawState);
         if (mapLiveActivityEnabled) {{

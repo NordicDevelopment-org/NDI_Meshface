@@ -1,3 +1,11 @@
+    const consoleCommandPaletteState = {{
+      open: false,
+      query: "",
+      commands: [],
+      filtered: [],
+      selectedIndex: 0,
+    }};
+
     function syncConsoleTerminalScreenFillHeight() {{
       const terminalScreen = document.getElementById("console-terminal-screen");
       if (!(terminalScreen instanceof HTMLElement)) return;
@@ -113,6 +121,306 @@
         ev.preventDefault();
         applyLayoutView(nextView, true);
       }});
+    }}
+
+    function consoleCommandPaletteElement() {{
+      const el = document.getElementById("console-command-palette");
+      return el instanceof HTMLElement ? el : null;
+    }}
+
+    function consoleCommandPaletteInputElement() {{
+      const el = document.getElementById("console-command-palette-input");
+      return el instanceof HTMLInputElement ? el : null;
+    }}
+
+    function consoleCommandPaletteListElement() {{
+      const el = document.getElementById("console-command-palette-list");
+      return el instanceof HTMLElement ? el : null;
+    }}
+
+    function collectConsoleCommandPaletteEntries() {{
+      ensureConsoleCommandsRegistered();
+      const entries = Array.from(consoleCommandRegistry.values())
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => {{
+          const name = String(entry.name || "").trim().toLowerCase();
+          const usage = String(entry.usage || name).trim() || name;
+          const description = String(entry.description || "").trim();
+          return {{
+            name,
+            usage,
+            description,
+            requiresArgs: /<[^>]+>/.test(usage),
+            searchText: `${{name}} ${{usage}} ${{description}}`.toLowerCase(),
+          }};
+        }})
+        .filter((entry) => !!entry.name)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return entries;
+    }}
+
+    function filterConsoleCommandPaletteEntries(query, entries = null) {{
+      const source = Array.isArray(entries) ? entries : collectConsoleCommandPaletteEntries();
+      const cleanQuery = String(query == null ? "" : query).trim().toLowerCase();
+      if (!cleanQuery) {{
+        return source.slice(0, 80);
+      }}
+      const terms = cleanQuery.split(/\s+/).filter(Boolean);
+      const ranked = [];
+      for (const entry of source) {{
+        if (!entry || typeof entry !== "object") continue;
+        const haystack = String(entry.searchText || "").toLowerCase();
+        if (terms.some((term) => !haystack.includes(term))) continue;
+        let score = 0;
+        if (entry.name === cleanQuery) score += 60;
+        if (entry.name.startsWith(cleanQuery)) score += 30;
+        if (entry.name.includes(cleanQuery)) score += 12;
+        if (entry.usage.toLowerCase().startsWith(cleanQuery)) score += 8;
+        if (entry.description.toLowerCase().includes(cleanQuery)) score += 4;
+        score += Math.max(0, 6 - terms.length);
+        ranked.push({{ entry, score }});
+      }}
+      ranked.sort((a, b) => {{
+        if (b.score !== a.score) return b.score - a.score;
+        return String(a.entry.name || "").localeCompare(String(b.entry.name || ""));
+      }});
+      return ranked.slice(0, 80).map((item) => item.entry);
+    }}
+
+    function renderConsoleCommandPaletteList() {{
+      const list = consoleCommandPaletteListElement();
+      if (!(list instanceof HTMLElement)) return;
+      list.innerHTML = "";
+      const items = Array.isArray(consoleCommandPaletteState.filtered)
+        ? consoleCommandPaletteState.filtered
+        : [];
+      if (!items.length) {{
+        const empty = document.createElement("div");
+        empty.className = "console-command-palette-empty";
+        empty.textContent = "No command matches. Try a shorter keyword.";
+        list.appendChild(empty);
+        return;
+      }}
+      const selectedIndex = Math.max(0, Math.min(items.length - 1, Number(consoleCommandPaletteState.selectedIndex) || 0));
+      consoleCommandPaletteState.selectedIndex = selectedIndex;
+      const fragment = document.createDocumentFragment();
+      for (let index = 0; index < items.length; index += 1) {{
+        const item = items[index];
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = `console-command-palette-item${{index === selectedIndex ? " is-selected" : ""}}`;
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", index === selectedIndex ? "true" : "false");
+        option.dataset.commandPaletteIndex = String(index);
+
+        const name = document.createElement("span");
+        name.className = "console-command-palette-item-name";
+        name.textContent = item.name;
+        option.appendChild(name);
+
+        const runHint = document.createElement("span");
+        runHint.className = "console-command-palette-item-run";
+        runHint.textContent = item.requiresArgs ? "Needs args" : "Run";
+        option.appendChild(runHint);
+
+        const usage = document.createElement("span");
+        usage.className = "console-command-palette-item-usage";
+        usage.textContent = item.usage;
+        option.appendChild(usage);
+
+        if (item.description) {{
+          const description = document.createElement("span");
+          description.className = "console-command-palette-item-description";
+          description.textContent = item.description;
+          option.appendChild(description);
+        }}
+
+        fragment.appendChild(option);
+      }}
+      list.appendChild(fragment);
+      const selectedEl = list.querySelector(".console-command-palette-item.is-selected");
+      if (selectedEl instanceof HTMLElement) {{
+        selectedEl.scrollIntoView({{ block: "nearest" }});
+      }}
+    }}
+
+    function refreshConsoleCommandPaletteResults(query = consoleCommandPaletteState.query) {{
+      const cleanQuery = String(query == null ? "" : query);
+      consoleCommandPaletteState.query = cleanQuery;
+      const baseEntries = Array.isArray(consoleCommandPaletteState.commands) && consoleCommandPaletteState.commands.length
+        ? consoleCommandPaletteState.commands
+        : collectConsoleCommandPaletteEntries();
+      consoleCommandPaletteState.commands = baseEntries;
+      const filtered = filterConsoleCommandPaletteEntries(cleanQuery, baseEntries);
+      consoleCommandPaletteState.filtered = filtered;
+      const maxIndex = Math.max(0, filtered.length - 1);
+      consoleCommandPaletteState.selectedIndex = Math.max(0, Math.min(maxIndex, Number(consoleCommandPaletteState.selectedIndex) || 0));
+      renderConsoleCommandPaletteList();
+    }}
+
+    function moveConsoleCommandPaletteSelection(delta) {{
+      const items = Array.isArray(consoleCommandPaletteState.filtered)
+        ? consoleCommandPaletteState.filtered
+        : [];
+      if (!items.length) return;
+      const cleanDelta = Math.trunc(Number(delta) || 0);
+      if (!cleanDelta) return;
+      const total = items.length;
+      const current = Math.max(0, Math.min(total - 1, Number(consoleCommandPaletteState.selectedIndex) || 0));
+      const next = (current + cleanDelta + total) % total;
+      consoleCommandPaletteState.selectedIndex = next;
+      renderConsoleCommandPaletteList();
+    }}
+
+    function stageConsoleCommandPaletteDraft(rawDraft) {{
+      const input = consoleCommandInputElement();
+      if (!(input instanceof HTMLInputElement)) return false;
+      input.value = String(rawDraft == null ? "" : rawDraft);
+      consoleCommandHistoryCursor = -1;
+      consoleCommandDraft = "";
+      if (typeof resetConsoleAutocompleteState === "function") {{
+        resetConsoleAutocompleteState();
+      }}
+      if (typeof syncConsoleCommandDraftRender === "function") {{
+        syncConsoleCommandDraftRender(input.value);
+      }} else {{
+        renderConsolePromptBuffer(false);
+      }}
+      focusConsoleCommandInput(false);
+      return true;
+    }}
+
+    function runConsoleCommandPaletteSelection() {{
+      const items = Array.isArray(consoleCommandPaletteState.filtered)
+        ? consoleCommandPaletteState.filtered
+        : [];
+      if (!items.length) return false;
+      const index = Math.max(0, Math.min(items.length - 1, Number(consoleCommandPaletteState.selectedIndex) || 0));
+      const item = items[index];
+      if (!item || typeof item !== "object") return false;
+      setConsoleCommandPaletteOpen(false);
+      applyLayoutView("console", true);
+      if (item.requiresArgs) {{
+        return stageConsoleCommandPaletteDraft(`${{item.name}} `);
+      }}
+      if (typeof runConsoleCommandLine === "function") {{
+        void runConsoleCommandLine(item.name);
+      }}
+      focusConsoleCommandInput(false);
+      return true;
+    }}
+
+    function setConsoleCommandPaletteOpen(open, options = null) {{
+      const root = consoleCommandPaletteElement();
+      if (!(root instanceof HTMLElement)) {{
+        consoleCommandPaletteState.open = false;
+        return;
+      }}
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const nextOpen = !!open;
+      consoleCommandPaletteState.open = nextOpen;
+      if (!nextOpen) {{
+        root.hidden = true;
+        root.setAttribute("aria-hidden", "true");
+        return;
+      }}
+      consoleCommandPaletteState.commands = collectConsoleCommandPaletteEntries();
+      if (opts.resetQuery === true) {{
+        consoleCommandPaletteState.query = "";
+      }} else if (Object.prototype.hasOwnProperty.call(opts, "query")) {{
+        consoleCommandPaletteState.query = String(opts.query == null ? "" : opts.query);
+      }}
+      const input = consoleCommandPaletteInputElement();
+      if (input instanceof HTMLInputElement) {{
+        input.value = consoleCommandPaletteState.query;
+      }}
+      consoleCommandPaletteState.selectedIndex = 0;
+      refreshConsoleCommandPaletteResults(consoleCommandPaletteState.query);
+      root.hidden = false;
+      root.setAttribute("aria-hidden", "false");
+      window.requestAnimationFrame(() => {{
+        const activeInput = consoleCommandPaletteInputElement();
+        if (!(activeInput instanceof HTMLInputElement)) return;
+        try {{
+          activeInput.focus({{ preventScroll: true }});
+        }} catch (_err) {{
+          activeInput.focus();
+        }}
+        activeInput.select();
+      }});
+    }}
+
+    function bindConsoleCommandPaletteControls() {{
+      const root = consoleCommandPaletteElement();
+      const input = consoleCommandPaletteInputElement();
+      const list = consoleCommandPaletteListElement();
+      if (!(root instanceof HTMLElement) || !(input instanceof HTMLInputElement) || !(list instanceof HTMLElement)) {{
+        return;
+      }}
+      if (root.dataset.bound !== "1") {{
+        root.dataset.bound = "1";
+        root.addEventListener("click", (ev) => {{
+          const target = ev.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("[data-command-palette-close]")) {{
+            setConsoleCommandPaletteOpen(false);
+            return;
+          }}
+          const btn = target.closest(".console-command-palette-item");
+          if (!(btn instanceof HTMLButtonElement)) return;
+          const index = Math.trunc(Number(btn.dataset.commandPaletteIndex));
+          if (Number.isFinite(index) && index >= 0) {{
+            consoleCommandPaletteState.selectedIndex = index;
+          }}
+          runConsoleCommandPaletteSelection();
+        }});
+      }}
+      if (input.dataset.bound !== "1") {{
+        input.dataset.bound = "1";
+        input.addEventListener("input", () => {{
+          consoleCommandPaletteState.selectedIndex = 0;
+          refreshConsoleCommandPaletteResults(input.value);
+        }});
+        input.addEventListener("keydown", (ev) => {{
+          if (ev.key === "ArrowDown") {{
+            ev.preventDefault();
+            moveConsoleCommandPaletteSelection(1);
+            return;
+          }}
+          if (ev.key === "ArrowUp") {{
+            ev.preventDefault();
+            moveConsoleCommandPaletteSelection(-1);
+            return;
+          }}
+          if (ev.key === "Enter" && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {{
+            ev.preventDefault();
+            runConsoleCommandPaletteSelection();
+            return;
+          }}
+          if (ev.key === "Escape") {{
+            ev.preventDefault();
+            setConsoleCommandPaletteOpen(false);
+          }}
+        }});
+      }}
+      if (document.body.dataset.consoleCommandPaletteHotkeyBound !== "1") {{
+        document.body.dataset.consoleCommandPaletteHotkeyBound = "1";
+        document.addEventListener("keydown", (ev) => {{
+          if (!ev || ev.defaultPrevented || ev.isComposing || ev.repeat) return;
+          const key = String(ev.key || "").toLowerCase();
+          if (key === "k" && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey) {{
+            ev.preventDefault();
+            setConsoleCommandPaletteOpen(!consoleCommandPaletteState.open, {{
+              resetQuery: !consoleCommandPaletteState.open,
+            }});
+            return;
+          }}
+          if (key === "escape" && consoleCommandPaletteState.open) {{
+            ev.preventDefault();
+            setConsoleCommandPaletteOpen(false);
+          }}
+        }});
+      }}
     }}
 
     function consoleContextMenuElement() {{
@@ -255,6 +563,7 @@
     function bindConsoleControls() {{
       ensureConsoleCommandsRegistered();
       bindConsoleDropdownHotkey();
+      bindConsoleCommandPaletteControls();
       const pre = document.getElementById("live-console");
       if (pre instanceof HTMLElement && pre.dataset.scrollBound !== "1") {{
         pre.dataset.scrollBound = "1";

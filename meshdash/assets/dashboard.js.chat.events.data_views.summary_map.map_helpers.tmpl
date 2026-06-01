@@ -548,6 +548,96 @@
       `;
     }}
 
+    function mapNodePopupActionButtonHtml(label, action, nodeId) {{
+      const cleanLabel = String(label || "").trim();
+      const cleanAction = String(action || "").trim().toLowerCase();
+      const cleanNodeId = normalizeNodeId(nodeId || "");
+      if (!cleanLabel || !cleanAction || !isSelectableNodeId(cleanNodeId)) return "";
+      return `
+        <button
+          type="button"
+          class="map-node-info-action-btn"
+          data-map-node-action="${{escAttr(cleanAction)}}"
+          data-node-id="${{escAttr(cleanNodeId)}}"
+        >${{escAttr(cleanLabel)}}</button>
+      `;
+    }}
+
+    function runMapNodePopupAction(action, rawNodeId) {{
+      const cleanAction = String(action || "").trim().toLowerCase();
+      const nodeId = normalizeNodeId(rawNodeId || "");
+      if (!isSelectableNodeId(nodeId)) return false;
+
+      if (cleanAction === "message") {{
+        selectNode(nodeId, false, false);
+        applyLayoutView("chat", true);
+        applyChatChannel("all", true);
+        peerDmActivePeerId = nodeId;
+        if (typeof setPeerDmMenuOpen === "function") {{
+          setPeerDmMenuOpen(false);
+        }}
+        if (typeof setChatNodeDetailsDrawerTab === "function") {{
+          setChatNodeDetailsDrawerTab("chat", {{ fetchHistory: false }});
+        }}
+        if (latestState) {{
+          renderChat(latestState);
+        }}
+        const chatInput = document.getElementById("chat-input");
+        if (chatInput instanceof HTMLInputElement) {{
+          window.requestAnimationFrame(() => {{
+            try {{
+              chatInput.focus({{ preventScroll: true }});
+            }} catch (_err) {{
+              chatInput.focus();
+            }}
+            const tail = chatInput.value.length;
+            try {{
+              chatInput.setSelectionRange(tail, tail);
+            }} catch (_err) {{
+            }}
+          }});
+        }}
+        return true;
+      }}
+
+      if (cleanAction === "trace") {{
+        selectNode(nodeId, false, false);
+        if (typeof openNetworkRoutesLiveTrace === "function") {{
+          openNetworkRoutesLiveTrace(nodeId, {{ autoRun: true }});
+          return true;
+        }}
+        applyLayoutView("network", true);
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("routes", {{ persist: true }});
+        }}
+        if (typeof runConsoleCommandLine === "function") {{
+          void runConsoleCommandLine(`traceroute ${{nodeId}}`);
+        }}
+        return true;
+      }}
+
+      if (cleanAction === "details") {{
+        applyLayoutView("network", true);
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("map", {{ persist: true }});
+        }}
+        selectNode(nodeId, true, false);
+        if (typeof setChatNodeDetailsDrawerTab === "function") {{
+          setChatNodeDetailsDrawerTab("details", {{ fetchHistory: true }});
+        }}
+        if (typeof setChatNodeDetailsDrawerExpanded === "function") {{
+          setChatNodeDetailsDrawerExpanded(true, {{
+            tab: "details",
+            fetchHistory: true,
+            rerender: false,
+          }});
+        }}
+        return true;
+      }}
+
+      return false;
+    }}
+
     function buildMapNodeInfoHtml(node, options = null) {{
       const opts = (options && typeof options === "object") ? options : {{}};
       const safeNode = (node && typeof node === "object") ? node : {{}};
@@ -641,6 +731,15 @@
         if (avgRssi != null && String(avgRssi).trim()) rows.push(mapNodeFieldHtml("Avg Link RSSI", avgRssi));
       }}
 
+      const actionNodeId = normalizeNodeId(displayId || normalizedId || fallbackId || "");
+      const quickActions = isSelectableNodeId(actionNodeId)
+        ? [
+            mapNodePopupActionButtonHtml("Message", "message", actionNodeId),
+            mapNodePopupActionButtonHtml("Trace", "trace", actionNodeId),
+            mapNodePopupActionButtonHtml("Open details", "details", actionNodeId),
+          ].filter(Boolean).join("")
+        : "";
+
       return `
         <div class="map-node-info-card${{isEstimated ? " is-estimated" : ""}}">
           <div class="map-node-info-header">
@@ -649,6 +748,11 @@
           <div class="map-node-info-grid">
             ${{rows.join("")}}
           </div>
+          ${{quickActions ? `
+            <div class="map-node-info-actions" role="group" aria-label="Node quick actions">
+              ${{quickActions}}
+            </div>
+          ` : ""}}
         </div>
       `;
     }}
@@ -689,6 +793,31 @@
         return !!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId);
       }};
       marker.on("popupopen", removeHoverTooltip);
+      marker.on("popupopen", (ev) => {{
+        const popup = ev && ev.popup;
+        const popupEl = popup && typeof popup.getElement === "function"
+          ? popup.getElement()
+          : null;
+        if (!(popupEl instanceof HTMLElement)) return;
+        const infoCard = popupEl.querySelector(".map-node-info-card");
+        if (!(infoCard instanceof HTMLElement) || infoCard.dataset.actionsBound === "1") return;
+        infoCard.dataset.actionsBound = "1";
+        infoCard.addEventListener("click", (clickEv) => {{
+          const target = clickEv.target;
+          if (!(target instanceof Element)) return;
+          const actionBtn = target.closest("[data-map-node-action]");
+          if (!(actionBtn instanceof HTMLButtonElement)) return;
+          const action = String(actionBtn.dataset.mapNodeAction || "").trim().toLowerCase();
+          const nodeId = normalizeNodeId(actionBtn.dataset.nodeId || overlayNodeId || "");
+          if (!action || !nodeId) return;
+          clickEv.preventDefault();
+          clickEv.stopPropagation();
+          const applied = runMapNodePopupAction(action, nodeId);
+          if (applied && typeof marker.closePopup === "function") {{
+            marker.closePopup();
+          }}
+        }});
+      }});
       marker.on("click", removeHoverTooltip);
       if (typeof marker.bindTooltip === "function" && !hoverTooltipSuppressed()) {{
         const measureTooltipSize = () => {{
@@ -1824,6 +1953,68 @@
       btn.addEventListener("click", () => {{
         resetMapViewToMostNodes();
       }});
+    }}
+
+    function activeMapNodeVisibilityFilterRuleCount(state = latestRawState || latestState) {{
+      const safeState = (state && typeof state === "object") ? state : (latestRawState || latestState || {{}});
+      const whitelistActive = (
+        typeof nodeVisibilityWhitelistFilterActive === "function"
+          ? nodeVisibilityWhitelistFilterActive(safeState)
+          : false
+      );
+      const whitelistCount = (
+        whitelistActive
+        && typeof nodeVisibilityWhitelistIds !== "undefined"
+        && nodeVisibilityWhitelistIds instanceof Set
+      )
+        ? nodeVisibilityWhitelistIds.size
+        : 0;
+      const blacklistCount = (
+        typeof nodeVisibilityBlacklistIds !== "undefined"
+        && nodeVisibilityBlacklistIds instanceof Set
+      )
+        ? nodeVisibilityBlacklistIds.size
+        : 0;
+      return Math.max(0, whitelistCount + blacklistCount);
+    }}
+
+    function refreshMapNodeFilterControl(state = latestRawState || latestState) {{
+      const btn = document.getElementById("map-node-filter-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const badge = document.getElementById("map-node-filter-badge");
+      const activeRules = activeMapNodeVisibilityFilterRuleCount(state);
+      const active = activeRules > 0;
+      btn.classList.toggle("has-active-filters", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+      btn.title = active
+        ? `Node filters active (${{activeRules}} rule${{activeRules === 1 ? "" : "s"}}). Open settings to edit.`
+        : "Open node visibility filters";
+      if (badge instanceof HTMLElement) {{
+        badge.hidden = !active;
+        badge.textContent = activeRules > 99 ? "99+" : String(activeRules);
+      }}
+    }}
+
+    function openMapNodeFilterSettings() {{
+      applyLayoutView("settings", true);
+      if (typeof setActiveSettingsTab === "function") {{
+        setActiveSettingsTab("nodes", true);
+      }}
+      if (typeof renderNodeVisibilityListsUi === "function") {{
+        renderNodeVisibilityListsUi(latestRawState || latestState || {{}});
+      }}
+    }}
+
+    function bindMapNodeFilterControl() {{
+      const btn = document.getElementById("map-node-filter-btn");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      if (btn.dataset.bound !== "1") {{
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", () => {{
+          openMapNodeFilterSettings();
+        }});
+      }}
+      refreshMapNodeFilterControl(latestRawState || latestState || {{}});
     }}
 
     function resolveMapPositionBadge(node, caps = null, nowUnix = Math.floor(Date.now() / 1000)) {{

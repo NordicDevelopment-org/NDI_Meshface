@@ -3071,6 +3071,14 @@ Ready.
           <div id="map-controls-dock" class="map-controls-dock">
             <button id="map-reset-view-btn" class="map-reset-view-btn" type="button" title="Reset map view">Reset view</button>
             <button
+              id="map-node-filter-btn"
+              class="map-reset-view-btn map-node-filter-btn"
+              type="button"
+              title="Open node visibility filters"
+              aria-label="Open node visibility filters"
+              aria-pressed="false"
+            >Filters <span id="map-node-filter-badge" class="map-node-filter-badge" hidden>0</span></button>
+            <button
               type="button"
               id="map-basemap-status"
               class="map-basemap-status status-loading"
@@ -4137,6 +4145,25 @@ Ready.
     </section>
   </div>
   <div id="peer-dm-popout-host" class="peer-dm-popout-host" aria-live="polite"></div>
+  <div id="console-command-palette" class="console-command-palette" hidden aria-hidden="true">
+    <div class="console-command-palette-backdrop" data-command-palette-close="1"></div>
+    <div class="console-command-palette-dialog" role="dialog" aria-modal="true" aria-labelledby="console-command-palette-title">
+      <div class="console-command-palette-head">
+        <strong id="console-command-palette-title" class="console-command-palette-title">Console Commands</strong>
+        <span class="console-command-palette-hint">Ctrl+K</span>
+      </div>
+      <input
+        id="console-command-palette-input"
+        class="console-command-palette-input"
+        type="search"
+        placeholder="Type a command name or description..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div id="console-command-palette-list" class="console-command-palette-list" role="listbox" aria-label="Console command matches"></div>
+      <div class="console-command-palette-footer">Enter runs command • Esc closes • ↑/↓ move</div>
+    </div>
+  </div>
     </main>
   </div>
 
