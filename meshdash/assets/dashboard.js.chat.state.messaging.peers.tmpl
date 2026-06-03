@@ -3696,12 +3696,46 @@
         }}
       }}
       if (tagHost instanceof HTMLElement) {{
+        const tagEditorPresetSignature = (preset) => {{
+          const safePreset = preset && typeof preset === "object" ? preset : null;
+          if (!safePreset) return "";
+          return JSON.stringify({{
+            id: normalizeNodeTagPresetId(safePreset.id || "", ""),
+            name: normalizeNodeTagPresetName(safePreset.name, "Tagged"),
+            emoji: normalizeNodeTagEmoji(safePreset.emoji, ""),
+            color: normalizeNodeTagColor(safePreset.color, "#2aa85a"),
+            vibrance: clampNodeTagVibrance(safePreset.vibrance, 70),
+          }});
+        }};
+        const manualTagEntry = typeof manualNodeTagEntryForNode === "function"
+          ? manualNodeTagEntryForNode(selectedId)
+          : null;
+        const editorTagEntry = manualTagEntry || tagEntry;
+        const activeEditorPreset = nodeTagPresetForId(activeNodeTagPresetId)
+          || nodeTagPresetForId("tag-default")
+          || defaultNodeTagPreset();
+        const editorCurrentPreset = editorTagEntry && editorTagEntry.preset
+          ? editorTagEntry.preset
+          : activeEditorPreset;
+        const tagEditorSignature = JSON.stringify({{
+          nodeId: selectedId,
+          manualPresetId: normalizeNodeTagPresetId(manualTagEntry && manualTagEntry.presetId, ""),
+          effectivePresetId: normalizeNodeTagPresetId(editorTagEntry && editorTagEntry.presetId, ""),
+          activePresetId: normalizeNodeTagPresetId(activeNodeTagPresetId || "tag-default", "tag-default"),
+          currentPreset: tagEditorPresetSignature(editorCurrentPreset),
+          nodeEmoji: nodeEmojiOverride,
+        }});
         const existingEditor = tagHost.querySelector("#favorite-menu-tag-editor");
         const existingNodeId = existingEditor instanceof HTMLElement
           ? normalizeNodeId(existingEditor.dataset.nodeId || "")
           : "";
-        if (!(existingEditor instanceof HTMLElement) || existingNodeId !== selectedId) {{
+        if (
+          !(existingEditor instanceof HTMLElement)
+          || existingNodeId !== selectedId
+          || tagHost.dataset.tagEditorSignature !== tagEditorSignature
+        ) {{
           tagHost.innerHTML = favoriteMenuTagEditorHtml(selectedId);
+          tagHost.dataset.tagEditorSignature = tagEditorSignature;
         }}
         bindFavoriteMenuTagEditorControls(selectedId);
       }}

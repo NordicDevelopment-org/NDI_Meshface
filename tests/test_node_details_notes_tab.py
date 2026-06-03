@@ -284,6 +284,60 @@ def test_dashboard_js_clears_node_details_drawer_when_hidden() -> None:
     assert 'setDrawerElementHtmlIfChanged(tagHost, "", "tag");' in hidden_block
 
 
+def test_dashboard_js_refreshes_node_tag_drawer_when_tag_state_changes() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    drawer_start = js.index("function syncChatNodeDetailsDrawer(")
+    signature_start = js.index("const tagEditorSignature = JSON.stringify({", drawer_start)
+    signature_end = js.index("bindFavoriteMenuTagEditorControls(selectedId);", signature_start)
+    signature_block = js[signature_start:signature_end]
+
+    assert "manualPresetId:" in signature_block
+    assert "effectivePresetId:" in signature_block
+    assert "activePresetId:" in signature_block
+    assert "currentPreset:" in signature_block
+    assert "nodeEmoji:" in signature_block
+    assert "tagHost.dataset.tagEditorSignature !== tagEditorSignature" in signature_block
+    assert "tagHost.dataset.tagEditorSignature = tagEditorSignature;" in signature_block
+
+    toggle_start = js.index("function toggleFavoriteNode(")
+    toggle_end = js.index("function toggleMutedNode(", toggle_start)
+    toggle_block = js[toggle_start:toggle_end]
+
+    assert "syncChatNodeDetailsDrawer(latestState, {" in toggle_block
+    assert "fetchHistory: false" in toggle_block
+
+
+def test_dashboard_js_allows_typing_custom_tag_from_default_drawer_preset() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    editor_start = js.index("function favoriteMenuTagEditorHtml(")
+    editor_end = js.index("function bindFavoriteMenuTagEditorControls(", editor_start)
+    editor_block = js[editor_start:editor_end]
+
+    assert "const selectedPresetLocked = favoriteMenuTagPresetFieldsLocked(selectedPresetId);" in editor_block
+    assert "function favoriteMenuTagPresetFieldsLocked(presetId) {" in editor_block
+    assert "? isMeshtasticFavoritePresetId(presetId)" in editor_block
+    assert 'isNodeTagPresetIdLocked(selectedPresetId)' not in editor_block
+
+    bind_start = js.index("function bindFavoriteMenuTagEditorControls(")
+    bind_end = js.index("function renderStarredNodeSelect(", bind_start)
+    bind_block = js[bind_start:bind_end]
+
+    assert "const locked = favoriteMenuTagPresetFieldsLocked(presetId);" in bind_block
+    assert "const effectivePreferredId = (" in bind_block
+    assert "&& isNodeTagPresetIdLocked(preferredPresetId)" in bind_block
+    assert "preferredId: effectivePreferredId," in bind_block
+
+
 def test_dashboard_js_renders_top_peer_as_clickable_node_link() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

@@ -24,9 +24,7 @@
       const selectedPresetId = currentTag && currentTag.presetId
         ? currentTag.presetId
         : normalizeNodeTagPresetId(activeNodeTagPresetId || currentPreset.id || "tag-default", "tag-default");
-      const selectedPresetLocked = (typeof isNodeTagPresetIdLocked === "function")
-        ? isNodeTagPresetIdLocked(selectedPresetId)
-        : false;
+      const selectedPresetLocked = favoriteMenuTagPresetFieldsLocked(selectedPresetId);
       const presets = nodeTagPresetEntries();
       const optionsHtml = presets.map((preset) => {{
         const presetId = normalizeNodeTagPresetId(preset.id, "tag-default");
@@ -69,6 +67,12 @@
         </div>
         <div id="favorite-menu-tag-status" class="favorite-menu-tag-status"></div>
       </div>`;
+    }}
+
+    function favoriteMenuTagPresetFieldsLocked(presetId) {{
+      return (typeof isMeshtasticFavoritePresetId === "function")
+        ? isMeshtasticFavoritePresetId(presetId)
+        : false;
     }}
 
     function bindFavoriteMenuTagEditorControls(nodeId) {{
@@ -129,9 +133,7 @@
       }};
 
       const applyPresetLockState = (presetId) => {{
-        const locked = (typeof isNodeTagPresetIdLocked === "function")
-          ? isNodeTagPresetIdLocked(presetId)
-          : false;
+        const locked = favoriteMenuTagPresetFieldsLocked(presetId);
         nameInput.disabled = locked;
         emojiInput.disabled = locked;
         colorInput.disabled = locked;
@@ -152,12 +154,20 @@
       }};
 
       const persistPresetFromEditor = (preferredId = "") => {{
+        const preferredPresetId = normalizeNodeTagPresetId(preferredId || "", "");
+        const effectivePreferredId = (
+          preferredPresetId
+          && typeof isNodeTagPresetIdLocked === "function"
+          && isNodeTagPresetIdLocked(preferredPresetId)
+        )
+          ? ""
+          : preferredPresetId;
         const preset = upsertNodeTagPreset(
           nameInput.value,
           colorInput.value,
           vibranceInput.value,
           {{
-            preferredId,
+            preferredId: effectivePreferredId,
             emoji: emojiInput.value,
           }}
         );
@@ -724,6 +734,11 @@
         renderFavorites(latestState);
       }} else {{
         renderStarredNodeSelect({{}});
+      }}
+      if (typeof syncChatNodeDetailsDrawer === "function") {{
+        syncChatNodeDetailsDrawer(latestState, {{
+          fetchHistory: false,
+        }});
       }}
       if (typeof setChatSendStatus === "function") {{
         const statusText = targetActive
