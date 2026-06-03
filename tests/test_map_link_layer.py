@@ -155,6 +155,62 @@ def test_dashboard_js_suppresses_map_hover_tooltip_while_popup_is_open() -> None
     assert "suppressHoverTooltip: isSelected," in js
 
 
+def test_dashboard_js_binds_programmatic_map_popup_actions() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert "function handleMapNodePopupActionClick(clickEv, fallbackNodeId = \"\", closePopupFn = null)" in js
+    assert "function bindMapNodePopupActionDelegates()" in js
+    assert 'document.body.dataset.mapNodePopupActionsBound = "1";' in js
+    assert 'document.addEventListener("click", (clickEv) => {' in js
+    assert "handleMapNodePopupActionClick(clickEv);" in js
+    assert 'runBootStep("bindMapNodePopupActionDelegates", () => bindMapNodePopupActionDelegates());' in js
+    assert "handleMapNodePopupActionClick(clickEv, overlayNodeId, () => {" in js
+    assert 'data-map-node-action="${escAttr(cleanAction)}"' in js
+    assert 'mapNodePopupActionButtonHtml("Message", "message", actionNodeId)' in js
+    assert 'mapNodePopupActionButtonHtml("Trace", "trace", actionNodeId)' in js
+    assert 'mapNodePopupActionButtonHtml("Open details", "details", actionNodeId)' in js
+
+
+def test_dashboard_js_map_popup_actions_use_node_drawer_without_leaving_map() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    action_start = js.index("function runMapNodePopupAction(")
+    action_end = js.index("function handleMapNodePopupActionClick(", action_start)
+    action_block = js[action_start:action_end]
+
+    message_start = action_block.index('if (cleanAction === "message") {')
+    trace_start = action_block.index('if (cleanAction === "trace") {')
+    details_start = action_block.index('if (cleanAction === "details") {')
+    message_block = action_block[message_start:trace_start]
+    trace_block = action_block[trace_start:details_start]
+
+    assert 'applyLayoutView("network", true);' in message_block
+    assert 'setActiveNetworkSubview("map", { persist: true });' in message_block
+    assert 'selectNode(nodeId, true, false);' in message_block
+    assert 'setChatNodeDetailsDrawerTab("messages", { fetchHistory: false });' in message_block
+    assert 'tab: "messages",' in message_block
+    assert 'setChatNodeDetailsDrawerTab("chat"' not in message_block
+    assert 'applyLayoutView("chat", true);' not in message_block
+    assert "peerDmActivePeerId = nodeId;" not in message_block
+
+    assert 'applyLayoutView("network", true);' in trace_block
+    assert 'setActiveNetworkSubview("map", { persist: true });' in trace_block
+    assert 'selectNode(nodeId, true, false);' in trace_block
+    assert 'setChatNodeDetailsDrawerTab("telemetry", { fetchHistory: false });' in trace_block
+    assert 'tab: "telemetry",' in trace_block
+    assert 'void runChatNodeTelemetryTool("traceroute", nodeId);' in trace_block
+    assert "openNetworkRoutesLiveTrace(nodeId" not in trace_block
+    assert 'setActiveNetworkSubview("routes", { persist: true });' not in trace_block
+
+
 def test_dashboard_js_does_not_show_native_map_wheel_title_tooltip() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

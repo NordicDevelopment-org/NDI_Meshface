@@ -569,49 +569,42 @@
       if (!isSelectableNodeId(nodeId)) return false;
 
       if (cleanAction === "message") {{
-        selectNode(nodeId, false, false);
-        applyLayoutView("chat", true);
-        applyChatChannel("all", true);
-        peerDmActivePeerId = nodeId;
-        if (typeof setPeerDmMenuOpen === "function") {{
-          setPeerDmMenuOpen(false);
+        applyLayoutView("network", true);
+        if (typeof setActiveNetworkSubview === "function") {{
+          setActiveNetworkSubview("map", {{ persist: true }});
         }}
+        selectNode(nodeId, true, false);
         if (typeof setChatNodeDetailsDrawerTab === "function") {{
-          setChatNodeDetailsDrawerTab("chat", {{ fetchHistory: false }});
+          setChatNodeDetailsDrawerTab("messages", {{ fetchHistory: false }});
         }}
-        if (latestState) {{
-          renderChat(latestState);
-        }}
-        const chatInput = document.getElementById("chat-input");
-        if (chatInput instanceof HTMLInputElement) {{
-          window.requestAnimationFrame(() => {{
-            try {{
-              chatInput.focus({{ preventScroll: true }});
-            }} catch (_err) {{
-              chatInput.focus();
-            }}
-            const tail = chatInput.value.length;
-            try {{
-              chatInput.setSelectionRange(tail, tail);
-            }} catch (_err) {{
-            }}
+        if (typeof setChatNodeDetailsDrawerExpanded === "function") {{
+          setChatNodeDetailsDrawerExpanded(true, {{
+            tab: "messages",
+            fetchHistory: false,
+            rerender: false,
           }});
         }}
         return true;
       }}
 
       if (cleanAction === "trace") {{
-        selectNode(nodeId, false, false);
-        if (typeof openNetworkRoutesLiveTrace === "function") {{
-          openNetworkRoutesLiveTrace(nodeId, {{ autoRun: true }});
-          return true;
-        }}
         applyLayoutView("network", true);
         if (typeof setActiveNetworkSubview === "function") {{
-          setActiveNetworkSubview("routes", {{ persist: true }});
+          setActiveNetworkSubview("map", {{ persist: true }});
         }}
-        if (typeof runConsoleCommandLine === "function") {{
-          void runConsoleCommandLine(`traceroute ${{nodeId}}`);
+        selectNode(nodeId, true, false);
+        if (typeof setChatNodeDetailsDrawerTab === "function") {{
+          setChatNodeDetailsDrawerTab("telemetry", {{ fetchHistory: false }});
+        }}
+        if (typeof setChatNodeDetailsDrawerExpanded === "function") {{
+          setChatNodeDetailsDrawerExpanded(true, {{
+            tab: "telemetry",
+            fetchHistory: false,
+            rerender: false,
+          }});
+        }}
+        if (typeof runChatNodeTelemetryTool === "function") {{
+          void runChatNodeTelemetryTool("traceroute", nodeId);
         }}
         return true;
       }}
@@ -636,6 +629,35 @@
       }}
 
       return false;
+    }}
+
+    function handleMapNodePopupActionClick(clickEv, fallbackNodeId = "", closePopupFn = null) {{
+      const target = clickEv && clickEv.target;
+      if (!(target instanceof Element)) return false;
+      const actionBtn = target.closest("[data-map-node-action]");
+      if (!(actionBtn instanceof HTMLButtonElement)) return false;
+      const action = String(actionBtn.dataset.mapNodeAction || "").trim().toLowerCase();
+      const nodeId = normalizeNodeId(actionBtn.dataset.nodeId || fallbackNodeId || "");
+      if (!action || !nodeId) return false;
+      clickEv.preventDefault();
+      clickEv.stopPropagation();
+      const applied = runMapNodePopupAction(action, nodeId);
+      if (!applied) return false;
+      if (typeof closePopupFn === "function") {{
+        closePopupFn();
+      }} else if (typeof map !== "undefined" && map && typeof map.closePopup === "function") {{
+        map.closePopup();
+      }}
+      return true;
+    }}
+
+    function bindMapNodePopupActionDelegates() {{
+      if (typeof document === "undefined" || !document.body) return;
+      if (document.body.dataset.mapNodePopupActionsBound === "1") return;
+      document.body.dataset.mapNodePopupActionsBound = "1";
+      document.addEventListener("click", (clickEv) => {{
+        handleMapNodePopupActionClick(clickEv);
+      }});
     }}
 
     function buildMapNodeInfoHtml(node, options = null) {{
@@ -803,19 +825,9 @@
         if (!(infoCard instanceof HTMLElement) || infoCard.dataset.actionsBound === "1") return;
         infoCard.dataset.actionsBound = "1";
         infoCard.addEventListener("click", (clickEv) => {{
-          const target = clickEv.target;
-          if (!(target instanceof Element)) return;
-          const actionBtn = target.closest("[data-map-node-action]");
-          if (!(actionBtn instanceof HTMLButtonElement)) return;
-          const action = String(actionBtn.dataset.mapNodeAction || "").trim().toLowerCase();
-          const nodeId = normalizeNodeId(actionBtn.dataset.nodeId || overlayNodeId || "");
-          if (!action || !nodeId) return;
-          clickEv.preventDefault();
-          clickEv.stopPropagation();
-          const applied = runMapNodePopupAction(action, nodeId);
-          if (applied && typeof marker.closePopup === "function") {{
+          handleMapNodePopupActionClick(clickEv, overlayNodeId, () => {{
             marker.closePopup();
-          }}
+          }});
         }});
       }});
       marker.on("click", removeHoverTooltip);
