@@ -91,6 +91,10 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (clean === "route" || clean === "routes") return "routes";' in js
     assert '|| clean === "top10" || clean === "sensors") return clean;' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
+    assert 'function clearNetworkGraphDom()' in js
+    assert 'const leavingNetworkGraphSubview = !!(' in js
+    assert 'const leavingNetworkGraphLayout = !!(' in js
+    assert 'summary.__meshNetworkGraphSummaryHtml = "";' in js
     assert 'function normalizeNetworkRoutesMode(raw)' in js
     assert 'const select = document.getElementById("network-routes-mode-select");' in js
     assert 'networkRoutesModeDefs\n          .map((entry) => `<option value="${escAttr(entry.id)}">${escAttr(entry.label)}</option>`)' in js

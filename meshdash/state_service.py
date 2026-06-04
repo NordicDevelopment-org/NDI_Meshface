@@ -1084,6 +1084,7 @@ def build_dashboard_state_lite(
     elif profile_name == "network":
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
+        slim_recent_chat = []
     slim_history_caps = _slim_history_caps(
         state_payload.history_caps,
         nodes=slim_nodes,

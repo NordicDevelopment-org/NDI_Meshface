@@ -1,3 +1,5 @@
+import meshdash.state_service as state_service
+from meshdash.state_payload_contracts import DashboardStatePayload, StateTrafficPayload
 from meshdash.state_service import (
     _slim_edges_for_network,
     _slim_history_caps,
@@ -231,6 +233,58 @@ def test_slim_nodes_for_chat_keeps_meshtastic_favorite_flag() -> None:
             "is_favorite": True,
         }
     ]
+
+
+def test_lite_network_profile_omits_recent_chat_rows(monkeypatch) -> None:
+    payload = DashboardStatePayload(
+        generated_at="2026-06-03T00:00:00Z",
+        summary={},
+        summary_error=None,
+        my_info={},
+        my_info_error=None,
+        metadata={},
+        metadata_error=None,
+        local_state={},
+        local_state_error=None,
+        nodes_error=None,
+        tracker_error=None,
+        tracker_saved_counts_error=None,
+        tracker_capabilities_error=None,
+        nodes=[{"id": "!node-a", "short_name": "A", "long_name": "Alpha"}],
+        history_caps={},
+        nodes_full=[],
+        traffic=StateTrafficPayload(
+            edges=[{"from": "!node-a", "to": "!node-b", "count": 1}],
+            port_counts=[],
+            recent_packets=[],
+            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            node_packet_trends={},
+        ),
+        local_node_id="!local",
+    )
+
+    monkeypatch.setattr(
+        state_service,
+        "build_dashboard_state_typed",
+        lambda **_kwargs: payload,
+    )
+
+    state = state_service.build_dashboard_state_lite(
+        iface=object(),
+        tracker=object(),
+        started_at=0,
+        target="",
+        show_secrets=True,
+        storage_probe_path=None,
+        revision_info={},
+        sensitive_field_names=set(),
+        profile="network",
+    )
+
+    traffic = state["traffic"]
+    assert isinstance(traffic, dict)
+    assert traffic["recent_chat"] == []
+    assert traffic["edges"]
 
 
 def test_slim_edges_for_network_drops_duplicate_strings_and_counts() -> None:

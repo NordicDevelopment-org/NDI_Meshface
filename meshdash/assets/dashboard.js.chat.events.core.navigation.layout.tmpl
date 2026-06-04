@@ -5003,7 +5003,13 @@
 
     function setActiveNetworkSubview(subviewName, options = {{}}) {{
       const next = normalizeNetworkSubview(subviewName);
+      const previous = normalizeNetworkSubview(activeNetworkSubview);
       const persist = options && options.persist !== false;
+      const leavingNetworkGraphSubview = !!(
+        normalizeLayoutView(activeLayoutView) === "network"
+        && previous === "graph"
+        && next !== "graph"
+      );
       if (normalizeLayoutView(activeLayoutView) === "network" && next === "graph") {{
         networkGraphViewState.pendingEntryViewportSync = true;
       }} else {{
@@ -5037,6 +5043,9 @@
           : panelName === "map";
         panel.hidden = !isActive;
         panel.classList.toggle("is-active", isActive);
+      }}
+      if (leavingNetworkGraphSubview) {{
+        clearNetworkGraphDom();
       }}
 
       syncMapControlsDock(activeLayoutView, next);
@@ -5457,6 +5466,46 @@
       }}
       networkGraphViewState.emptyRetryTimer = null;
       networkGraphViewState.emptyRetryCount = 0;
+    }}
+
+    function clearNetworkGraphDom() {{
+      const svg = document.getElementById("network-graph-svg");
+      const summary = document.getElementById("network-graph-summary");
+      const legend = document.getElementById("network-graph-legend");
+      const empty = document.getElementById("network-graph-empty");
+      cancelNetworkGraphViewAnimation();
+      cancelNetworkGraphSceneAnimation();
+      clearNetworkGraphEmptyRetry();
+      if (networkGraphViewState.suppressClickTimer !== null) {{
+        clearTimeout(networkGraphViewState.suppressClickTimer);
+      }}
+      networkGraphViewState.suppressClick = false;
+      networkGraphViewState.suppressClickTimer = null;
+      if (svg instanceof SVGElement) {{
+        stopNetworkGraphPan(svg);
+        svg.innerHTML = "";
+      }}
+      if (summary instanceof HTMLElement) {{
+        summary.innerHTML = "";
+        summary.__meshNetworkGraphSummaryHtml = "";
+      }}
+      if (legend instanceof HTMLElement) {{
+        legend.innerHTML = "";
+        legend.hidden = true;
+      }}
+      if (empty instanceof HTMLElement) {{
+        empty.hidden = true;
+      }}
+      networkGraphViewState.lastRootId = "";
+      networkGraphViewState.lastSelectedId = "";
+      networkGraphViewState.lastSceneStructureSignature = "";
+      networkGraphViewState.renderedPositions = new Map();
+      networkGraphViewState.renderedLayoutSnapshot = null;
+      networkGraphViewState.pendingFocusTransition = null;
+      networkGraphViewState.pendingSelectedNodeCenterId = "";
+      networkGraphViewState.pendingEntryViewportSync = true;
+      networkGraphViewState.forceCenteredFitOnce = true;
+      networkGraphViewState.skipSceneAnimationOnce = true;
     }}
 
     function scheduleNetworkGraphEmptyRetry() {{
@@ -10784,12 +10833,20 @@
       const requestedSavedAlias = requested === "saved";
       const next = normalizeLayoutView(viewName);
       const previous = normalizeLayoutView(activeLayoutView);
+      const leavingNetworkGraphLayout = !!(
+        previous === "network"
+        && next !== "network"
+        && normalizeNetworkSubview(activeNetworkSubview) === "graph"
+      );
       if (next === "console") {{
         if (previous !== "console") {{
           consoleHotkeyReturnLayoutView = previous;
         }}
       }} else {{
         consoleHotkeyReturnLayoutView = next;
+      }}
+      if (leavingNetworkGraphLayout) {{
+        clearNetworkGraphDom();
       }}
       activeLayoutView = next;
       if (resolveTopbarLauncherLayoutView(next) === "apps") {{
