@@ -867,6 +867,14 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     text_section = css.rsplit("\n    .chat-feed-text {", 1)[1].split("}", 1)[0]
     dark_item_section = css.split('[data-theme="dark"] .card.chat .chat-feed-item {', 1)[1].split("}", 1)[0]
     monitor_item_section = css.split(".chat-feed.chat-feed-view-monitor .chat-feed-item {", 1)[1].split("}", 1)[0]
+    hop_reply_button_section = css.split("button.chat-hop-watermark-inline.chat-hop-reply-btn {", 1)[1].split("}", 1)[0]
+    hop_reply_hover_section = css.split("button.chat-hop-watermark-inline.chat-hop-reply-btn:hover {", 1)[1].split("}", 1)[0]
+    hop_reply_icon_section = css.split(".chat-hop-reply-icon {", 1)[1].split("}", 1)[0]
+    hop_reply_text_section = css.split(".chat-hop-reply-text {", 1)[1].split("}", 1)[0]
+    dark_hop_reply_button_section = css.split(
+        '[data-theme="dark"] .card.chat button.chat-hop-watermark-inline.chat-hop-reply-btn {',
+        1,
+    )[1].split("}", 1)[0]
     mobile_section = css.split("@media (max-width: 760px) {", 1)[1]
 
     assert "width: fit-content;" in item_section
@@ -912,9 +920,23 @@ def test_chat_feed_self_authored_messages_render_as_bubbles_without_inline_time(
     assert "font-size: 10px;" in css
     assert "font-weight: 700;" in css
     assert "font-variant-numeric: tabular-nums;" in css
+    assert "font-size: 10px;" in hop_reply_button_section
+    assert "line-height: 1.4;" in hop_reply_button_section
+    assert "font-weight: 400;" in hop_reply_button_section
+    assert "font-variant-numeric: normal;" in hop_reply_button_section
+    assert "color: #24533a;" in hop_reply_button_section
+    assert "opacity: 1;" in hop_reply_button_section
+    assert "font-weight: 400;" in hop_reply_icon_section
+    assert "font-size: 10px;" in hop_reply_text_section
+    assert "line-height: 1.4;" in hop_reply_text_section
+    assert "font-weight: 600;" in hop_reply_text_section
+    assert "font-variant-numeric: normal;" in hop_reply_text_section
+    assert "text-decoration:" not in hop_reply_hover_section
     assert "opacity: 0.58;" in css
     assert '[data-theme="dark"] .card.chat .chat-hop-watermark-inline {' in css
     assert "opacity: 0.52;" in css
+    assert "color: #90a79b;" in dark_hop_reply_button_section
+    assert "opacity: 1;" in dark_hop_reply_button_section
     assert "border: 1px solid var(--chat-feed-node-outline);" in dark_item_section
     assert "border-radius: 16px 16px 16px 6px;" in dark_item_section
     assert "width: 100%;" in monitor_item_section
