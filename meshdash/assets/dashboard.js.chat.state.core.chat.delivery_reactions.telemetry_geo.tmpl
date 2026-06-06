@@ -153,7 +153,9 @@
           ?? packet.message_id
         );
         if (packetId) {{
-          packetSummaryById.set(String(packetId), entry);
+          for (const packetIdKey of messageIdAliasKeys(packetId)) {{
+            packetSummaryById.set(packetIdKey, entry);
+          }}
         }}
 
         const portnum = String(summary.portnum ?? decoded.portnum ?? "").trim().toUpperCase();

@@ -995,6 +995,12 @@ def test_chat_reply_preview_links_jump_to_original_packet() -> None:
     assert "function focusChatFeedItemByMessageId(messageIdRaw)" in js
     assert "await loadOlderChatMessagesForCurrentView();" in js
     assert "void jumpToOriginalChatMessage(targetId);" in js
+    assert "function messageIdAliasKeys(value) {" in js
+    assert "if (truncated < 0 && truncated >= -2147483648)" in js
+    assert "const signedId = unsignedId > 0x7fffffff ? unsignedId - 0x100000000 : unsignedId;" in js
+    assert "for (const msgIdKey of messageIdAliasKeys(msgId)) {" in js
+    assert "for (const packetIdKey of messageIdAliasKeys(packetId)) {" in js
+    assert 'replyInlineText = "Reply context unavailable.";' in js
 
 
 def test_chat_reply_preview_uses_reaction_emoji_for_empty_parent_text() -> None:

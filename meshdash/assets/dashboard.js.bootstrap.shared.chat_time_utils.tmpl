@@ -75,9 +75,28 @@
     }}
 
     function parsePositiveMessageId(value) {{
+      if (value == null || (typeof value === "string" && !value.trim())) return null;
       const num = Number(value);
-      if (!Number.isFinite(num) || num <= 0) return null;
-      return Math.trunc(num);
+      if (!Number.isFinite(num)) return null;
+      const truncated = Math.trunc(num);
+      if (truncated > 0) return truncated;
+      if (truncated < 0 && truncated >= -2147483648) {{
+        return truncated >>> 0;
+      }}
+      return null;
+    }}
+
+    function messageIdAliasKeys(value) {{
+      const messageId = parsePositiveMessageId(value);
+      if (!messageId) return [];
+      const keys = new Set([String(messageId)]);
+      if (Number.isInteger(messageId) && messageId >= 0 && messageId <= 0xffffffff) {{
+        const unsignedId = messageId >>> 0;
+        keys.add(String(unsignedId));
+        const signedId = unsignedId > 0x7fffffff ? unsignedId - 0x100000000 : unsignedId;
+        keys.add(String(signedId));
+      }}
+      return Array.from(keys);
     }}
 
     function optionalFiniteNumber(value) {{

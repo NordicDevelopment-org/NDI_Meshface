@@ -223,7 +223,7 @@ def test_dashboard_js_wires_network_top_nodes_fetch_and_render() -> None:
     assert 'function syncNetworkTopNodesPrimaryControls(viewName = activeLayoutView, subviewName = activeNetworkSubview)' in js
     assert 'const controlsHost = document.getElementById("network-top-nodes-primary-controls");' in js
     assert "/api/history/top_nodes?category=" in js
-    assert 'if (normalizedView === "network" && next === "top10") {' in js
+    assert 'if (renderSubview && normalizedView === "network" && next === "top10") {' in js
 
 
 def test_dashboard_css_keeps_top_node_bar_below_row_text() -> None:

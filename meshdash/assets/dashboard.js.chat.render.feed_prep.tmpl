@@ -333,7 +333,9 @@
             // Keep an index entry for every message id, including reactions.
             // Replies can target reaction packets; without this, context depends
             // on recent_packets retention and may appear missing across nodes.
-            messageIndexLocal.set(String(msgId), msg);
+            for (const msgIdKey of messageIdAliasKeys(msgId)) {{
+              messageIndexLocal.set(msgIdKey, msg);
+            }}
           }}
           if (isReactionMessage(msg)) {{
             const replyId = replyIdOf(msg);
