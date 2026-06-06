@@ -32,6 +32,12 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
         return {"state_revision": tracker.state_revision, "profile": "chat"}
 
     setattr(build_state_fn, "lite_chat", build_lite_chat_fn)
+
+    def build_lite_status_fn(**_kwargs):
+        calls.append("lite_status")
+        return {"state_revision": tracker.state_revision, "profile": "status"}
+
+    setattr(build_state_fn, "lite_status", build_lite_status_fn)
     state_fn = build_state_snapshot_loader_with_dependencies(
         dependencies=StateSnapshotRuntimeDependencies(
             iface=object(),
@@ -65,6 +71,11 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
 
     assert lite_chat_fn() == {"state_revision": 2, "profile": "chat"}
     assert calls == ["full", "full", "lite_chat", "lite_chat"]
+
+    lite_status_fn = state_fn.lite_status  # type: ignore[attr-defined]
+    assert lite_status_fn() == {"state_revision": 2, "profile": "status"}
+    assert lite_status_fn() == {"state_revision": 2, "profile": "status"}
+    assert calls == ["full", "full", "lite_chat", "lite_chat", "lite_status"]
 
 
 def test_record_local_chat_bumps_tracker_state_revision() -> None:

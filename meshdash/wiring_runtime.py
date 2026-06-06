@@ -131,6 +131,8 @@ def build_dashboard_runtime_dependencies(
     build_state_lite_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_chat_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_network_fn: BuildStateWithSensitiveFn | None = None,
+    build_state_lite_status_fn: BuildStateWithSensitiveFn | None = None,
+    build_state_lite_console_fn: BuildStateWithSensitiveFn | None = None,
     sensitive_field_names: set[str],
     build_node_history_loader_fn: BuildNodeHistoryLoaderFn,
     build_online_activity_loader_fn: BuildOnlineActivityLoaderFn,
@@ -178,6 +180,24 @@ def build_dashboard_runtime_dependencies(
         )
         try:
             setattr(build_state_with_sensitive_fields, "lite_network", build_state_lite_network_with_sensitive_fields)
+        except Exception:
+            pass
+    if build_state_lite_status_fn is not None:
+        build_state_lite_status_with_sensitive_fields = _build_state_builder(
+            build_state_fn=build_state_lite_status_fn,
+            sensitive_field_names=sensitive_field_names,
+        )
+        try:
+            setattr(build_state_with_sensitive_fields, "lite_status", build_state_lite_status_with_sensitive_fields)
+        except Exception:
+            pass
+    if build_state_lite_console_fn is not None:
+        build_state_lite_console_with_sensitive_fields = _build_state_builder(
+            build_state_fn=build_state_lite_console_fn,
+            sensitive_field_names=sensitive_field_names,
+        )
+        try:
+            setattr(build_state_with_sensitive_fields, "lite_console", build_state_lite_console_with_sensitive_fields)
         except Exception:
             pass
     make_http_handler = _build_http_handler_factory(

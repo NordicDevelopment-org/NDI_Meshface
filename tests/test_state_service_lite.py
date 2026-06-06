@@ -287,6 +287,132 @@ def test_lite_network_profile_omits_recent_chat_rows(monkeypatch) -> None:
     assert traffic["edges"]
 
 
+def test_lite_status_profile_omits_live_traffic_rows(monkeypatch) -> None:
+    payload = DashboardStatePayload(
+        generated_at="2026-06-03T00:00:00Z",
+        summary={},
+        summary_error=None,
+        my_info={},
+        my_info_error=None,
+        metadata={},
+        metadata_error=None,
+        local_state={},
+        local_state_error=None,
+        nodes_error=None,
+        tracker_error=None,
+        tracker_saved_counts_error=None,
+        tracker_capabilities_error=None,
+        nodes=[{"id": "!node-a", "short_name": "A", "long_name": "Alpha", "last_heard": "drop"}],
+        history_caps={
+            "!node-a": {
+                "last_seen_unix": 10,
+                "last_seen": "2026-06-03 00:00:10Z",
+                "last_short_name": "A",
+            }
+        },
+        nodes_full=[],
+        traffic=StateTrafficPayload(
+            edges=[{"from": "!node-a", "to": "!node-b", "count": 1}],
+            port_counts=[{"portnum": "TEXT_MESSAGE_APP", "count": 2}],
+            recent_packets=[{"summary": {"packet_id": 1, "from": "!node-a", "to": "^all"}}],
+            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            node_packet_trends={"!node-a": {"recent": 2}},
+        ),
+        local_node_id="!local",
+    )
+
+    monkeypatch.setattr(
+        state_service,
+        "build_dashboard_state_typed",
+        lambda **_kwargs: payload,
+    )
+
+    state = state_service.build_dashboard_state_lite(
+        iface=object(),
+        tracker=object(),
+        started_at=0,
+        target="",
+        show_secrets=True,
+        storage_probe_path=None,
+        revision_info={},
+        sensitive_field_names=set(),
+        profile="status",
+    )
+
+    traffic = state["traffic"]
+    assert isinstance(traffic, dict)
+    assert traffic["recent_chat"] == []
+    assert traffic["recent_packets"] == []
+    assert traffic["edges"] == []
+    assert traffic["port_counts"] == []
+    assert traffic["node_packet_trends"] == {}
+    assert state["nodes"] == [{"id": "!node-a", "short_name": "A", "long_name": "Alpha"}]
+    assert state["history_caps"]["!node-a"]["last_seen_unix"] == 10
+    assert "last_seen" not in state["history_caps"]["!node-a"]
+
+
+def test_lite_console_profile_keeps_packet_feed_without_chat_or_edges(monkeypatch) -> None:
+    payload = DashboardStatePayload(
+        generated_at="2026-06-03T00:00:00Z",
+        summary={},
+        summary_error=None,
+        my_info={},
+        my_info_error=None,
+        metadata={},
+        metadata_error=None,
+        local_state={},
+        local_state_error=None,
+        nodes_error=None,
+        tracker_error=None,
+        tracker_saved_counts_error=None,
+        tracker_capabilities_error=None,
+        nodes=[{"id": "!node-a", "short_name": "A", "long_name": "Alpha"}],
+        history_caps={},
+        nodes_full=[],
+        traffic=StateTrafficPayload(
+            edges=[{"from": "!node-a", "to": "!node-b", "count": 1}],
+            port_counts=[{"portnum": "TEXT_MESSAGE_APP", "count": 2}],
+            recent_packets=[
+                {
+                    "summary": {"packet_id": 1, "from": "!node-a", "to": "^all"},
+                    "packet": {"id": 1, "raw": {"drop": True}},
+                }
+            ],
+            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            node_packet_trends={"!node-a": {"recent": 2}},
+        ),
+        local_node_id="!local",
+    )
+
+    monkeypatch.setattr(
+        state_service,
+        "build_dashboard_state_typed",
+        lambda **_kwargs: payload,
+    )
+
+    state = state_service.build_dashboard_state_lite(
+        iface=object(),
+        tracker=object(),
+        started_at=0,
+        target="",
+        show_secrets=True,
+        storage_probe_path=None,
+        revision_info={},
+        sensitive_field_names=set(),
+        profile="console",
+    )
+
+    traffic = state["traffic"]
+    assert isinstance(traffic, dict)
+    assert traffic["recent_chat"] == []
+    assert traffic["edges"] == []
+    assert traffic["port_counts"] == []
+    assert traffic["node_packet_trends"] == {}
+    assert len(traffic["recent_packets"]) == 1
+    assert traffic["recent_packets"][0]["packet"]["id"] == 1
+    assert "raw" not in traffic["recent_packets"][0]["packet"]
+
+
 def test_slim_edges_for_network_drops_duplicate_strings_and_counts() -> None:
     slimmed = _slim_edges_for_network(
         [

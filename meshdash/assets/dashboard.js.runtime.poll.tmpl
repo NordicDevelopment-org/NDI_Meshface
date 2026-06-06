@@ -58,6 +58,12 @@
       if (activeLayoutView === "network") {{
         return "network";
       }}
+      if (activeLayoutView === "settings") {{
+        return "status";
+      }}
+      if (activeLayoutView === "console") {{
+        return consoleLiveModeActive ? "console" : "status";
+      }}
       return "default";
     }}
 
@@ -68,7 +74,11 @@
           ? "/api/state?lite=1&profile=chat"
           : (pollProfile === "network"
             ? "/api/state?lite=1&profile=network"
-            : "/api/state?lite=1");
+            : (pollProfile === "status"
+              ? "/api/state?lite=1&profile=status"
+              : (pollProfile === "console"
+                ? "/api/state?lite=1&profile=console"
+                : "/api/state?lite=1")));
         const stateUrl = forceStateReloadOnce
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;

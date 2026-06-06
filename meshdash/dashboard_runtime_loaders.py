@@ -152,6 +152,32 @@ def _with_summary_persistence(
         except Exception:
             pass
 
+    lite_status_fn = getattr(base_state_fn, "lite_status", None)
+    if callable(lite_status_fn):
+        def _wrapped_state_lite_status_fn() -> object:
+            payload = lite_status_fn()
+            _persist_summary(payload)
+            return payload
+
+        _copy_state_fn_attrs(_wrapped_state_lite_status_fn, lite_status_fn)
+        try:
+            setattr(_wrapped_state_fn, "lite_status", _wrapped_state_lite_status_fn)
+        except Exception:
+            pass
+
+    lite_console_fn = getattr(base_state_fn, "lite_console", None)
+    if callable(lite_console_fn):
+        def _wrapped_state_lite_console_fn() -> object:
+            payload = lite_console_fn()
+            _persist_summary(payload)
+            return payload
+
+        _copy_state_fn_attrs(_wrapped_state_lite_console_fn, lite_console_fn)
+        try:
+            setattr(_wrapped_state_fn, "lite_console", _wrapped_state_lite_console_fn)
+        except Exception:
+            pass
+
     return _wrapped_state_fn
 
 

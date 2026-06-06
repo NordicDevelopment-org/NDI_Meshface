@@ -223,6 +223,78 @@ def build_state_snapshot_loader_with_dependencies(
         except Exception:
             pass
 
+    build_state_lite_status = getattr(build_state_fn, "lite_status", None)
+    if callable(build_state_lite_status):
+        lite_status_cache_key: tuple[int, int, int, int] | None = None
+        lite_status_cache_payload: dict[str, object] | None = None
+
+        def state_fn_lite_status() -> dict:
+            nonlocal lite_status_cache_key, lite_status_cache_payload
+            key = _cache_key()
+            if lite_status_cache_payload is not None and lite_status_cache_key == key:
+                return lite_status_cache_payload
+            payload = build_state_lite_status(
+                iface=dependencies.iface,
+                tracker=dependencies.tracker,
+                started_at=dependencies.started_at,
+                target=dependencies.target,
+                show_secrets=dependencies.show_secrets,
+                storage_probe_path=dependencies.storage_probe_path,
+                revision_info=dependencies.revision_info,
+            )
+            lite_status_cache_key = key
+            lite_status_cache_payload = payload
+            return payload
+
+        def state_fn_lite_status_etag() -> str:
+            return _etag_for("lite-status")
+
+        try:
+            setattr(state_fn_lite_status, "etag", state_fn_lite_status_etag)
+        except Exception:
+            pass
+
+        try:
+            setattr(state_fn, "lite_status", state_fn_lite_status)
+        except Exception:
+            pass
+
+    build_state_lite_console = getattr(build_state_fn, "lite_console", None)
+    if callable(build_state_lite_console):
+        lite_console_cache_key: tuple[int, int, int, int] | None = None
+        lite_console_cache_payload: dict[str, object] | None = None
+
+        def state_fn_lite_console() -> dict:
+            nonlocal lite_console_cache_key, lite_console_cache_payload
+            key = _cache_key()
+            if lite_console_cache_payload is not None and lite_console_cache_key == key:
+                return lite_console_cache_payload
+            payload = build_state_lite_console(
+                iface=dependencies.iface,
+                tracker=dependencies.tracker,
+                started_at=dependencies.started_at,
+                target=dependencies.target,
+                show_secrets=dependencies.show_secrets,
+                storage_probe_path=dependencies.storage_probe_path,
+                revision_info=dependencies.revision_info,
+            )
+            lite_console_cache_key = key
+            lite_console_cache_payload = payload
+            return payload
+
+        def state_fn_lite_console_etag() -> str:
+            return _etag_for("lite-console")
+
+        try:
+            setattr(state_fn_lite_console, "etag", state_fn_lite_console_etag)
+        except Exception:
+            pass
+
+        try:
+            setattr(state_fn, "lite_console", state_fn_lite_console)
+        except Exception:
+            pass
+
     # Optional raw/debug getters used by the Data view.
     sensitive_field_names = getattr(build_state_fn, "_sensitive_field_names", set())
     if not isinstance(sensitive_field_names, set):

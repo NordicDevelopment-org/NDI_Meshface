@@ -144,6 +144,22 @@ def handle_state_get(
                 state_lite_fn = getattr(state_fn, "lite", None)
                 if callable(state_lite_fn):
                     selected_fn = state_lite_fn
+        elif profile == "status":
+            state_lite_status_fn = getattr(state_fn, "lite_status", None)
+            if callable(state_lite_status_fn):
+                selected_fn = state_lite_status_fn
+            else:
+                state_lite_fn = getattr(state_fn, "lite", None)
+                if callable(state_lite_fn):
+                    selected_fn = state_lite_fn
+        elif profile == "console":
+            state_lite_console_fn = getattr(state_fn, "lite_console", None)
+            if callable(state_lite_console_fn):
+                selected_fn = state_lite_console_fn
+            else:
+                state_lite_fn = getattr(state_fn, "lite", None)
+                if callable(state_lite_fn):
+                    selected_fn = state_lite_fn
         else:
             state_lite_fn = getattr(state_fn, "lite", None)
             if callable(state_lite_fn):

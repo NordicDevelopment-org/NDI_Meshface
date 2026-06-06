@@ -592,8 +592,17 @@ def _slim_packet_summary(summary: object) -> dict[str, object]:
     return slim
 
 
-def _slim_recent_packets(recent_packets: list[dict[str, object]]) -> list[dict[str, object]]:
-    max_packets = 120
+def _slim_recent_packets(
+    recent_packets: list[dict[str, object]],
+    *,
+    max_packets: int = 120,
+) -> list[dict[str, object]]:
+    try:
+        max_packets = max(0, int(max_packets))
+    except Exception:
+        max_packets = 120
+    if max_packets <= 0:
+        return []
     slimmed: list[dict[str, object]] = []
     # The tracker buffer is chronological; lite state needs the newest packet
     # frames so protocol side channels such as file-transfer/BBS snapshots can
@@ -1073,10 +1082,16 @@ def build_dashboard_state_lite(
         include_debug=False,
         include_nodes_full=False,
     )
-    slim_recent_packets = _slim_recent_packets(state_payload.traffic.recent_packets)
+    profile_name = str(profile or "").strip().lower()
+    slim_recent_packet_limit = 0 if profile_name == "status" else 120
+    slim_recent_packets = _slim_recent_packets(
+        state_payload.traffic.recent_packets,
+        max_packets=slim_recent_packet_limit,
+    )
     slim_recent_chat = list(state_payload.traffic.recent_chat)
     slim_edges = list(state_payload.traffic.edges)
-    profile_name = str(profile or "").strip().lower()
+    slim_port_counts = list(state_payload.traffic.port_counts)
+    slim_node_packet_trends = state_payload.traffic.node_packet_trends
     slim_nodes = state_payload.nodes
     if profile_name == "chat":
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
@@ -1085,6 +1100,12 @@ def build_dashboard_state_lite(
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
         slim_recent_chat = []
+    elif profile_name in {"status", "console"}:
+        slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
+        slim_edges = []
+        slim_recent_chat = []
+        slim_port_counts = []
+        slim_node_packet_trends = {}
     slim_history_caps = _slim_history_caps(
         state_payload.history_caps,
         nodes=slim_nodes,
@@ -1092,14 +1113,14 @@ def build_dashboard_state_lite(
         recent_packets=slim_recent_packets,
         edges=slim_edges,
         local_node_id=state_payload.local_node_id,
-        include_text_times=profile_name not in {"chat", "network"},
+        include_text_times=profile_name not in {"chat", "network", "status", "console"},
     )
     slim_traffic = StateTrafficPayload(
         edges=slim_edges,
-        port_counts=state_payload.traffic.port_counts,
+        port_counts=slim_port_counts,
         recent_packets=slim_recent_packets,
         recent_chat=slim_recent_chat,
-        node_packet_trends=state_payload.traffic.node_packet_trends,
+        node_packet_trends=slim_node_packet_trends,
     )
     state = DashboardStatePayload(
         generated_at=state_payload.generated_at,
