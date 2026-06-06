@@ -108,6 +108,12 @@ def test_dashboard_js_fetches_filtered_sensor_series_from_server() -> None:
 
     assert "const envMetricsCatalogCache = new Map();" in js
     assert "const envMetricsSeriesCache = new Map();" in js
+    assert "const envMetricsCatalogInflight = new Map();" in js
+    assert "const envMetricsSeriesInflight = new Map();" in js
+    assert "envMetricsCatalogInflight.has(catalogCacheKey)" in js
+    assert "envMetricsSeriesInflight.has(seriesCacheKey)" in js
+    assert "envMetricsViewState.lastSnapshotRenderSignature === renderSignature" in js
+    assert "snapshotSkipped: !!(snapshotResult && snapshotResult.skipped)" in js
     assert 'params.set("metric", cleanMetric);' in js
     assert 'params.set("node_id", cleanNodeId);' in js
     assert 'metricSelect.addEventListener("change", () => {' in js

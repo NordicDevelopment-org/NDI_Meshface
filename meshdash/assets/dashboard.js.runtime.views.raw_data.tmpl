@@ -24,10 +24,17 @@
       cutoffUnix: 0,
       hiddenLegendNodeIds: new Set(),
       legendScopeKey: "",
+      catalogVersion: 0,
+      seriesVersion: 0,
+      lastCatalogPayload: null,
+      lastSeriesPayload: null,
+      lastSnapshotRenderSignature: "",
     }};
 
     const envMetricsCatalogCache = new Map();
     const envMetricsSeriesCache = new Map();
+    const envMetricsCatalogInflight = new Map();
+    const envMetricsSeriesInflight = new Map();
     const envMetricColorPalette = [
       "#2f855a",
       "#2b6cb0",
@@ -96,6 +103,83 @@
       return num.toFixed(decimals);
     }}
 
+    function environmentMetricsNowMs() {{
+      return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+    }}
+
+    function roundEnvironmentMetricsMs(value) {{
+      const ms = Number(value);
+      return Number.isFinite(ms) ? Math.round(Math.max(0, ms) * 100) / 100 : 0;
+    }}
+
+    function environmentMetricsPerfEnabled() {{
+      return !!(typeof window !== "undefined" && window.__meshDashboardGuiBenchmarkActive === true);
+    }}
+
+    function startEnvironmentMetricsRenderPerf(forceRefresh = false) {{
+      if (!environmentMetricsPerfEnabled()) return null;
+      const startedAtMs = environmentMetricsNowMs();
+      return {{
+        status: "running",
+        forceRefresh: !!forceRefresh,
+        startedAtMs,
+        totalMs: 0,
+        points: 0,
+        metrics: 0,
+        nodes: 0,
+        selectedMetric: "",
+        selectedNodeId: "",
+        windowHours: 0,
+        snapshotSkipped: false,
+        phases: [],
+      }};
+    }}
+
+    function markEnvironmentMetricsRenderPerf(run, name, extra = null) {{
+      if (!run) return;
+      const nowMs = environmentMetricsNowMs();
+      const phases = Array.isArray(run.phases) ? run.phases : [];
+      const previous = phases.length
+        ? Number(phases[phases.length - 1].atMs) || 0
+        : 0;
+      const atMs = roundEnvironmentMetricsMs(nowMs - (Number(run.startedAtMs) || nowMs));
+      const phase = {{
+        name: String(name || "phase"),
+        atMs,
+        deltaMs: roundEnvironmentMetricsMs(atMs - previous),
+      }};
+      if (extra && typeof extra === "object") {{
+        Object.assign(phase, extra);
+      }}
+      phases.push(phase);
+      run.phases = phases;
+    }}
+
+    function finishEnvironmentMetricsRenderPerf(run, status, extra = null) {{
+      if (!run) return;
+      run.status = String(status || "complete");
+      run.totalMs = roundEnvironmentMetricsMs(environmentMetricsNowMs() - (Number(run.startedAtMs) || environmentMetricsNowMs()));
+      if (extra && typeof extra === "object") {{
+        Object.assign(run, extra);
+      }}
+      delete run.startedAtMs;
+      if (typeof window !== "undefined") {{
+        const store = window.__meshEnvironmentMetricsRenderStats && typeof window.__meshEnvironmentMetricsRenderStats === "object"
+          ? window.__meshEnvironmentMetricsRenderStats
+          : {{ runs: [] }};
+        const runs = Array.isArray(store.runs) ? store.runs : [];
+        runs.push(run);
+        if (runs.length > 80) {{
+          runs.splice(0, runs.length - 80);
+        }}
+        store.runs = runs;
+        store.last = run;
+        window.__meshEnvironmentMetricsRenderStats = store;
+      }}
+    }}
+
     function normalizeEnvHistoryHours(raw) {{
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) return 72;
@@ -115,8 +199,38 @@
     function setEnvironmentMetricsStatus(text, kind = "info") {{
       const status = document.getElementById("env-metrics-status");
       if (!(status instanceof HTMLElement)) return;
-      status.textContent = String(text == null ? "" : text).trim() || "n/a";
-      status.dataset.kind = String(kind || "info");
+      const nextText = String(text == null ? "" : text).trim() || "n/a";
+      const nextKind = String(kind || "info");
+      if (status.textContent !== nextText) {{
+        status.textContent = nextText;
+      }}
+      if (status.dataset.kind !== nextKind) {{
+        status.dataset.kind = nextKind;
+      }}
+    }}
+
+    function environmentMetricsCatalogTtlMs() {{
+      return Math.max(refreshMs * 2, 8000);
+    }}
+
+    function environmentMetricsSeriesTtlMs() {{
+      return Math.max(refreshMs * 2, 6000);
+    }}
+
+    function environmentMetricsCacheEntryFresh(entry, ttlMs, nowMs = Date.now()) {{
+      return !!(
+        entry
+        && entry.data
+        && (nowMs - (Number(entry.fetchedAt) || 0)) < Math.max(0, Number(ttlMs) || 0)
+      );
+    }}
+
+    function environmentMetricsSeriesCacheKey(windowHours, metricKey, nodeId) {{
+      return [
+        String(normalizeEnvHistoryHours(windowHours)),
+        normalizeEnvMetricKey(metricKey || ""),
+        normalizeNodeId(nodeId || ""),
+      ].join("|");
     }}
 
     function syncEnvironmentWindowPicker() {{
@@ -1198,7 +1312,36 @@
       }};
     }}
 
-    function renderEnvironmentMetricsSnapshot() {{
+    function buildEnvironmentMetricsSnapshotRenderSignature(
+      windowHours,
+      selectedMetric,
+      selectedNodeId,
+      hiddenNodeIds,
+      dockedInNetwork,
+    ) {{
+      const hiddenKey = Array.from(hiddenNodeIds instanceof Set ? hiddenNodeIds : new Set())
+        .map((nodeId) => normalizeNodeId(nodeId))
+        .filter(Boolean)
+        .sort()
+        .join(",");
+      return [
+        String(normalizeEnvHistoryHours(windowHours)),
+        normalizeEnvMetricKey(selectedMetric || ""),
+        normalizeNodeId(selectedNodeId || ""),
+        String(Math.max(0, Math.trunc(Number(envMetricsViewState.catalogVersion) || 0))),
+        String(Math.max(0, Math.trunc(Number(envMetricsViewState.seriesVersion) || 0))),
+        String(envMetricsViewState.source || ""),
+        String(Math.max(0, Math.trunc(Number(envMetricsViewState.scannedPackets) || 0))),
+        String(Math.max(0, Math.trunc(Number(envMetricsViewState.cutoffUnix) || 0))),
+        Number(envMetricsChartState.zoomStart).toFixed(6),
+        Number(envMetricsChartState.zoomEnd).toFixed(6),
+        hiddenKey,
+        dockedInNetwork ? "network" : "home",
+      ].join("|");
+    }}
+
+    function renderEnvironmentMetricsSnapshot(options = null) {{
+      const forceRender = !!(options && options.force);
       const points = Array.isArray(envMetricsViewState.points) ? envMetricsViewState.points : [];
       const metrics = Array.isArray(envMetricsViewState.metrics) ? envMetricsViewState.metrics : [];
       const nodes = resolveEnvironmentNodeOptions(envMetricsViewState.nodes, points);
@@ -1210,6 +1353,27 @@
       const filteredPoints = filterEnvironmentMetricPoints(points, selectedMetric, selectedNodeId);
       const selectionScopeKey = buildEnvironmentMetricsSelectionScopeKey(metricMeta, nodeMeta);
       const hiddenNodeIds = syncEnvironmentLegendScope(selectionScopeKey);
+      const chartSvg = document.getElementById("env-metrics-chart");
+      const dockedInNetwork = !!(chartSvg instanceof SVGElement && chartSvg.closest(".network-sensors-panel"));
+      const renderSignature = buildEnvironmentMetricsSnapshotRenderSignature(
+        windowHours,
+        selectedMetric,
+        selectedNodeId,
+        hiddenNodeIds,
+        dockedInNetwork,
+      );
+      if (!forceRender && renderSignature && envMetricsViewState.lastSnapshotRenderSignature === renderSignature) {{
+        return {{
+          skipped: true,
+          points: filteredPoints.length,
+          metrics: metrics.length,
+          nodes: nodes.length,
+          selectedMetric,
+          selectedNodeId,
+          windowHours,
+        }};
+      }}
+      envMetricsViewState.lastSnapshotRenderSignature = renderSignature;
       const chartMeta = renderEnvironmentMetricsChart(filteredPoints, metricMeta, nodeMeta, hiddenNodeIds);
       const activeLegendNodeIds = new Set(
         (Array.isArray(chartMeta && chartMeta.legendItems) ? chartMeta.legendItems : [])
@@ -1222,11 +1386,27 @@
 
       if (!metrics.length || !nodes.length) {{
         setEnvironmentMetricsStatus("No historical sensor telemetry has been saved yet.", "warn");
-        return;
+        return {{
+          skipped: false,
+          points: filteredPoints.length,
+          metrics: metrics.length,
+          nodes: nodes.length,
+          selectedMetric,
+          selectedNodeId,
+          windowHours,
+        }};
       }}
       if (!metricMeta) {{
         setEnvironmentMetricsStatus("Metric list loaded, but no metric is currently selected.", "warn");
-        return;
+        return {{
+          skipped: false,
+          points: filteredPoints.length,
+          metrics: metrics.length,
+          nodes: nodes.length,
+          selectedMetric,
+          selectedNodeId,
+          windowHours,
+        }};
       }}
       const nodeSummary = nodeMeta
         ? `${{nodeMeta.label || nodeMeta.id}} (${{nodeMeta.id}})`
@@ -1238,10 +1418,23 @@
         `Window ${{windowHours}}h • Metric: ${{metricMeta.label}} • Scope: ${{nodeSummary}} • Points: ${{renderedCount}} • ${{scannedLabel}}: ${{Math.max(0, Math.trunc(Number(envMetricsViewState.scannedPackets) || 0))}}`,
         filteredPoints.length ? "info" : "warn",
       );
+      return {{
+        skipped: false,
+        points: filteredPoints.length,
+        metrics: metrics.length,
+        nodes: nodes.length,
+        selectedMetric,
+        selectedNodeId,
+        windowHours,
+      }};
     }}
 
     function applyEnvironmentMetricsCatalogPayload(payload) {{
       const data = (payload && typeof payload === "object") ? payload : {{}};
+      if (envMetricsViewState.lastCatalogPayload !== data) {{
+        envMetricsViewState.lastCatalogPayload = data;
+        envMetricsViewState.catalogVersion = Math.max(0, Math.trunc(Number(envMetricsViewState.catalogVersion) || 0)) + 1;
+      }}
       envMetricsViewState.metrics = Array.isArray(data.metrics) ? data.metrics : [];
       envMetricsViewState.nodes = Array.isArray(data.nodes) ? data.nodes : [];
       envMetricsViewState.selectedWindowHours = normalizeEnvHistoryHours(data.window_hours || envMetricsViewState.selectedWindowHours);
@@ -1254,6 +1447,10 @@
 
     function applyEnvironmentMetricsSeriesPayload(payload) {{
       const data = (payload && typeof payload === "object") ? payload : {{}};
+      if (envMetricsViewState.lastSeriesPayload !== data) {{
+        envMetricsViewState.lastSeriesPayload = data;
+        envMetricsViewState.seriesVersion = Math.max(0, Math.trunc(Number(envMetricsViewState.seriesVersion) || 0)) + 1;
+      }}
       envMetricsViewState.points = Array.isArray(data.points) ? data.points : [];
       envMetricsViewState.source = String(data.source || "");
       envMetricsViewState.scannedPackets = Math.max(0, Math.trunc(Number(data.scanned_packets) || 0));
@@ -1266,39 +1463,58 @@
       const cacheKey = String(cleanHours);
       const nowMs = Date.now();
       const cached = envMetricsCatalogCache.get(cacheKey);
-      const ttlMs = Math.max(refreshMs * 2, 8000);
-      if (!forceRefresh && cached && cached.data && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
+      const ttlMs = environmentMetricsCatalogTtlMs();
+      if (!forceRefresh && environmentMetricsCacheEntryFresh(cached, ttlMs, nowMs)) {{
         return cached.data;
+      }}
+      const inflight = envMetricsCatalogInflight.get(cacheKey);
+      if (!forceRefresh && inflight) {{
+        return inflight;
       }}
       const params = new URLSearchParams();
       params.set("hours", String(cleanHours));
       params.set("limit", "25000");
-      const resp = await fetch(`/api/history/environment?${{params.toString()}}`, {{ cache: "no-store" }});
-      if (!resp.ok) throw new Error(`sensor history API ${{resp.status}}`);
-      const payload = await resp.json();
-      if (!payload || typeof payload !== "object") {{
-        throw new Error("sensor history returned an invalid payload");
+      const request = fetch(`/api/history/environment?${{params.toString()}}`, {{ cache: "no-store" }})
+        .then(async (resp) => {{
+          if (!resp.ok) throw new Error(`sensor history API ${{resp.status}}`);
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {{
+            throw new Error("sensor history returned an invalid payload");
+          }}
+          if (payload.ok === false) {{
+            throw new Error(String(payload.error || "sensor history unavailable"));
+          }}
+          envMetricsCatalogCache.set(cacheKey, {{
+            fetchedAt: Date.now(),
+            data: payload,
+          }});
+          return payload;
+        }})
+        .finally(() => {{
+          if (envMetricsCatalogInflight.get(cacheKey) === request) {{
+            envMetricsCatalogInflight.delete(cacheKey);
+          }}
+        }});
+      if (!forceRefresh) {{
+        envMetricsCatalogInflight.set(cacheKey, request);
       }}
-      if (payload.ok === false) {{
-        throw new Error(String(payload.error || "sensor history unavailable"));
-      }}
-      envMetricsCatalogCache.set(cacheKey, {{
-        fetchedAt: nowMs,
-        data: payload,
-      }});
-      return payload;
+      return request;
     }}
 
     async function fetchEnvironmentMetricsSeries(windowHours, metricKey, nodeId, forceRefresh = false) {{
       const cleanHours = normalizeEnvHistoryHours(windowHours);
       const cleanMetric = normalizeEnvMetricKey(metricKey || "");
       const cleanNodeId = normalizeNodeId(nodeId || "");
-      const cacheKey = [String(cleanHours), cleanMetric, cleanNodeId].join("|");
+      const cacheKey = environmentMetricsSeriesCacheKey(cleanHours, cleanMetric, cleanNodeId);
       const nowMs = Date.now();
       const cached = envMetricsSeriesCache.get(cacheKey);
-      const ttlMs = Math.max(refreshMs * 2, 6000);
-      if (!forceRefresh && cached && cached.data && (nowMs - (cached.fetchedAt || 0)) < ttlMs) {{
+      const ttlMs = environmentMetricsSeriesTtlMs();
+      if (!forceRefresh && environmentMetricsCacheEntryFresh(cached, ttlMs, nowMs)) {{
         return cached.data;
+      }}
+      const inflight = envMetricsSeriesInflight.get(cacheKey);
+      if (!forceRefresh && inflight) {{
+        return inflight;
       }}
       const params = new URLSearchParams();
       params.set("hours", String(cleanHours));
@@ -1309,20 +1525,31 @@
       if (cleanNodeId) {{
         params.set("node_id", cleanNodeId);
       }}
-      const resp = await fetch(`/api/history/environment?${{params.toString()}}`, {{ cache: "no-store" }});
-      if (!resp.ok) throw new Error(`sensor history API ${{resp.status}}`);
-      const payload = await resp.json();
-      if (!payload || typeof payload !== "object") {{
-        throw new Error("sensor history returned an invalid payload");
+      const request = fetch(`/api/history/environment?${{params.toString()}}`, {{ cache: "no-store" }})
+        .then(async (resp) => {{
+          if (!resp.ok) throw new Error(`sensor history API ${{resp.status}}`);
+          const payload = await resp.json();
+          if (!payload || typeof payload !== "object") {{
+            throw new Error("sensor history returned an invalid payload");
+          }}
+          if (payload.ok === false) {{
+            throw new Error(String(payload.error || "sensor history unavailable"));
+          }}
+          envMetricsSeriesCache.set(cacheKey, {{
+            fetchedAt: Date.now(),
+            data: payload,
+          }});
+          return payload;
+        }})
+        .finally(() => {{
+          if (envMetricsSeriesInflight.get(cacheKey) === request) {{
+            envMetricsSeriesInflight.delete(cacheKey);
+          }}
+        }});
+      if (!forceRefresh) {{
+        envMetricsSeriesInflight.set(cacheKey, request);
       }}
-      if (payload.ok === false) {{
-        throw new Error(String(payload.error || "sensor history unavailable"));
-      }}
-      envMetricsSeriesCache.set(cacheKey, {{
-        fetchedAt: nowMs,
-        data: payload,
-      }});
-      return payload;
+      return request;
     }}
 
     function bindEnvironmentMetricsControls() {{
@@ -1346,11 +1573,32 @@
     }}
 
     async function renderEnvironmentMetricsView(forceRefresh = false) {{
+      const perfRun = startEnvironmentMetricsRenderPerf(forceRefresh);
       bindEnvironmentMetricsControls();
       const windowHours = syncEnvironmentWindowPicker();
-      setEnvironmentMetricsStatus(`Loading saved sensor telemetry (${windowHours}h window)...`, "info");
+      const selectedMetricBefore = normalizeEnvMetricKey(envMetricsViewState.selectedMetric || "");
+      const selectedNodeIdBefore = currentEnvironmentMetricsScopedNodeId();
+      markEnvironmentMetricsRenderPerf(perfRun, "start", {{
+        windowHours,
+        selectedMetric: selectedMetricBefore,
+        selectedNodeId: selectedNodeIdBefore,
+      }});
+      if (forceRefresh || !envMetricsViewState.lastSnapshotRenderSignature) {{
+        setEnvironmentMetricsStatus(`Loading saved sensor telemetry (${windowHours}h window)...`, "info");
+      }}
       try {{
+        const catalogCacheKey = String(windowHours);
+        const catalogCacheEntry = envMetricsCatalogCache.get(catalogCacheKey);
+        const catalogCacheFresh = environmentMetricsCacheEntryFresh(catalogCacheEntry, environmentMetricsCatalogTtlMs());
+        markEnvironmentMetricsRenderPerf(perfRun, "catalog-start", {{
+          cacheFresh: !forceRefresh && catalogCacheFresh,
+          inflight: envMetricsCatalogInflight.has(catalogCacheKey),
+        }});
         const catalogPayload = await fetchEnvironmentMetricsCatalog(windowHours, forceRefresh);
+        markEnvironmentMetricsRenderPerf(perfRun, "catalog", {{
+          metrics: Array.isArray(catalogPayload && catalogPayload.metrics) ? catalogPayload.metrics.length : 0,
+          nodes: Array.isArray(catalogPayload && catalogPayload.nodes) ? catalogPayload.nodes.length : 0,
+        }});
         applyEnvironmentMetricsCatalogPayload(catalogPayload);
         const selectedMetric = syncEnvironmentMetricPicker(envMetricsViewState.metrics);
         const selectedNodeId = currentEnvironmentMetricsScopedNodeId();
@@ -1359,17 +1607,56 @@
           envMetricsViewState.source = "";
           envMetricsViewState.scannedPackets = 0;
           envMetricsViewState.cutoffUnix = 0;
-          renderEnvironmentMetricsSnapshot();
+          const snapshotResult = renderEnvironmentMetricsSnapshot({{ force: forceRefresh }});
+          markEnvironmentMetricsRenderPerf(perfRun, "snapshot", {{
+            skipped: !!(snapshotResult && snapshotResult.skipped),
+            points: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.points) || 0)),
+          }});
+          finishEnvironmentMetricsRenderPerf(perfRun, "no-metric", {{
+            points: 0,
+            metrics: Array.isArray(envMetricsViewState.metrics) ? envMetricsViewState.metrics.length : 0,
+            nodes: Array.isArray(envMetricsViewState.nodes) ? envMetricsViewState.nodes.length : 0,
+            selectedMetric: "",
+            selectedNodeId,
+            windowHours,
+            snapshotSkipped: !!(snapshotResult && snapshotResult.skipped),
+          }});
           return;
         }}
+        const seriesCacheKey = environmentMetricsSeriesCacheKey(windowHours, selectedMetric, selectedNodeId);
+        const seriesCacheEntry = envMetricsSeriesCache.get(seriesCacheKey);
+        const seriesCacheFresh = environmentMetricsCacheEntryFresh(seriesCacheEntry, environmentMetricsSeriesTtlMs());
+        markEnvironmentMetricsRenderPerf(perfRun, "series-start", {{
+          cacheFresh: !forceRefresh && seriesCacheFresh,
+          inflight: envMetricsSeriesInflight.has(seriesCacheKey),
+          selectedMetric,
+          selectedNodeId,
+        }});
         const seriesPayload = await fetchEnvironmentMetricsSeries(
           windowHours,
           selectedMetric,
           selectedNodeId,
           forceRefresh,
         );
+        markEnvironmentMetricsRenderPerf(perfRun, "series", {{
+          points: Array.isArray(seriesPayload && seriesPayload.points) ? seriesPayload.points.length : 0,
+          source: String((seriesPayload && seriesPayload.source) || ""),
+        }});
         applyEnvironmentMetricsSeriesPayload(seriesPayload);
-        renderEnvironmentMetricsSnapshot();
+        const snapshotResult = renderEnvironmentMetricsSnapshot({{ force: forceRefresh }});
+        markEnvironmentMetricsRenderPerf(perfRun, "snapshot", {{
+          skipped: !!(snapshotResult && snapshotResult.skipped),
+          points: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.points) || 0)),
+        }});
+        finishEnvironmentMetricsRenderPerf(perfRun, "ok", {{
+          points: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.points) || 0)),
+          metrics: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.metrics) || 0)),
+          nodes: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.nodes) || 0)),
+          selectedMetric: snapshotResult && snapshotResult.selectedMetric ? snapshotResult.selectedMetric : selectedMetric,
+          selectedNodeId: snapshotResult && snapshotResult.selectedNodeId ? snapshotResult.selectedNodeId : selectedNodeId,
+          windowHours: Math.max(0, Math.trunc(Number(snapshotResult && snapshotResult.windowHours) || windowHours)),
+          snapshotSkipped: !!(snapshotResult && snapshotResult.skipped),
+        }});
       }} catch (err) {{
         const msg = err instanceof Error ? err.message : String(err || "unknown error");
         envMetricsViewState.points = [];
@@ -1377,8 +1664,22 @@
         envMetricsViewState.nodes = [];
         envMetricsViewState.source = "";
         envMetricsViewState.scannedPackets = 0;
-        renderEnvironmentMetricsSnapshot();
+        const snapshotResult = renderEnvironmentMetricsSnapshot({{ force: true }});
         setEnvironmentMetricsStatus(`Sensor history unavailable: ${{msg}}`, "error");
+        markEnvironmentMetricsRenderPerf(perfRun, "error", {{
+          message: msg,
+          snapshotSkipped: !!(snapshotResult && snapshotResult.skipped),
+        }});
+        finishEnvironmentMetricsRenderPerf(perfRun, "error", {{
+          error: msg,
+          points: 0,
+          metrics: 0,
+          nodes: 0,
+          selectedMetric: "",
+          selectedNodeId: selectedNodeIdBefore,
+          windowHours,
+          snapshotSkipped: !!(snapshotResult && snapshotResult.skipped),
+        }});
       }}
     }}
 

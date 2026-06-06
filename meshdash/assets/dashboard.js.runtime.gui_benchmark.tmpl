@@ -212,6 +212,12 @@
       const pollStats = pollStatsStore && pollStatsStore.last && typeof pollStatsStore.last === "object"
         ? pollStatsStore.last
         : null;
+      const envMetricsStatsStore = (typeof window !== "undefined" && window.__meshEnvironmentMetricsRenderStats && typeof window.__meshEnvironmentMetricsRenderStats === "object")
+        ? window.__meshEnvironmentMetricsRenderStats
+        : null;
+      const envMetricsStats = envMetricsStatsStore && envMetricsStatsStore.last && typeof envMetricsStatsStore.last === "object"
+        ? envMetricsStatsStore.last
+        : null;
       return {{
         activeLayoutView,
         activeNetworkSubview,
@@ -248,6 +254,21 @@
           subview: pollStats.subview || "",
           phases: Array.isArray(pollStats.phases)
             ? pollStats.phases.slice(-24).map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
+            : [],
+        }} : null,
+        environmentMetricsRender: envMetricsStats ? {{
+          status: envMetricsStats.status || "",
+          totalMs: meshGuiBenchmarkRoundMs(envMetricsStats.totalMs),
+          forceRefresh: !!envMetricsStats.forceRefresh,
+          snapshotSkipped: !!envMetricsStats.snapshotSkipped,
+          points: Math.max(0, Math.trunc(Number(envMetricsStats.points) || 0)),
+          metrics: Math.max(0, Math.trunc(Number(envMetricsStats.metrics) || 0)),
+          nodes: Math.max(0, Math.trunc(Number(envMetricsStats.nodes) || 0)),
+          selectedMetric: envMetricsStats.selectedMetric || "",
+          selectedNodeId: envMetricsStats.selectedNodeId || "",
+          windowHours: Math.max(0, Math.trunc(Number(envMetricsStats.windowHours) || 0)),
+          phases: Array.isArray(envMetricsStats.phases)
+            ? envMetricsStats.phases.slice(-16).map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
             : [],
         }} : null,
         networkGraphRender: graphStats ? {{
@@ -299,6 +320,31 @@
       return pollStatsStore && Array.isArray(pollStatsStore.runs) ? pollStatsStore.runs.length : 0;
     }}
 
+    function meshGuiBenchmarkEnvironmentMetricsRenderRunCount() {{
+      const envMetricsStatsStore = (typeof window !== "undefined" && window.__meshEnvironmentMetricsRenderStats && typeof window.__meshEnvironmentMetricsRenderStats === "object")
+        ? window.__meshEnvironmentMetricsRenderStats
+        : null;
+      return envMetricsStatsStore && Array.isArray(envMetricsStatsStore.runs) ? envMetricsStatsStore.runs.length : 0;
+    }}
+
+    function meshGuiBenchmarkEnvironmentMetricsRenderRunsSince(startIndex) {{
+      const envMetricsStatsStore = (typeof window !== "undefined" && window.__meshEnvironmentMetricsRenderStats && typeof window.__meshEnvironmentMetricsRenderStats === "object")
+        ? window.__meshEnvironmentMetricsRenderStats
+        : null;
+      const runs = envMetricsStatsStore && Array.isArray(envMetricsStatsStore.runs) ? envMetricsStatsStore.runs : [];
+      const safeStart = Math.max(0, Math.trunc(Number(startIndex) || 0));
+      return runs.slice(safeStart).slice(-8).map((run) => {{
+        if (!run || typeof run !== "object") return run;
+        return {{
+          ...run,
+          totalMs: meshGuiBenchmarkRoundMs(run.totalMs),
+          phases: Array.isArray(run.phases)
+            ? run.phases.slice(-16).map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
+            : [],
+        }};
+      }});
+    }}
+
     function meshGuiBenchmarkPollPerfRunsSince(startIndex) {{
       const pollStatsStore = (typeof window !== "undefined" && window.__meshPollPerfStats && typeof window.__meshPollPerfStats === "object")
         ? window.__meshPollPerfStats
@@ -340,6 +386,25 @@
             : [],
         }};
       }});
+    }}
+
+    function meshGuiBenchmarkViewUsesEnvironmentMetrics(viewName, subviewName = "") {{
+      const view = normalizeLayoutView(viewName || activeLayoutView);
+      if (view === "environment") return true;
+      if (view !== "network") return false;
+      return normalizeNetworkSubview(subviewName || activeNetworkSubview) === "sensors";
+    }}
+
+    async function meshGuiBenchmarkWaitForEnvironmentMetricsRender(startIndex, timeoutMs = 1500) {{
+      const safeStart = Math.max(0, Math.trunc(Number(startIndex) || 0));
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      while ((meshGuiBenchmarkNowMs() - startedAtMs) < Math.max(0, Number(timeoutMs) || 0)) {{
+        if (meshGuiBenchmarkEnvironmentMetricsRenderRunCount() > safeStart) {{
+          return true;
+        }}
+        await meshGuiBenchmarkSleep(20);
+      }}
+      return meshGuiBenchmarkEnvironmentMetricsRenderRunCount() > safeStart;
     }}
 
     function meshGuiBenchmarkApiProfileForView(viewName, subviewName = "") {{
@@ -443,7 +508,11 @@
       const beforeChatRuns = meshGuiBenchmarkChatRenderRunCount();
       const beforeGraphRuns = meshGuiBenchmarkNetworkGraphRenderRunCount();
       const beforePollRuns = meshGuiBenchmarkPollPerfRunCount();
+      const beforeEnvMetricsRuns = meshGuiBenchmarkEnvironmentMetricsRenderRunCount();
       await poll();
+      if (meshGuiBenchmarkViewUsesEnvironmentMetrics(view, subview)) {{
+        await meshGuiBenchmarkWaitForEnvironmentMetricsRender(beforeEnvMetricsRuns);
+      }}
       await meshGuiBenchmarkNextFrame();
       const chatPerfDelta = chatPerfStats.samples - beforeChatSamples;
       return {{
@@ -462,6 +531,8 @@
         chatRenderRuns: meshGuiBenchmarkChatRenderRunsSince(beforeChatRuns),
         pollPerfRunsAdded: Math.max(0, meshGuiBenchmarkPollPerfRunCount() - beforePollRuns),
         pollPerfRuns: meshGuiBenchmarkPollPerfRunsSince(beforePollRuns),
+        environmentMetricsRenderRunsAdded: Math.max(0, meshGuiBenchmarkEnvironmentMetricsRenderRunCount() - beforeEnvMetricsRuns),
+        environmentMetricsRenderRuns: meshGuiBenchmarkEnvironmentMetricsRenderRunsSince(beforeEnvMetricsRuns),
         networkGraphRenderRunsAdded: Math.max(0, meshGuiBenchmarkNetworkGraphRenderRunCount() - beforeGraphRuns),
         networkGraphRenderRuns: meshGuiBenchmarkNetworkGraphRenderRunsSince(beforeGraphRuns),
       }};
@@ -472,6 +543,7 @@
       const subview = view === "network" ? normalizeNetworkSubview(subviewName || activeNetworkSubview) : "";
       const beforeChatRuns = meshGuiBenchmarkChatRenderRunCount();
       const beforeGraphRuns = meshGuiBenchmarkNetworkGraphRenderRunCount();
+      const beforeEnvMetricsRuns = meshGuiBenchmarkEnvironmentMetricsRenderRunCount();
       const alreadyActive = meshGuiBenchmarkIsViewActive(view, subview);
       if (alreadyActive) {{
         return {{
@@ -480,6 +552,8 @@
           skipBenchmarkFrameWait: true,
           chatRenderRunsAdded: Math.max(0, meshGuiBenchmarkChatRenderRunCount() - beforeChatRuns),
           chatRenderRuns: meshGuiBenchmarkChatRenderRunsSince(beforeChatRuns),
+          environmentMetricsRenderRunsAdded: Math.max(0, meshGuiBenchmarkEnvironmentMetricsRenderRunCount() - beforeEnvMetricsRuns),
+          environmentMetricsRenderRuns: meshGuiBenchmarkEnvironmentMetricsRenderRunsSince(beforeEnvMetricsRuns),
           networkGraphRenderRunsAdded: Math.max(0, meshGuiBenchmarkNetworkGraphRenderRunCount() - beforeGraphRuns),
           networkGraphRenderRuns: meshGuiBenchmarkNetworkGraphRenderRunsSince(beforeGraphRuns),
         }};
@@ -488,6 +562,9 @@
         setActiveNetworkSubview(subview, {{ persist: false }});
       }}
       applyLayoutView(view, false);
+      if (meshGuiBenchmarkViewUsesEnvironmentMetrics(view, subview)) {{
+        await meshGuiBenchmarkWaitForEnvironmentMetricsRender(beforeEnvMetricsRuns);
+      }}
       await meshGuiBenchmarkNextFrame();
       if (view === "network" && subview === "graph") {{
         await meshGuiBenchmarkSleep(120);
@@ -498,6 +575,8 @@
         alreadyActive: false,
         chatRenderRunsAdded: Math.max(0, meshGuiBenchmarkChatRenderRunCount() - beforeChatRuns),
         chatRenderRuns: meshGuiBenchmarkChatRenderRunsSince(beforeChatRuns),
+        environmentMetricsRenderRunsAdded: Math.max(0, meshGuiBenchmarkEnvironmentMetricsRenderRunCount() - beforeEnvMetricsRuns),
+        environmentMetricsRenderRuns: meshGuiBenchmarkEnvironmentMetricsRenderRunsSince(beforeEnvMetricsRuns),
         networkGraphRenderRunsAdded: Math.max(0, meshGuiBenchmarkNetworkGraphRenderRunCount() - beforeGraphRuns),
         networkGraphRenderRuns: meshGuiBenchmarkNetworkGraphRenderRunsSince(beforeGraphRuns),
       }};
