@@ -155,6 +155,7 @@ _DASHBOARD_JS_TEMPLATE_PARTS = (
     "dashboard.js.runtime.views.remote.tmpl",
     "dashboard.js.runtime.poll.tmpl",
     "dashboard.js.runtime.boot.tmpl",
+    "dashboard.js.runtime.gui_benchmark.tmpl",
 )
 
 

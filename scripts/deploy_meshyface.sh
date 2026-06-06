@@ -293,6 +293,9 @@ compute_local_deploy_payload_hash() {
     cd "${ROOT_DIR}" || exit 1
     {
       LC_ALL=C sha256sum "mesh_dashboard.py" "mesh_connection.py" "requirements.txt"
+      if [[ -f "scripts/benchmark_gui_responsiveness.py" ]]; then
+        LC_ALL=C sha256sum "scripts/benchmark_gui_responsiveness.py"
+      fi
       LC_ALL=C find "meshdash" -type f \
         ! -path 'meshdash/__pycache__/*' \
         ! -name '*.pyc' \
@@ -309,6 +312,9 @@ set -euo pipefail && \
 cd '${APP_DIR}' && \
 { \
   LC_ALL=C sha256sum 'mesh_dashboard.py' 'mesh_connection.py' 'requirements.txt' && \
+  if [[ -f 'scripts/benchmark_gui_responsiveness.py' ]]; then \
+    LC_ALL=C sha256sum 'scripts/benchmark_gui_responsiveness.py'; \
+  fi && \
   LC_ALL=C find 'meshdash' -type f \
     ! -path 'meshdash/__pycache__/*' \
     ! -name '*.pyc' \
@@ -776,6 +782,11 @@ scp_cmd \
   "${ROOT_DIR}/mesh_connection.py" \
   "${ROOT_DIR}/requirements.txt" \
   "${TARGET}:${APP_DIR}/"
+
+ssh_cmd "${TARGET}" "mkdir -p '${APP_DIR}/scripts'"
+scp_cmd \
+  "${ROOT_DIR}/scripts/benchmark_gui_responsiveness.py" \
+  "${TARGET}:${APP_DIR}/scripts/"
 
 tar \
   -C "${ROOT_DIR}" \

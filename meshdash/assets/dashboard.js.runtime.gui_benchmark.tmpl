@@ -1,0 +1,518 @@
+    function meshGuiBenchmarkNowMs() {{
+      return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+    }}
+
+    function meshGuiBenchmarkQueryValue(name) {{
+      try {{
+        const params = new URLSearchParams(window.location.search || "");
+        return params.has(name) ? params.get(name) : null;
+      }} catch (_err) {{
+        return null;
+      }}
+    }}
+
+    function meshGuiBenchmarkBoolQuery(name) {{
+      const value = meshGuiBenchmarkQueryValue(name);
+      if (value == null) return false;
+      const clean = String(value || "").trim().toLowerCase();
+      return clean === "" || clean === "1" || clean === "true" || clean === "yes" || clean === "on";
+    }}
+
+    function meshGuiBenchmarkInt(value, fallback, minValue, maxValue) {{
+      const parsed = Math.trunc(Number(value));
+      if (!Number.isFinite(parsed)) return fallback;
+      const min = Number.isFinite(Number(minValue)) ? Number(minValue) : parsed;
+      const max = Number.isFinite(Number(maxValue)) ? Number(maxValue) : parsed;
+      return Math.max(min, Math.min(max, parsed));
+    }}
+
+    function meshGuiBenchmarkRoundMs(value) {{
+      const ms = Number(value);
+      return Number.isFinite(ms) ? Math.round(Math.max(0, ms) * 100) / 100 : 0;
+    }}
+
+    function meshGuiBenchmarkSleep(ms) {{
+      return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+    }}
+
+    function meshGuiBenchmarkNextFrame() {{
+      return new Promise((resolve) => {{
+        window.requestAnimationFrame(() => {{
+          window.requestAnimationFrame(() => resolve());
+        }});
+      }});
+    }}
+
+    function meshGuiBenchmarkStats(values) {{
+      const sorted = (Array.isArray(values) ? values : [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!sorted.length) {{
+        return {{ count: 0, min: 0, p50: 0, p90: 0, p95: 0, max: 0, avg: 0 }};
+      }}
+      const percentile = (p) => {{
+        const idx = Math.max(0, Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1));
+        return sorted[idx];
+      }};
+      const total = sorted.reduce((sum, value) => sum + value, 0);
+      return {{
+        count: sorted.length,
+        min: meshGuiBenchmarkRoundMs(sorted[0]),
+        p50: meshGuiBenchmarkRoundMs(percentile(50)),
+        p90: meshGuiBenchmarkRoundMs(percentile(90)),
+        p95: meshGuiBenchmarkRoundMs(percentile(95)),
+        max: meshGuiBenchmarkRoundMs(sorted[sorted.length - 1]),
+        avg: meshGuiBenchmarkRoundMs(total / sorted.length),
+      }};
+    }}
+
+    function meshGuiBenchmarkSummarizeSamples(samples) {{
+      const rows = Array.isArray(samples) ? samples : [];
+      const byLabel = {{}};
+      for (const sample of rows) {{
+        const label = String((sample && sample.label) || "unknown");
+        if (!byLabel[label]) {{
+          byLabel[label] = {{
+            totalMs: [],
+            frameMaxMs: [],
+            frameP95Ms: [],
+            longTaskCount: 0,
+            errors: 0,
+          }};
+        }}
+        byLabel[label].totalMs.push(Number(sample.totalMs) || 0);
+        byLabel[label].frameMaxMs.push(Number(sample.frameMaxMs) || 0);
+        byLabel[label].frameP95Ms.push(Number(sample.frameP95Ms) || 0);
+        byLabel[label].longTaskCount += Math.max(0, Math.trunc(Number(sample.longTaskCount) || 0));
+        if (sample && sample.error) byLabel[label].errors += 1;
+      }}
+      const labels = {{}};
+      for (const [label, data] of Object.entries(byLabel)) {{
+        labels[label] = {{
+          totalMs: meshGuiBenchmarkStats(data.totalMs),
+          frameMaxMs: meshGuiBenchmarkStats(data.frameMaxMs),
+          frameP95Ms: meshGuiBenchmarkStats(data.frameP95Ms),
+          longTaskCount: data.longTaskCount,
+          errors: data.errors,
+        }};
+      }}
+      return {{
+        samples: rows.length,
+        totalMs: meshGuiBenchmarkStats(rows.map((sample) => sample.totalMs)),
+        frameMaxMs: meshGuiBenchmarkStats(rows.map((sample) => sample.frameMaxMs)),
+        frameP95Ms: meshGuiBenchmarkStats(rows.map((sample) => sample.frameP95Ms)),
+        longTaskCount: rows.reduce((sum, sample) => sum + Math.max(0, Math.trunc(Number(sample.longTaskCount) || 0)), 0),
+        errors: rows.filter((sample) => sample && sample.error).length,
+        byLabel: labels,
+      }};
+    }}
+
+    async function meshGuiBenchmarkMeasure(label, callback, meta = null) {{
+      const frameDeltas = [];
+      const longTasks = [];
+      let running = true;
+      let frameId = 0;
+      let lastFrameMs = meshGuiBenchmarkNowMs();
+      let observer = null;
+      if (typeof PerformanceObserver !== "undefined") {{
+        try {{
+          observer = new PerformanceObserver((list) => {{
+            for (const entry of list.getEntries()) {{
+              if (!entry) continue;
+              longTasks.push({{
+                durationMs: meshGuiBenchmarkRoundMs(entry.duration),
+                startTimeMs: meshGuiBenchmarkRoundMs(entry.startTime),
+              }});
+            }}
+          }});
+          observer.observe({{ type: "longtask", buffered: true }});
+        }} catch (_err) {{
+          observer = null;
+        }}
+      }}
+      const tick = (timestamp) => {{
+        const now = Number.isFinite(Number(timestamp)) ? Number(timestamp) : meshGuiBenchmarkNowMs();
+        frameDeltas.push(Math.max(0, now - lastFrameMs));
+        lastFrameMs = now;
+        if (running) {{
+          frameId = window.requestAnimationFrame(tick);
+        }}
+      }};
+      frameId = window.requestAnimationFrame(tick);
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      let detail = null;
+      let error = "";
+      try {{
+        detail = await callback();
+        await meshGuiBenchmarkNextFrame();
+      }} catch (err) {{
+        error = err instanceof Error ? (err.message || String(err)) : String(err || "unknown error");
+      }} finally {{
+        running = false;
+        if (frameId) {{
+          try {{
+            window.cancelAnimationFrame(frameId);
+          }} catch (_err) {{
+          }}
+        }}
+        if (observer) {{
+          try {{
+            observer.disconnect();
+          }} catch (_err) {{
+          }}
+        }}
+      }}
+      const totalMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      const frameStats = meshGuiBenchmarkStats(frameDeltas);
+      const longTaskDurations = longTasks.map((entry) => entry.durationMs);
+      const longTaskStats = meshGuiBenchmarkStats(longTaskDurations);
+      return {{
+        label,
+        totalMs: meshGuiBenchmarkRoundMs(totalMs),
+        frameSamples: frameStats.count,
+        frameP95Ms: frameStats.p95,
+        frameMaxMs: frameStats.max,
+        longTaskCount: longTasks.length,
+        longTaskTotalMs: meshGuiBenchmarkRoundMs(longTaskDurations.reduce((sum, value) => sum + value, 0)),
+        longTaskMaxMs: longTaskStats.max,
+        meta: (meta && typeof meta === "object") ? {{ ...meta }} : {{}},
+        detail: detail && typeof detail === "object" ? detail : {{}},
+        error,
+      }};
+    }}
+
+    function meshGuiBenchmarkStateSnapshot() {{
+      const state = (latestState && typeof latestState === "object") ? latestState : {{}};
+      const rawState = (latestRawState && typeof latestRawState === "object") ? latestRawState : state;
+      const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
+      const rawTraffic = (rawState.traffic && typeof rawState.traffic === "object") ? rawState.traffic : traffic;
+      return {{
+        activeLayoutView,
+        activeNetworkSubview,
+        pollProfile: (typeof statePollProfile === "function") ? statePollProfile() : "",
+        nodes: Array.isArray(state.nodes) ? state.nodes.length : 0,
+        rawNodes: Array.isArray(rawState.nodes) ? rawState.nodes.length : 0,
+        historyCaps: rawState.history_caps && typeof rawState.history_caps === "object"
+          ? Object.keys(rawState.history_caps).length
+          : 0,
+        recentChat: Array.isArray(rawTraffic.recent_chat) ? rawTraffic.recent_chat.length : 0,
+        recentPackets: Array.isArray(rawTraffic.recent_packets) ? rawTraffic.recent_packets.length : 0,
+        edges: Array.isArray(rawTraffic.edges) ? rawTraffic.edges.length : 0,
+      }};
+    }}
+
+    function meshGuiBenchmarkApiProfileForView(viewName, subviewName = "") {{
+      const view = normalizeLayoutView(viewName || activeLayoutView);
+      if (view === "network") return "network";
+      if (isChatWorkspaceLayoutView(view) || view === "bbs") return "chat";
+      return "default";
+    }}
+
+    async function meshGuiBenchmarkFetchJson(label, path) {{
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      const resp = await fetch(path, {{ cache: "no-store" }});
+      const text = await resp.text();
+      const fetchedAtMs = meshGuiBenchmarkNowMs();
+      let payload = null;
+      let parseError = "";
+      try {{
+        payload = text ? JSON.parse(text) : null;
+      }} catch (err) {{
+        parseError = err instanceof Error ? err.message : String(err || "parse failed");
+      }}
+      const parsedAtMs = meshGuiBenchmarkNowMs();
+      const traffic = payload && payload.traffic && typeof payload.traffic === "object" ? payload.traffic : {{}};
+      return {{
+        label,
+        path,
+        ok: !!resp.ok,
+        status: resp.status,
+        bytes: text.length,
+        fetchMs: meshGuiBenchmarkRoundMs(fetchedAtMs - startedAtMs),
+        parseMs: meshGuiBenchmarkRoundMs(parsedAtMs - fetchedAtMs),
+        totalMs: meshGuiBenchmarkRoundMs(parsedAtMs - startedAtMs),
+        parseError,
+        counts: {{
+          nodes: payload && Array.isArray(payload.nodes) ? payload.nodes.length : 0,
+          historyCaps: payload && payload.history_caps && typeof payload.history_caps === "object"
+            ? Object.keys(payload.history_caps).length
+            : 0,
+          recentChat: Array.isArray(traffic.recent_chat) ? traffic.recent_chat.length : 0,
+          recentPackets: Array.isArray(traffic.recent_packets) ? traffic.recent_packets.length : 0,
+          edges: Array.isArray(traffic.edges) ? traffic.edges.length : 0,
+        }},
+      }};
+    }}
+
+    function meshGuiBenchmarkStatePathForProfile(profileName) {{
+      const clean = String(profileName || "default").trim().toLowerCase();
+      const params = new URLSearchParams();
+      params.set("lite", "1");
+      if (clean === "chat" || clean === "network") {{
+        params.set("profile", clean);
+      }}
+      params.set("_bench", String(Date.now()));
+      return `/api/state?${{params.toString()}}`;
+    }}
+
+    async function meshGuiBenchmarkForcePoll(viewName, subviewName = "") {{
+      const view = normalizeLayoutView(viewName || activeLayoutView);
+      const subview = view === "network" ? normalizeNetworkSubview(subviewName || activeNetworkSubview) : "";
+      if (view === "network" && subview) {{
+        setActiveNetworkSubview(subview, {{ persist: false }});
+      }}
+      applyLayoutView(view, false);
+      await meshGuiBenchmarkNextFrame();
+      try {{
+        stateEtag = "";
+        forceStateReloadOnce = true;
+      }} catch (_err) {{
+      }}
+      const beforeChatSamples = chatPerfStats.samples;
+      await poll();
+      await meshGuiBenchmarkNextFrame();
+      const chatPerfDelta = chatPerfStats.samples - beforeChatSamples;
+      return {{
+        state: meshGuiBenchmarkStateSnapshot(),
+        chatPerf: {{
+          samplesAdded: chatPerfDelta,
+          lastMs: meshGuiBenchmarkRoundMs(chatPerfStats.lastMs),
+          emaMs: meshGuiBenchmarkRoundMs(chatPerfStats.emaMs),
+          maxMs: meshGuiBenchmarkRoundMs(chatPerfStats.maxMs),
+          feedCount: chatPerfStats.lastFeedCount,
+          rosterCount: chatPerfStats.lastRosterCount,
+          channel: chatPerfStats.lastChannel,
+        }},
+      }};
+    }}
+
+    async function meshGuiBenchmarkSwitchView(viewName, subviewName = "") {{
+      const view = normalizeLayoutView(viewName || activeLayoutView);
+      const subview = view === "network" ? normalizeNetworkSubview(subviewName || activeNetworkSubview) : "";
+      if (view === "network" && subview) {{
+        setActiveNetworkSubview(subview, {{ persist: false }});
+      }}
+      applyLayoutView(view, false);
+      await meshGuiBenchmarkNextFrame();
+      if (view === "network" && subview === "graph") {{
+        await meshGuiBenchmarkSleep(120);
+        await meshGuiBenchmarkNextFrame();
+      }}
+      return meshGuiBenchmarkStateSnapshot();
+    }}
+
+    async function meshGuiBenchmarkSelectNode() {{
+      const state = (latestState && typeof latestState === "object") ? latestState : {{}};
+      const nodes = Array.isArray(state.nodes) ? state.nodes : [];
+      let nodeId = "";
+      for (const node of nodes) {{
+        const candidate = normalizeNodeId(node && node.id);
+        if (isSelectableNodeId(candidate)) {{
+          nodeId = candidate;
+          break;
+        }}
+      }}
+      if (!nodeId) {{
+        return {{ skipped: true, reason: "no selectable node" }};
+      }}
+      const beforeRuns = window.__meshNodeSelectionPerf && Array.isArray(window.__meshNodeSelectionPerf.runs)
+        ? window.__meshNodeSelectionPerf.runs.length
+        : 0;
+      selectNode(nodeId, true, false);
+      await meshGuiBenchmarkNextFrame();
+      await meshGuiBenchmarkSleep(120);
+      const store = window.__meshNodeSelectionPerf || {{}};
+      const runs = Array.isArray(store.runs) ? store.runs : [];
+      const lastRun = store.lastRun || runs[runs.length - 1] || null;
+      return {{
+        skipped: false,
+        nodeId,
+        perfRunsAdded: Math.max(0, runs.length - beforeRuns),
+        lastRun: lastRun ? {{
+          status: lastRun.status || "",
+          totalDurationMs: meshGuiBenchmarkRoundMs(lastRun.totalDurationMs),
+          phases: Array.isArray(lastRun.phases) ? lastRun.phases.slice(-8) : [],
+        }} : null,
+      }};
+    }}
+
+    function meshGuiBenchmarkDefaultViewSpecs() {{
+      return [
+        {{ view: "chat", subview: "" }},
+        {{ view: "network", subview: "map" }},
+        {{ view: "network", subview: "graph" }},
+        {{ view: "history", subview: "" }},
+        {{ view: "settings", subview: "" }},
+        {{ view: "console", subview: "" }},
+      ];
+    }}
+
+    function meshGuiBenchmarkParseViewSpecs(rawValue) {{
+      const raw = String(rawValue || "").trim();
+      if (!raw) return meshGuiBenchmarkDefaultViewSpecs();
+      const specs = raw.split(",")
+        .map((part) => part.trim().toLowerCase())
+        .filter(Boolean)
+        .map((part) => {{
+          const pieces = part.split(":");
+          return {{
+            view: normalizeLayoutView(pieces[0] || "chat"),
+            subview: pieces[1] ? normalizeNetworkSubview(pieces[1]) : "",
+          }};
+        }});
+      return specs.length ? specs : meshGuiBenchmarkDefaultViewSpecs();
+    }}
+
+    function meshGuiBenchmarkOptionsFromQuery() {{
+      return {{
+        iterations: meshGuiBenchmarkInt(meshGuiBenchmarkQueryValue("mesh_gui_bench_iterations"), 5, 1, 50),
+        warmup: meshGuiBenchmarkInt(meshGuiBenchmarkQueryValue("mesh_gui_bench_warmup"), 1, 0, 10),
+        settleMs: meshGuiBenchmarkInt(meshGuiBenchmarkQueryValue("mesh_gui_bench_settle_ms"), 80, 0, 1000),
+        views: meshGuiBenchmarkParseViewSpecs(meshGuiBenchmarkQueryValue("mesh_gui_bench_views")),
+        includeApi: meshGuiBenchmarkQueryValue("mesh_gui_bench_api") !== "0",
+        includeSelection: meshGuiBenchmarkQueryValue("mesh_gui_bench_select") !== "0",
+      }};
+    }}
+
+    async function meshGuiBenchmarkRun(options = null) {{
+      const opts = Object.assign(meshGuiBenchmarkOptionsFromQuery(), (options && typeof options === "object") ? options : {{}});
+      const startedWall = new Date().toISOString();
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      const samples = [];
+      const api = [];
+      const originalChatPerfEnabled = chatPerfEnabled;
+      chatPerfEnabled = true;
+      window.__meshDashboardGuiBenchmarkActive = true;
+      try {{
+        await meshGuiBenchmarkSleep(50);
+        for (let index = 0; index < opts.warmup; index += 1) {{
+          await meshGuiBenchmarkForcePoll("chat", "");
+        }}
+        if (opts.includeApi) {{
+          const stateProfiles = ["default", "chat", "network"];
+          for (const profile of stateProfiles) {{
+            try {{
+              api.push(await meshGuiBenchmarkFetchJson(`state:${{profile}}`, meshGuiBenchmarkStatePathForProfile(profile)));
+            }} catch (err) {{
+              api.push({{
+                label: `state:${{profile}}`,
+                path: meshGuiBenchmarkStatePathForProfile(profile),
+                ok: false,
+                error: err instanceof Error ? (err.message || String(err)) : String(err || "request failed"),
+              }});
+            }}
+          }}
+          for (const [label, path] of [
+            ["database", "/api/system/database"],
+            ["history-summary", "/api/history/summary?hours=168"],
+            ["history-links", "/api/history/links?window=30d&limit=1800"],
+            ["top-nodes", "/api/history/top_nodes?category=packets&limit=10"],
+          ]) {{
+            try {{
+              api.push(await meshGuiBenchmarkFetchJson(label, path));
+            }} catch (err) {{
+              api.push({{
+                label,
+                path,
+                ok: false,
+                error: err instanceof Error ? (err.message || String(err)) : String(err || "request failed"),
+              }});
+            }}
+          }}
+        }}
+        for (let iteration = 0; iteration < opts.iterations; iteration += 1) {{
+          for (const spec of opts.views) {{
+            const view = normalizeLayoutView(spec.view || "chat");
+            const subview = view === "network" ? normalizeNetworkSubview(spec.subview || "map") : "";
+            const suffix = subview ? `${{view}}:${{subview}}` : view;
+            samples.push(await meshGuiBenchmarkMeasure(
+              `switch:${{suffix}}`,
+              () => meshGuiBenchmarkSwitchView(view, subview),
+              {{ iteration, view, subview }}
+            ));
+            await meshGuiBenchmarkSleep(opts.settleMs);
+            samples.push(await meshGuiBenchmarkMeasure(
+              `poll:${{suffix}}`,
+              () => meshGuiBenchmarkForcePoll(view, subview),
+              {{ iteration, view, subview, profile: meshGuiBenchmarkApiProfileForView(view, subview) }}
+            ));
+            await meshGuiBenchmarkSleep(opts.settleMs);
+          }}
+        }}
+        if (opts.includeSelection) {{
+          applyLayoutView("network", false);
+          setActiveNetworkSubview("map", {{ persist: false }});
+          await meshGuiBenchmarkForcePoll("network", "map");
+          for (let iteration = 0; iteration < Math.min(opts.iterations, 8); iteration += 1) {{
+            samples.push(await meshGuiBenchmarkMeasure(
+              "select-node",
+              () => meshGuiBenchmarkSelectNode(),
+              {{ iteration, view: "network", subview: "map" }}
+            ));
+          }}
+        }}
+      }} finally {{
+        chatPerfEnabled = originalChatPerfEnabled;
+        window.__meshDashboardGuiBenchmarkActive = false;
+      }}
+      const finishedAtMs = meshGuiBenchmarkNowMs();
+      const result = {{
+        ok: samples.every((sample) => !sample.error),
+        version: 1,
+        startedAt: startedWall,
+        finishedAt: new Date().toISOString(),
+        durationMs: meshGuiBenchmarkRoundMs(finishedAtMs - startedAtMs),
+        location: String(window.location.href || ""),
+        userAgent: String(window.navigator && window.navigator.userAgent || ""),
+        viewport: {{
+          width: window.innerWidth,
+          height: window.innerHeight,
+          devicePixelRatio: window.devicePixelRatio || 1,
+        }},
+        options: opts,
+        state: meshGuiBenchmarkStateSnapshot(),
+        api,
+        samples,
+        summary: meshGuiBenchmarkSummarizeSamples(samples),
+      }};
+      window.__meshDashboardBenchmarkLastResult = result;
+      return result;
+    }}
+
+    function meshGuiBenchmarkRenderResult(result) {{
+      const payload = JSON.stringify(result, null, 2);
+      const pre = document.createElement("pre");
+      pre.id = "mesh-gui-benchmark-result";
+      pre.textContent = payload;
+      document.body.innerHTML = "";
+      document.body.appendChild(pre);
+      document.documentElement.dataset.meshGuiBenchmarkStatus = result && result.ok ? "ok" : "error";
+    }}
+
+    window.__meshDashboardBenchmark = {{
+      run: meshGuiBenchmarkRun,
+      summarizeSamples: meshGuiBenchmarkSummarizeSamples,
+    }};
+
+    if (meshGuiBenchmarkBoolQuery("mesh_gui_bench")) {{
+      window.setTimeout(() => {{
+        meshGuiBenchmarkRun()
+          .then((result) => meshGuiBenchmarkRenderResult(result))
+          .catch((err) => {{
+            meshGuiBenchmarkRenderResult({{
+              ok: false,
+              version: 1,
+              error: err instanceof Error ? (err.message || String(err)) : String(err || "benchmark failed"),
+              startedAt: new Date().toISOString(),
+              location: String(window.location.href || ""),
+              state: meshGuiBenchmarkStateSnapshot(),
+              samples: [],
+              api: [],
+              summary: meshGuiBenchmarkSummarizeSamples([]),
+            }});
+          }});
+      }}, 0);
+    }}
