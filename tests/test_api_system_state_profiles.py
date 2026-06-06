@@ -112,6 +112,72 @@ def test_handle_state_get_uses_lite_network_profile_when_requested() -> None:
     assert calls == ["lite_network"]
 
 
+def test_handle_state_get_uses_lite_network_graph_profile_when_requested() -> None:
+    calls: list[str] = []
+
+    def state_fn():
+        calls.append("full")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite():
+        calls.append("lite")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite_network_graph():
+        calls.append("lite_network_graph")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    setattr(state_fn, "lite", state_lite)
+    setattr(state_fn, "lite_network_graph", state_lite_network_graph)
+    setattr(state_fn, "fault_history_fn", lambda: [])
+
+    def write_json_response_fn(_handler, *, status_code, payload_obj, no_store=False, extra_headers=None):
+        return None
+
+    handle_state_get(
+        _Handler(),
+        state_fn=state_fn,
+        write_json_response_fn=write_json_response_fn,
+        query="lite=1&profile=network-graph",
+        private_mode=False,
+    )
+
+    assert calls == ["lite_network_graph"]
+
+
+def test_handle_state_get_falls_back_to_network_for_network_graph_profile() -> None:
+    calls: list[str] = []
+
+    def state_fn():
+        calls.append("full")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite():
+        calls.append("lite")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    def state_lite_network():
+        calls.append("lite_network")
+        return {"generated_at": "now", "summary": {}, "traffic": {}}
+
+    setattr(state_fn, "lite", state_lite)
+    setattr(state_fn, "lite_network", state_lite_network)
+    setattr(state_fn, "fault_history_fn", lambda: [])
+
+    def write_json_response_fn(_handler, *, status_code, payload_obj, no_store=False, extra_headers=None):
+        return None
+
+    handle_state_get(
+        _Handler(),
+        state_fn=state_fn,
+        write_json_response_fn=write_json_response_fn,
+        query="lite=1&profile=network-graph",
+        private_mode=False,
+    )
+
+    assert calls == ["lite_network"]
+
+
 def test_handle_state_get_uses_lite_network_map_profile_when_requested() -> None:
     calls: list[str] = []
 

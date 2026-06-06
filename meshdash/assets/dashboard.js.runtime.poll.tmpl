@@ -59,6 +59,9 @@
         if (networkSubviewUsesMap(activeNetworkSubview)) {{
           return "network-map";
         }}
+        if (activeNetworkSubview === "graph") {{
+          return "network-graph";
+        }}
         return "network";
       }}
       if (activeLayoutView === "settings") {{
@@ -77,13 +80,15 @@
           ? "/api/state?lite=1&profile=chat"
           : (pollProfile === "network"
             ? "/api/state?lite=1&profile=network"
-            : (pollProfile === "network-map"
-              ? "/api/state?lite=1&profile=network-map"
-              : (pollProfile === "status"
-                ? "/api/state?lite=1&profile=status"
-                : (pollProfile === "console"
-                  ? "/api/state?lite=1&profile=console"
-                  : "/api/state?lite=1"))));
+            : (pollProfile === "network-graph"
+              ? "/api/state?lite=1&profile=network-graph"
+              : (pollProfile === "network-map"
+                ? "/api/state?lite=1&profile=network-map"
+                : (pollProfile === "status"
+                  ? "/api/state?lite=1&profile=status"
+                  : (pollProfile === "console"
+                    ? "/api/state?lite=1&profile=console"
+                    : "/api/state?lite=1")))));
         const stateUrl = forceStateReloadOnce
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;

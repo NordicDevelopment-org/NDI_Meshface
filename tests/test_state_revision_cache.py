@@ -39,6 +39,12 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
 
     setattr(build_state_fn, "lite_status", build_lite_status_fn)
 
+    def build_lite_network_graph_fn(**_kwargs):
+        calls.append("lite_network_graph")
+        return {"state_revision": tracker.state_revision, "profile": "network-graph"}
+
+    setattr(build_state_fn, "lite_network_graph", build_lite_network_graph_fn)
+
     def build_lite_network_map_fn(**_kwargs):
         calls.append("lite_network_map")
         return {"state_revision": tracker.state_revision, "profile": "network-map"}
@@ -83,10 +89,30 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
     assert lite_status_fn() == {"state_revision": 2, "profile": "status"}
     assert calls == ["full", "full", "lite_chat", "lite_chat", "lite_status"]
 
+    lite_network_graph_fn = state_fn.lite_network_graph  # type: ignore[attr-defined]
+    assert lite_network_graph_fn() == {"state_revision": 2, "profile": "network-graph"}
+    assert lite_network_graph_fn() == {"state_revision": 2, "profile": "network-graph"}
+    assert calls == [
+        "full",
+        "full",
+        "lite_chat",
+        "lite_chat",
+        "lite_status",
+        "lite_network_graph",
+    ]
+
     lite_network_map_fn = state_fn.lite_network_map  # type: ignore[attr-defined]
     assert lite_network_map_fn() == {"state_revision": 2, "profile": "network-map"}
     assert lite_network_map_fn() == {"state_revision": 2, "profile": "network-map"}
-    assert calls == ["full", "full", "lite_chat", "lite_chat", "lite_status", "lite_network_map"]
+    assert calls == [
+        "full",
+        "full",
+        "lite_chat",
+        "lite_chat",
+        "lite_status",
+        "lite_network_graph",
+        "lite_network_map",
+    ]
 
 
 def test_record_local_chat_bumps_tracker_state_revision() -> None:

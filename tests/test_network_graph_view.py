@@ -263,6 +263,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'layoutSourceSignature: "",' in js
     assert 'function buildNetworkGraphLayoutSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "")' in js
     assert 'function hydrateNetworkGraphLayoutData(baseLayout, nodeMap, combinedEdges, state)' in js
+    assert 'function resolveNetworkGraphPacketPortnum(packet)' in js
+    assert 'safePacket.summary && typeof safePacket.summary === "object"' in js
     assert 'const graphLayoutSourceSignature = buildNetworkGraphLayoutSourceSignature(' in js
     assert 'networkGraphViewState.layoutSourceSignature === graphLayoutSourceSignature' in js
     assert 'networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();' in js
@@ -441,6 +443,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const networkGraphActive304 = activeLayoutView === "network" && activeNetworkSubview === "graph" && !networkSubviewUsesMap(activeNetworkSubview);' in js
     assert 'const networkRoutesActive304 = activeLayoutView === "network" && activeNetworkSubview === "routes";' in js
     assert 'const networkSensorsActive = activeLayoutView === "network" && activeNetworkSubview === "sensors";' in js
+    assert 'return "network-graph";' in js
     assert '|| (activeLayoutView === "network" && !networkSensorsActive)' in js
     assert 'if (weeklySummaryPromise) {' in js
     assert 'const networkGraphActive = next === "network" && activeNetworkSubview === "graph" && !networkSubviewUsesMap(activeNetworkSubview);' in js

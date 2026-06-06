@@ -144,6 +144,18 @@ def handle_state_get(
                 state_lite_fn = getattr(state_fn, "lite", None)
                 if callable(state_lite_fn):
                     selected_fn = state_lite_fn
+        elif profile in {"network-graph", "network_graph"}:
+            state_lite_network_graph_fn = getattr(state_fn, "lite_network_graph", None)
+            if callable(state_lite_network_graph_fn):
+                selected_fn = state_lite_network_graph_fn
+            else:
+                state_lite_network_fn = getattr(state_fn, "lite_network", None)
+                if callable(state_lite_network_fn):
+                    selected_fn = state_lite_network_fn
+                else:
+                    state_lite_fn = getattr(state_fn, "lite", None)
+                    if callable(state_lite_fn):
+                        selected_fn = state_lite_fn
         elif profile in {"network-map", "network_map"}:
             state_lite_network_map_fn = getattr(state_fn, "lite_network_map", None)
             if callable(state_lite_network_map_fn):

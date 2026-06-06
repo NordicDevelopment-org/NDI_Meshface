@@ -5174,16 +5174,50 @@
       const safePacket = (packet && typeof packet === "object") ? packet : null;
       const safeKeys = Array.isArray(keys) ? keys : [];
       const numericLookup = nodeIdByNum instanceof Map ? nodeIdByNum : new Map();
-      for (const key of safeKeys) {{
-        const rawValue = safePacket ? safePacket[key] : null;
-        const clean = normalizeNodeId(rawValue);
-        if (isCanonicalNodeId(clean) || clean === "^all" || clean === "local") {{
-          return clean;
+      const sources = [];
+      if (safePacket) {{
+        sources.push(safePacket);
+        if (safePacket.summary && typeof safePacket.summary === "object") sources.push(safePacket.summary);
+        if (safePacket.packet && typeof safePacket.packet === "object") {{
+          sources.push(safePacket.packet);
+          if (safePacket.packet.decoded && typeof safePacket.packet.decoded === "object") {{
+            sources.push(safePacket.packet.decoded);
+          }}
         }}
-        const nodeNum = parseNodeNum(rawValue);
-        if (Number.isInteger(nodeNum) && numericLookup.has(nodeNum)) {{
-          return normalizeNodeId(numericLookup.get(nodeNum) || "");
+      }}
+      for (const source of sources) {{
+        for (const key of safeKeys) {{
+          const rawValue = source ? source[key] : null;
+          const clean = normalizeNodeId(rawValue);
+          if (isCanonicalNodeId(clean) || clean === "^all" || clean === "local") {{
+            return clean;
+          }}
+          const nodeNum = parseNodeNum(rawValue);
+          if (Number.isInteger(nodeNum) && numericLookup.has(nodeNum)) {{
+            return normalizeNodeId(numericLookup.get(nodeNum) || "");
+          }}
         }}
+      }}
+      return "";
+    }}
+
+    function resolveNetworkGraphPacketPortnum(packet) {{
+      const safePacket = (packet && typeof packet === "object") ? packet : null;
+      const sources = [];
+      if (safePacket) {{
+        sources.push(safePacket);
+        if (safePacket.summary && typeof safePacket.summary === "object") sources.push(safePacket.summary);
+        if (safePacket.packet && typeof safePacket.packet === "object") {{
+          sources.push(safePacket.packet);
+          if (safePacket.packet.decoded && typeof safePacket.packet.decoded === "object") {{
+            sources.push(safePacket.packet.decoded);
+          }}
+        }}
+      }}
+      for (const source of sources) {{
+        const rawValue = source ? (source.portnum ?? source.portNum) : null;
+        const text = String(rawValue == null ? "" : rawValue).trim();
+        if (text) return text;
       }}
       return "";
     }}
@@ -5240,7 +5274,7 @@
         if (!(packet && typeof packet === "object")) continue;
         const fromId = resolveNetworkGraphPacketNodeId(packet, networkGraphPacketFromIdKeys, nodeIdByNum);
         const toId = resolveNetworkGraphPacketNodeId(packet, networkGraphPacketToIdKeys, nodeIdByNum);
-        const portnum = String((packet.portnum ?? packet.portNum ?? "") || "").trim();
+        const portnum = resolveNetworkGraphPacketPortnum(packet);
         const fromSignal = ensureSignal(fromId);
         if (fromSignal) {{
           fromSignal.packetCount += 1;

@@ -691,6 +691,61 @@ def _slim_recent_packets_for_activity(
     return slimmed
 
 
+def _packet_value_from_sources(entry: Mapping[str, object], keys: tuple[str, ...]) -> object:
+    sources: list[object] = [
+        entry,
+        entry.get("summary"),
+        entry.get("packet"),
+    ]
+    packet = entry.get("packet")
+    if isinstance(packet, Mapping):
+        sources.append(packet.get("decoded"))
+    for source in sources:
+        if not isinstance(source, Mapping):
+            continue
+        for key in keys:
+            value = source.get(key)
+            if value is not None and value != "":
+                return value
+    return None
+
+
+def _slim_recent_packets_for_network_graph(
+    recent_packets: list[dict[str, object]],
+    *,
+    max_packets: int = 120,
+) -> list[dict[str, object]]:
+    """Keep the packet routing fields the graph uses for signal metadata."""
+    try:
+        max_packets = max(0, int(max_packets))
+    except Exception:
+        max_packets = 120
+    if max_packets <= 0:
+        return []
+    slimmed: list[dict[str, object]] = []
+    for entry in recent_packets[-max_packets:]:
+        if not isinstance(entry, Mapping):
+            continue
+        slim_entry: dict[str, object] = {}
+        for target_key, source_keys in (
+            ("from", ("from", "from_id", "fromId", "source_id", "sourceId", "source", "from_num", "fromNum")),
+            ("to", ("to", "to_id", "toId", "dest_id", "destId", "destination", "dest", "to_num", "toNum")),
+            ("portnum", ("portnum", "portNum")),
+            ("packet_id", ("packet_id", "packetId", "id", "message_id", "messageId")),
+            ("rx_time_unix", ("rx_time_unix", "time_unix", "rxTime")),
+        ):
+            value = _packet_value_from_sources(entry, source_keys)
+            if value is not None:
+                slim_entry[target_key] = value
+        for key in ("captured_at", "rx_time", "time"):
+            value = entry.get(key)
+            if value is not None:
+                slim_entry[key] = value
+        if slim_entry:
+            slimmed.append(slim_entry)
+    return slimmed
+
+
 def _normalize_modem_preset(value: object) -> Optional[str]:
     if value is None:
         return None
@@ -1114,6 +1169,11 @@ def build_dashboard_state_lite(
     profile_name = str(profile or "").strip().lower()
     if profile_name == "status":
         slim_recent_packets = []
+    elif profile_name in {"network-graph", "network_graph"}:
+        slim_recent_packets = _slim_recent_packets_for_network_graph(
+            state_payload.traffic.recent_packets,
+            max_packets=120,
+        )
     elif profile_name in {"network-map", "network_map"}:
         slim_recent_packets = _slim_recent_packets_for_activity(
             state_payload.traffic.recent_packets,
@@ -1136,6 +1196,12 @@ def build_dashboard_state_lite(
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
         slim_recent_chat = []
+    elif profile_name in {"network-graph", "network_graph"}:
+        slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
+        slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
+        slim_recent_chat = []
+        slim_port_counts = []
+        slim_node_packet_trends = {}
     elif profile_name in {"network-map", "network_map"}:
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
@@ -1156,7 +1222,16 @@ def build_dashboard_state_lite(
         edges=slim_edges,
         local_node_id=state_payload.local_node_id,
         include_text_times=profile_name
-        not in {"chat", "network", "network-map", "network_map", "status", "console"},
+        not in {
+            "chat",
+            "network",
+            "network-graph",
+            "network_graph",
+            "network-map",
+            "network_map",
+            "status",
+            "console",
+        },
     )
     slim_traffic = StateTrafficPayload(
         edges=slim_edges,

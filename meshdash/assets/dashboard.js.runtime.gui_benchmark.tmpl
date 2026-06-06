@@ -208,7 +208,9 @@
       const view = normalizeLayoutView(viewName || activeLayoutView);
       if (view === "network") {{
         const subview = normalizeNetworkSubview(subviewName || activeNetworkSubview);
-        return networkSubviewUsesMap(subview) ? "network-map" : "network";
+        if (networkSubviewUsesMap(subview)) return "network-map";
+        if (subview === "graph") return "network-graph";
+        return "network";
       }}
       if (view === "settings") return "status";
       if (view === "console") return "status";
@@ -256,7 +258,14 @@
       const clean = String(profileName || "default").trim().toLowerCase();
       const params = new URLSearchParams();
       params.set("lite", "1");
-      if (clean === "chat" || clean === "network" || clean === "network-map" || clean === "status" || clean === "console") {{
+      if (
+        clean === "chat"
+        || clean === "network"
+        || clean === "network-graph"
+        || clean === "network-map"
+        || clean === "status"
+        || clean === "console"
+      ) {{
         params.set("profile", clean);
       }}
       params.set("_bench", String(Date.now()));
@@ -397,7 +406,7 @@
           await meshGuiBenchmarkForcePoll("chat", "");
         }}
         if (opts.includeApi) {{
-          const stateProfiles = ["default", "chat", "network", "network-map", "status", "console"];
+          const stateProfiles = ["default", "chat", "network", "network-graph", "network-map", "status", "console"];
           for (const profile of stateProfiles) {{
             try {{
               api.push(await meshGuiBenchmarkFetchJson(`state:${{profile}}`, meshGuiBenchmarkStatePathForProfile(profile)));

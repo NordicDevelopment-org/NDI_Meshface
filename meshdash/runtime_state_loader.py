@@ -223,6 +223,42 @@ def build_state_snapshot_loader_with_dependencies(
         except Exception:
             pass
 
+    build_state_lite_network_graph = getattr(build_state_fn, "lite_network_graph", None)
+    if callable(build_state_lite_network_graph):
+        lite_network_graph_cache_key: tuple[int, int, int, int] | None = None
+        lite_network_graph_cache_payload: dict[str, object] | None = None
+
+        def state_fn_lite_network_graph() -> dict:
+            nonlocal lite_network_graph_cache_key, lite_network_graph_cache_payload
+            key = _cache_key()
+            if lite_network_graph_cache_payload is not None and lite_network_graph_cache_key == key:
+                return lite_network_graph_cache_payload
+            payload = build_state_lite_network_graph(
+                iface=dependencies.iface,
+                tracker=dependencies.tracker,
+                started_at=dependencies.started_at,
+                target=dependencies.target,
+                show_secrets=dependencies.show_secrets,
+                storage_probe_path=dependencies.storage_probe_path,
+                revision_info=dependencies.revision_info,
+            )
+            lite_network_graph_cache_key = key
+            lite_network_graph_cache_payload = payload
+            return payload
+
+        def state_fn_lite_network_graph_etag() -> str:
+            return _etag_for("lite-network-graph")
+
+        try:
+            setattr(state_fn_lite_network_graph, "etag", state_fn_lite_network_graph_etag)
+        except Exception:
+            pass
+
+        try:
+            setattr(state_fn, "lite_network_graph", state_fn_lite_network_graph)
+        except Exception:
+            pass
+
     build_state_lite_network_map = getattr(build_state_fn, "lite_network_map", None)
     if callable(build_state_lite_network_map):
         lite_network_map_cache_key: tuple[int, int, int, int] | None = None
