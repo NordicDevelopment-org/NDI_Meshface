@@ -131,6 +131,7 @@ def build_dashboard_runtime_dependencies(
     build_state_lite_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_chat_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_network_fn: BuildStateWithSensitiveFn | None = None,
+    build_state_lite_network_map_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_status_fn: BuildStateWithSensitiveFn | None = None,
     build_state_lite_console_fn: BuildStateWithSensitiveFn | None = None,
     sensitive_field_names: set[str],
@@ -180,6 +181,15 @@ def build_dashboard_runtime_dependencies(
         )
         try:
             setattr(build_state_with_sensitive_fields, "lite_network", build_state_lite_network_with_sensitive_fields)
+        except Exception:
+            pass
+    if build_state_lite_network_map_fn is not None:
+        build_state_lite_network_map_with_sensitive_fields = _build_state_builder(
+            build_state_fn=build_state_lite_network_map_fn,
+            sensitive_field_names=sensitive_field_names,
+        )
+        try:
+            setattr(build_state_with_sensitive_fields, "lite_network_map", build_state_lite_network_map_with_sensitive_fields)
         except Exception:
             pass
     if build_state_lite_status_fn is not None:

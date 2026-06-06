@@ -152,6 +152,19 @@ def _with_summary_persistence(
         except Exception:
             pass
 
+    lite_network_map_fn = getattr(base_state_fn, "lite_network_map", None)
+    if callable(lite_network_map_fn):
+        def _wrapped_state_lite_network_map_fn() -> object:
+            payload = lite_network_map_fn()
+            _persist_summary(payload)
+            return payload
+
+        _copy_state_fn_attrs(_wrapped_state_lite_network_map_fn, lite_network_map_fn)
+        try:
+            setattr(_wrapped_state_fn, "lite_network_map", _wrapped_state_lite_network_map_fn)
+        except Exception:
+            pass
+
     lite_status_fn = getattr(base_state_fn, "lite_status", None)
     if callable(lite_status_fn):
         def _wrapped_state_lite_status_fn() -> object:

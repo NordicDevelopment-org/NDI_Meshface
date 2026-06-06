@@ -5,6 +5,7 @@ from meshdash.state_service import (
     _slim_history_caps,
     _slim_nodes_for_chat,
     _slim_recent_packets,
+    _slim_recent_packets_for_activity,
 )
 from meshdash.state_summary import apply_node_historical_names
 
@@ -186,6 +187,43 @@ def test_slim_recent_packets_caps_lite_buffer_length() -> None:
     assert slimmed[-1]["summary"]["packet_id"] == 149
 
 
+def test_slim_recent_packets_for_activity_drops_packet_body() -> None:
+    recent_packets = [
+        {
+            "summary": {
+                "packet_id": 123,
+                "from": "!from",
+                "to": "!to",
+                "portnum": "POSITION_APP",
+                "rx_time": "2026-06-03 00:00:01Z",
+            },
+            "packet": {
+                "id": 123,
+                "fromId": "!from",
+                "toId": "!to",
+                "decoded": {"payload": "drop-me"},
+                "raw": {"drop": True},
+            },
+            "captured_at": "2026-06-03 00:00:01Z",
+        }
+    ]
+
+    slimmed = _slim_recent_packets_for_activity(recent_packets)
+
+    assert slimmed == [
+            {
+                "summary": {
+                    "packet_id": 123,
+                    "from": "!from",
+                    "to": "!to",
+                "portnum": "POSITION_APP",
+                "rx_time": "2026-06-03 00:00:01Z",
+            },
+            "captured_at": "2026-06-03 00:00:01Z",
+        }
+    ]
+
+
 def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
     slimmed = _slim_nodes_for_chat(
         [
@@ -285,6 +323,66 @@ def test_lite_network_profile_omits_recent_chat_rows(monkeypatch) -> None:
     assert isinstance(traffic, dict)
     assert traffic["recent_chat"] == []
     assert traffic["edges"]
+
+
+def test_lite_network_map_profile_keeps_activity_packets_only(monkeypatch) -> None:
+    payload = DashboardStatePayload(
+        generated_at="2026-06-03T00:00:00Z",
+        summary={},
+        summary_error=None,
+        my_info={},
+        my_info_error=None,
+        metadata={},
+        metadata_error=None,
+        local_state={},
+        local_state_error=None,
+        nodes_error=None,
+        tracker_error=None,
+        tracker_saved_counts_error=None,
+        tracker_capabilities_error=None,
+        nodes=[{"id": "!node-a", "short_name": "A", "long_name": "Alpha"}],
+        history_caps={},
+        nodes_full=[],
+        traffic=StateTrafficPayload(
+            edges=[{"from": "!node-a", "to": "!node-b", "count": 1}],
+            port_counts=[{"portnum": "TEXT_MESSAGE_APP", "count": 2}],
+            recent_packets=[
+                {
+                    "summary": {"packet_id": 1, "from": "!node-a", "to": "^all"},
+                    "packet": {"id": 1, "raw": {"drop": True}},
+                }
+            ],
+            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            node_packet_trends={"!node-a": {"recent": 2}},
+        ),
+        local_node_id="!local",
+    )
+
+    monkeypatch.setattr(
+        state_service,
+        "build_dashboard_state_typed",
+        lambda **_kwargs: payload,
+    )
+
+    state = state_service.build_dashboard_state_lite(
+        iface=object(),
+        tracker=object(),
+        started_at=0,
+        target="",
+        show_secrets=True,
+        storage_probe_path=None,
+        revision_info={},
+        sensitive_field_names=set(),
+        profile="network-map",
+    )
+
+    traffic = state["traffic"]
+    assert isinstance(traffic, dict)
+    assert traffic["recent_chat"] == []
+    assert traffic["edges"]
+    assert traffic["port_counts"] == []
+    assert traffic["node_packet_trends"] == {}
+    assert traffic["recent_packets"] == [{"summary": {"packet_id": 1, "from": "!node-a", "to": "^all"}}]
 
 
 def test_lite_status_profile_omits_live_traffic_rows(monkeypatch) -> None:

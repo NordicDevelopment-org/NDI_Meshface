@@ -662,6 +662,35 @@ def _slim_recent_packets(
     return slimmed
 
 
+def _slim_recent_packets_for_activity(
+    recent_packets: list[dict[str, object]],
+    *,
+    max_packets: int = 120,
+) -> list[dict[str, object]]:
+    """Keep only fields needed to detect map node activity flashes."""
+    try:
+        max_packets = max(0, int(max_packets))
+    except Exception:
+        max_packets = 120
+    if max_packets <= 0:
+        return []
+    slimmed: list[dict[str, object]] = []
+    for entry in recent_packets[-max_packets:]:
+        if not isinstance(entry, Mapping):
+            continue
+        slim_entry: dict[str, object] = {}
+        slim_summary = _slim_packet_summary(entry.get("summary"))
+        if slim_summary:
+            slim_entry["summary"] = slim_summary
+        for key in ("captured_at", "rx_time", "time"):
+            value = entry.get(key)
+            if value is not None:
+                slim_entry[key] = value
+        if slim_entry:
+            slimmed.append(slim_entry)
+    return slimmed
+
+
 def _normalize_modem_preset(value: object) -> Optional[str]:
     if value is None:
         return None
@@ -1083,11 +1112,18 @@ def build_dashboard_state_lite(
         include_nodes_full=False,
     )
     profile_name = str(profile or "").strip().lower()
-    slim_recent_packet_limit = 0 if profile_name == "status" else 120
-    slim_recent_packets = _slim_recent_packets(
-        state_payload.traffic.recent_packets,
-        max_packets=slim_recent_packet_limit,
-    )
+    if profile_name == "status":
+        slim_recent_packets = []
+    elif profile_name in {"network-map", "network_map"}:
+        slim_recent_packets = _slim_recent_packets_for_activity(
+            state_payload.traffic.recent_packets,
+            max_packets=120,
+        )
+    else:
+        slim_recent_packets = _slim_recent_packets(
+            state_payload.traffic.recent_packets,
+            max_packets=120,
+        )
     slim_recent_chat = list(state_payload.traffic.recent_chat)
     slim_edges = list(state_payload.traffic.edges)
     slim_port_counts = list(state_payload.traffic.port_counts)
@@ -1100,6 +1136,12 @@ def build_dashboard_state_lite(
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
         slim_recent_chat = []
+    elif profile_name in {"network-map", "network_map"}:
+        slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
+        slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
+        slim_recent_chat = []
+        slim_port_counts = []
+        slim_node_packet_trends = {}
     elif profile_name in {"status", "console"}:
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = []
@@ -1113,7 +1155,8 @@ def build_dashboard_state_lite(
         recent_packets=slim_recent_packets,
         edges=slim_edges,
         local_node_id=state_payload.local_node_id,
-        include_text_times=profile_name not in {"chat", "network", "status", "console"},
+        include_text_times=profile_name
+        not in {"chat", "network", "network-map", "network_map", "status", "console"},
     )
     slim_traffic = StateTrafficPayload(
         edges=slim_edges,

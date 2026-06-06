@@ -38,6 +38,12 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
         return {"state_revision": tracker.state_revision, "profile": "status"}
 
     setattr(build_state_fn, "lite_status", build_lite_status_fn)
+
+    def build_lite_network_map_fn(**_kwargs):
+        calls.append("lite_network_map")
+        return {"state_revision": tracker.state_revision, "profile": "network-map"}
+
+    setattr(build_state_fn, "lite_network_map", build_lite_network_map_fn)
     state_fn = build_state_snapshot_loader_with_dependencies(
         dependencies=StateSnapshotRuntimeDependencies(
             iface=object(),
@@ -76,6 +82,11 @@ def test_state_snapshot_cache_key_includes_tracker_state_revision() -> None:
     assert lite_status_fn() == {"state_revision": 2, "profile": "status"}
     assert lite_status_fn() == {"state_revision": 2, "profile": "status"}
     assert calls == ["full", "full", "lite_chat", "lite_chat", "lite_status"]
+
+    lite_network_map_fn = state_fn.lite_network_map  # type: ignore[attr-defined]
+    assert lite_network_map_fn() == {"state_revision": 2, "profile": "network-map"}
+    assert lite_network_map_fn() == {"state_revision": 2, "profile": "network-map"}
+    assert calls == ["full", "full", "lite_chat", "lite_chat", "lite_status", "lite_network_map"]
 
 
 def test_record_local_chat_bumps_tracker_state_revision() -> None:

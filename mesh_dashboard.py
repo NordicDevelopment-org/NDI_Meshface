@@ -353,6 +353,32 @@ def _build_state_lite_network_helper(
     )
 
 
+def _build_state_lite_network_map_helper(
+    *,
+    iface: object,
+    tracker: object,
+    started_at: float,
+    target: str,
+    show_secrets: bool,
+    storage_probe_path: Optional[str],
+    revision_info: object,
+    sensitive_field_names: set[str],
+) -> dict[str, object]:
+    return _build_dashboard_state_lite_helper(
+        iface=iface,
+        tracker=tracker,
+        started_at=started_at,
+        target=target,
+        show_secrets=show_secrets,
+        storage_probe_path=storage_probe_path,
+        revision_info=revision_info,
+        sensitive_field_names=sensitive_field_names,
+        collect_nodes_fn=_collect_nodes_rows_typed_helper,
+        collect_local_state_fn=_collect_local_state_helper,
+        profile="network-map",
+    )
+
+
 def _build_state_lite_status_helper(
     *,
     iface: object,
@@ -540,6 +566,7 @@ def run_dashboard(args: argparse.Namespace) -> None:
         build_state_lite_fn=_build_state_lite_helper,
         build_state_lite_chat_fn=_build_state_lite_chat_helper,
         build_state_lite_network_fn=_build_state_lite_network_helper,
+        build_state_lite_network_map_fn=_build_state_lite_network_map_helper,
         build_state_lite_status_fn=_build_state_lite_status_helper,
         build_state_lite_console_fn=_build_state_lite_console_helper,
         sensitive_field_names=SENSITIVE_FIELD_NAMES,
