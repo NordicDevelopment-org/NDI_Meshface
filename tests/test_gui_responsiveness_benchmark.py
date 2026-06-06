@@ -13,6 +13,8 @@ def test_dashboard_js_includes_gui_responsiveness_benchmark(
             "meshGuiBenchmarkForcePoll",
             "meshGuiBenchmarkFetchJson",
             "meshGuiBenchmarkSummarizeSamples",
+            "networkGraphRender: graphStats ?",
+            "networkGraphRenderRunsAdded",
             'const stateProfiles = ["default", "chat", "network", "network-graph", "network-map", "status", "console"];',
             "mesh-gui-benchmark-result",
         ),

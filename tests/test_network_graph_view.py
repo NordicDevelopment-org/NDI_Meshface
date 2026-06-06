@@ -91,9 +91,13 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'if (clean === "route" || clean === "routes") return "routes";' in js
     assert '|| clean === "top10" || clean === "sensors") return clean;' in js
     assert 'function renderNetworkGraphView(state = latestState)' in js
+    assert 'function recordNetworkGraphRenderStats(stats)' in js
+    assert 'const markNetworkGraphRenderPhase = (name, extra = null) => {' in js
     assert 'function clearNetworkGraphDom()' in js
     assert 'const leavingNetworkGraphSubview = !!(' in js
     assert 'const leavingNetworkGraphLayout = !!(' in js
+    assert 'setActiveNetworkSubview(activeNetworkSubview, { persist: false, render: false });' in js
+    assert 'latestStatePollProfile === "network-graph"' in js
     assert 'summary.__meshNetworkGraphSummaryHtml = "";' in js
     assert 'function normalizeNetworkRoutesMode(raw)' in js
     assert 'const select = document.getElementById("network-routes-mode-select");' in js
@@ -265,7 +269,14 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'function buildNetworkGraphLayoutSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "")' in js
     assert 'function hydrateNetworkGraphLayoutData(baseLayout, nodeMap, combinedEdges, state)' in js
     assert 'function buildNetworkGraphSceneDataSignature(scene, sourceSignature = "")' in js
+    assert 'void sourceSignature;' in js
+    assert 'Keep ordinary state-counter churn from forcing an O(edges + nodes) SVG sync.' in js
     assert 'const canSkipSceneDataSync = !!(' in js
+    assert 'const graphHistoryEdgesLoading = networkGraphHistoryEdgesLoading(edgeMode);' in js
+    assert 'markNetworkGraphRenderPhase("history_loading"' in js
+    assert 'action: "history-loading",' in js
+    assert 'markNetworkGraphRenderPhase("scene_markup"' in js
+    assert 'markNetworkGraphRenderPhase("scene_dom_replace"' in js
     assert 'function resolveNetworkGraphPacketPortnum(packet)' in js
     assert 'safePacket.summary && typeof safePacket.summary === "object"' in js
     assert 'const graphLayoutSourceSignature = buildNetworkGraphLayoutSourceSignature(' in js
@@ -310,6 +321,7 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'const includeAllLiveNodes = !(options && options.includeAllLiveNodes === false);' in js
     assert 'const pinnedNodeIds = Array.isArray(options && options.pinnedNodeIds)' in js
     assert 'function networkGraphRawEdgesForMode(rawEdges, modeName = networkGraphEdgeMode)' in js
+    assert 'function networkGraphHistoryEdgesLoading(modeName = networkGraphEdgeMode)' in js
     assert 'function networkGraphHistoryCapsForMode(historyCapsRaw, modeName = networkGraphEdgeMode)' in js
     assert 'function filterNetworkGraphRawEdgesByMode(rawEdges, mode = networkGraphEdgeMode)' in js
     assert 'fetch(`/api/history/links?${params.toString()}`' in js

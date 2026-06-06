@@ -19,6 +19,8 @@ POLL_RENDER_SKIP_TOKEN_GROUPS: tuple[tuple[str, Sequence[str]], ...] = (
             '"/api/state?lite=1&profile=status"',
             '"/api/state?lite=1&profile=console"',
             'function statePollProfile() {',
+            'latestStatePollProfile = pollProfile;',
+            'networkGraphActive304 && latestStatePollProfile === "network-graph"',
             'if (activeLayoutView === "bbs") {',
             'return "network-map";',
             'return "network-graph";',

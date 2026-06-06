@@ -189,6 +189,12 @@
       const rawState = (latestRawState && typeof latestRawState === "object") ? latestRawState : state;
       const traffic = (state.traffic && typeof state.traffic === "object") ? state.traffic : {{}};
       const rawTraffic = (rawState.traffic && typeof rawState.traffic === "object") ? rawState.traffic : traffic;
+      const graphStatsStore = (typeof window !== "undefined" && window.__meshNetworkGraphRenderStats && typeof window.__meshNetworkGraphRenderStats === "object")
+        ? window.__meshNetworkGraphRenderStats
+        : null;
+      const graphStats = graphStatsStore && graphStatsStore.last && typeof graphStatsStore.last === "object"
+        ? graphStatsStore.last
+        : null;
       return {{
         activeLayoutView,
         activeNetworkSubview,
@@ -201,7 +207,46 @@
         recentChat: Array.isArray(rawTraffic.recent_chat) ? rawTraffic.recent_chat.length : 0,
         recentPackets: Array.isArray(rawTraffic.recent_packets) ? rawTraffic.recent_packets.length : 0,
         edges: Array.isArray(rawTraffic.edges) ? rawTraffic.edges.length : 0,
+        networkGraphRender: graphStats ? {{
+          status: graphStats.status || "",
+          action: graphStats.action || "",
+          totalMs: meshGuiBenchmarkRoundMs(graphStats.totalMs),
+          reusedData: !!graphStats.reusedData,
+          reusedLayout: !!graphStats.reusedLayout,
+          skippedSceneDataSync: !!graphStats.skippedSceneDataSync,
+          nodes: Math.max(0, Math.trunc(Number(graphStats.nodes) || 0)),
+          edges: Math.max(0, Math.trunc(Number(graphStats.edges) || 0)),
+          renderedItems: Math.max(0, Math.trunc(Number(graphStats.renderedItems) || 0)),
+          phases: Array.isArray(graphStats.phases)
+            ? graphStats.phases.slice(-16).map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
+            : [],
+        }} : null,
       }};
+    }}
+
+    function meshGuiBenchmarkNetworkGraphRenderRunCount() {{
+      const graphStatsStore = (typeof window !== "undefined" && window.__meshNetworkGraphRenderStats && typeof window.__meshNetworkGraphRenderStats === "object")
+        ? window.__meshNetworkGraphRenderStats
+        : null;
+      return graphStatsStore && Array.isArray(graphStatsStore.runs) ? graphStatsStore.runs.length : 0;
+    }}
+
+    function meshGuiBenchmarkNetworkGraphRenderRunsSince(startIndex) {{
+      const graphStatsStore = (typeof window !== "undefined" && window.__meshNetworkGraphRenderStats && typeof window.__meshNetworkGraphRenderStats === "object")
+        ? window.__meshNetworkGraphRenderStats
+        : null;
+      const runs = graphStatsStore && Array.isArray(graphStatsStore.runs) ? graphStatsStore.runs : [];
+      const safeStart = Math.max(0, Math.trunc(Number(startIndex) || 0));
+      return runs.slice(safeStart).slice(-8).map((run) => {{
+        if (!run || typeof run !== "object") return run;
+        return {{
+          ...run,
+          totalMs: meshGuiBenchmarkRoundMs(run.totalMs),
+          phases: Array.isArray(run.phases)
+            ? run.phases.slice(-16).map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
+            : [],
+        }};
+      }});
     }}
 
     function meshGuiBenchmarkApiProfileForView(viewName, subviewName = "") {{
@@ -286,6 +331,7 @@
       }} catch (_err) {{
       }}
       const beforeChatSamples = chatPerfStats.samples;
+      const beforeGraphRuns = meshGuiBenchmarkNetworkGraphRenderRunCount();
       await poll();
       await meshGuiBenchmarkNextFrame();
       const chatPerfDelta = chatPerfStats.samples - beforeChatSamples;
@@ -300,12 +346,15 @@
           rosterCount: chatPerfStats.lastRosterCount,
           channel: chatPerfStats.lastChannel,
         }},
+        networkGraphRenderRunsAdded: Math.max(0, meshGuiBenchmarkNetworkGraphRenderRunCount() - beforeGraphRuns),
+        networkGraphRenderRuns: meshGuiBenchmarkNetworkGraphRenderRunsSince(beforeGraphRuns),
       }};
     }}
 
     async function meshGuiBenchmarkSwitchView(viewName, subviewName = "") {{
       const view = normalizeLayoutView(viewName || activeLayoutView);
       const subview = view === "network" ? normalizeNetworkSubview(subviewName || activeNetworkSubview) : "";
+      const beforeGraphRuns = meshGuiBenchmarkNetworkGraphRenderRunCount();
       if (view === "network" && subview) {{
         setActiveNetworkSubview(subview, {{ persist: false }});
       }}
@@ -315,7 +364,11 @@
         await meshGuiBenchmarkSleep(120);
         await meshGuiBenchmarkNextFrame();
       }}
-      return meshGuiBenchmarkStateSnapshot();
+      return {{
+        state: meshGuiBenchmarkStateSnapshot(),
+        networkGraphRenderRunsAdded: Math.max(0, meshGuiBenchmarkNetworkGraphRenderRunCount() - beforeGraphRuns),
+        networkGraphRenderRuns: meshGuiBenchmarkNetworkGraphRenderRunsSince(beforeGraphRuns),
+      }};
     }}
 
     async function meshGuiBenchmarkSelectNode() {{

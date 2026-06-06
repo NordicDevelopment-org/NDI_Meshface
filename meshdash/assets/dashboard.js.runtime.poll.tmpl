@@ -155,7 +155,7 @@
           const networkTopNodesActive304 = activeLayoutView === "network" && activeNetworkSubview === "top10";
           if (activeLayoutView === "network") {{
             renderNodes(nodes304);
-            if (networkGraphActive304 && typeof renderNetworkGraphView === "function") {{
+            if (networkGraphActive304 && latestStatePollProfile === "network-graph" && typeof renderNetworkGraphView === "function") {{
               renderNetworkGraphView(latestState);
             }}
             if (networkRoutesActive304 && typeof renderNetworkRoutes === "function") {{
@@ -257,6 +257,7 @@
         );
         const state = applyNodeVisibilityFiltersToState(rawState);
         latestState = state;
+        latestStatePollProfile = pollProfile;
         if (typeof refreshMapNodeFilterControl === "function") {{
           refreshMapNodeFilterControl(rawState);
         }}

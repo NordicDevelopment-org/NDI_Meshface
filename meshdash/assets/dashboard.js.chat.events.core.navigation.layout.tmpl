@@ -5005,6 +5005,7 @@
       const next = normalizeNetworkSubview(subviewName);
       const previous = normalizeNetworkSubview(activeNetworkSubview);
       const persist = options && options.persist !== false;
+      const renderSubview = !(options && options.render === false);
       const leavingNetworkGraphSubview = !!(
         normalizeLayoutView(activeLayoutView) === "network"
         && previous === "graph"
@@ -5075,35 +5076,39 @@
       }}
 
       if (normalizedView === "network" && next === "overview") {{
-        if (typeof refreshNetworkOverviewPanels === "function") {{
+        if (renderSubview && typeof refreshNetworkOverviewPanels === "function") {{
           void refreshNetworkOverviewPanels(false);
         }}
       }}
       if (normalizedView === "network" && next === "graph") {{
         renderNetworkGraphSummaryControlsOnly();
       }}
-      if (normalizedView === "network" && next === "graph" && !nextUsesMap) {{
-        if (typeof renderNetworkGraphView === "function") {{
+      if (renderSubview && normalizedView === "network" && next === "graph" && !nextUsesMap) {{
+        if (latestStatePollProfile === "network-graph" && typeof renderNetworkGraphView === "function") {{
           renderNetworkGraphView(latestState);
+        }} else if (typeof requestImmediatePoll === "function") {{
+          stateEtag = "";
+          forceStateReloadOnce = true;
+          requestImmediatePoll(0);
         }}
       }}
-      if (normalizedView === "network" && next === "routes") {{
+      if (renderSubview && normalizedView === "network" && next === "routes") {{
         syncNetworkRoutesFromSelectedNode(latestState, {{ preferSelectedTarget: true }});
         renderNetworkRoutes(latestState);
       }}
-      if (normalizedView === "network" && next === "top10") {{
+      if (renderSubview && normalizedView === "network" && next === "top10") {{
         renderNetworkTopNodes(latestState);
       }}
-      if (normalizedView === "network" && next === "sensors") {{
+      if (renderSubview && normalizedView === "network" && next === "sensors") {{
         if (typeof renderEnvironmentMetricsView === "function") {{
           void renderEnvironmentMetricsView(false);
         }}
       }}
-      if (normalizedView === "network" && next === "diagnostics") {{
+      if (renderSubview && normalizedView === "network" && next === "diagnostics") {{
         void refreshNetworkDiagnosticsPanel(false);
       }}
 
-      if (normalizedView === "network" && nextUsesMap) {{
+      if (renderSubview && normalizedView === "network" && nextUsesMap) {{
         lastMapSignature = "";
         lastMapGraphSignature = "";
         lastMapRenderMode = "";
@@ -5387,6 +5392,38 @@
       renderedLayoutSnapshot: null,
       pendingFocusTransition: null,
     }};
+
+    function networkGraphPerfNow() {{
+      return (typeof performance !== "undefined" && performance && typeof performance.now === "function")
+        ? performance.now()
+        : Date.now();
+    }}
+
+    function networkGraphRoundMs(value) {{
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? Math.round(Math.max(0, numberValue) * 100) / 100 : 0;
+    }}
+
+    function recordNetworkGraphRenderStats(stats) {{
+      if (typeof window === "undefined" || !stats || typeof stats !== "object") return;
+      const safeStats = {{
+        ...stats,
+        totalMs: networkGraphRoundMs(stats.totalMs),
+        phases: Array.isArray(stats.phases)
+          ? stats.phases.map((phase) => (phase && typeof phase === "object" ? {{ ...phase }} : phase))
+          : [],
+      }};
+      const existing = window.__meshNetworkGraphRenderStats;
+      const store = existing && typeof existing === "object" ? existing : {{ runs: [] }};
+      const runs = Array.isArray(store.runs) ? store.runs : [];
+      runs.push(safeStats);
+      if (runs.length > 40) {{
+        runs.splice(0, runs.length - 40);
+      }}
+      store.runs = runs;
+      store.last = safeStats;
+      window.__meshNetworkGraphRenderStats = store;
+    }}
 
     function cloneNetworkGraphViewBox(rawViewBox = networkGraphViewportBase) {{
       const fallback = networkGraphViewportBase;
@@ -6512,14 +6549,43 @@
     }}
 
     function buildNetworkGraphSceneDataSignature(scene, sourceSignature = "") {{
+      void sourceSignature;
       const safeScene = (scene && typeof scene === "object") ? scene : {{}};
       const nodeMap = safeScene.nodeMap instanceof Map ? safeScene.nodeMap : new Map();
+      const edges = Array.isArray(safeScene.edges) ? safeScene.edges : [];
+      const items = Array.isArray(safeScene.items) ? safeScene.items : [];
       let hash = 2166136261;
-      hash = hashMixStr(hash, String(sourceSignature || ""));
+      // Keep ordinary state-counter churn from forcing an O(edges + nodes) SVG sync.
       hash = hashMixStr(hash, normalizeNodeId(safeScene.rootId || ""));
       hash = hashMixStr(hash, normalizeNodeId(safeScene.localId || ""));
       hash = hashMixStr(hash, String(networkGraphViewState.selectedTagRouteKey || ""));
       hash = hashMixInt(hash, networkGraphViewState.selfPathVisible !== false ? 1 : 0);
+      const edgeDataKeys = edges.map((edge) => {{
+        const edgeKey = buildNetworkGraphEdgeDomKey(edge);
+        return [
+          edgeKey,
+          edge && edge.isReal ? "1" : "0",
+          Math.round(Number(edge && edge.weight) * 100) || 0,
+          Math.trunc(Number(edge && edge.directionCount) || 0),
+          Math.trunc(Number(edge && edge.lastSeenUnix) || 0),
+          Math.round(Number(edge && edge.avgHops) * 100) || 0,
+        ].join(":");
+      }}).sort();
+      hash = hashMixInt(hash, edgeDataKeys.length);
+      for (const edgeKey of edgeDataKeys) {{
+        hash = hashMixStr(hash, edgeKey);
+      }}
+      const itemDataKeys = items.map((item) => [
+        normalizeNodeId(item && item.nodeId),
+        Math.trunc(Number(item && item.degree) || 0),
+        Math.round(Number(item && item.weight) * 100) || 0,
+        item && item.detached ? "1" : "0",
+        item && item.broadcastOnly ? "1" : "0",
+      ].join(":")).sort();
+      hash = hashMixInt(hash, itemDataKeys.length);
+      for (const itemKey of itemDataKeys) {{
+        hash = hashMixStr(hash, itemKey);
+      }}
       const hiddenIds = networkGraphViewState.hiddenTagRoutePresetIds instanceof Set
         ? Array.from(networkGraphViewState.hiddenTagRoutePresetIds).map((value) => String(value || "")).filter(Boolean).sort()
         : [];
@@ -8141,6 +8207,15 @@
       return networkGraphHistoryEdgeCache.has(mode)
         ? (networkGraphHistoryEdgeCache.get(mode) || [])
         : safeEdges;
+    }}
+
+    function networkGraphHistoryEdgesLoading(modeName = networkGraphEdgeMode) {{
+      const mode = normalizeNetworkGraphEdgeMode(modeName);
+      return !!(
+        networkGraphEdgeModeUsesHistoryFetch(mode)
+        && networkGraphHistoryEdgeRequests.has(mode)
+        && !networkGraphHistoryEdgeCache.has(mode)
+      );
     }}
 
     function networkGraphHistoryCapsForMode(historyCapsRaw, modeName = networkGraphEdgeMode) {{
@@ -10121,6 +10196,35 @@
       if (!(svg instanceof SVGElement)) return;
       if (!(empty instanceof HTMLElement) || !(summary instanceof HTMLElement) || !(legend instanceof HTMLElement)) return;
       bindNetworkGraphInteractions(svg);
+      const graphPerfStartedAtMs = networkGraphPerfNow();
+      let graphPerfLastMs = graphPerfStartedAtMs;
+      const graphPerfPhases = [];
+      const markNetworkGraphRenderPhase = (name, extra = null) => {{
+        const nowMs = networkGraphPerfNow();
+        const phase = {{
+          name: String(name || ""),
+          deltaMs: networkGraphRoundMs(nowMs - graphPerfLastMs),
+          atMs: networkGraphRoundMs(nowMs - graphPerfStartedAtMs),
+        }};
+        if (extra && typeof extra === "object") {{
+          Object.assign(phase, extra);
+        }}
+        graphPerfPhases.push(phase);
+        graphPerfLastMs = nowMs;
+        return phase;
+      }};
+      const finishNetworkGraphRenderStats = (status, extra = null) => {{
+        const nowMs = networkGraphPerfNow();
+        const stats = {{
+          status: String(status || "complete"),
+          totalMs: networkGraphRoundMs(nowMs - graphPerfStartedAtMs),
+          phases: graphPerfPhases.slice(),
+        }};
+        if (extra && typeof extra === "object") {{
+          Object.assign(stats, extra);
+        }}
+        recordNetworkGraphRenderStats(stats);
+      }};
 
       const safeState = (state && typeof state === "object") ? state : {{}};
       const nodes = Array.isArray(safeState.nodes) ? safeState.nodes : [];
@@ -10130,11 +10234,63 @@
       const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
       const edgeMode = normalizeNetworkGraphEdgeMode(networkGraphEdgeMode);
       const historyCaps = networkGraphHistoryCapsForMode(historyCapsRaw, edgeMode);
-      const rawEdges = networkGraphRawEdgesForMode(
-        Array.isArray(traffic.edges) ? traffic.edges : [],
-        edgeMode
-      );
+      const rawStateEdges = Array.isArray(traffic.edges) ? traffic.edges : [];
+      if (networkGraphEdgeModeUsesHistoryFetch(edgeMode)) {{
+        ensureNetworkGraphHistoryEdges(edgeMode);
+      }}
+      const graphHistoryEdgesLoading = networkGraphHistoryEdgesLoading(edgeMode);
+      const rawEdges = graphHistoryEdgesLoading
+        ? []
+        : networkGraphRawEdgesForMode(rawStateEdges, edgeMode);
       const layoutMode = normalizeNetworkGraphLayoutMode(networkGraphLayoutMode);
+      if (graphHistoryEdgesLoading) {{
+        cancelNetworkGraphSceneAnimation();
+        stopNetworkGraphPan(svg);
+        if (svg.childElementCount) {{
+          svg.innerHTML = "";
+        }}
+        renderNetworkGraphSummaryControlsOnly();
+        renderNetworkGraphNavigationControls(safeState, new Map(), "");
+        networkGraphViewState.bounds = defaultNetworkGraphBounds();
+        networkGraphViewState.resetBounds = defaultNetworkGraphBounds();
+        networkGraphViewState.lastRootId = "";
+        networkGraphViewState.initialized = false;
+        networkGraphViewState.pendingEntryViewportSync = true;
+        networkGraphViewState.pendingModeViewportSync = false;
+        networkGraphViewState.renderedPositions = new Map();
+        networkGraphViewState.renderedLayoutSnapshot = null;
+        networkGraphViewState.lastSelectedId = "";
+        networkGraphViewState.lastSceneStructureSignature = "";
+        networkGraphViewState.lastSceneDataSignature = "";
+        networkGraphViewState.pendingFocusTransition = null;
+        networkGraphViewState.pendingSelectedNodeCenterId = "";
+        networkGraphViewState.preferCenteredTreeFit = false;
+        networkGraphViewState.resetCenter = null;
+        networkGraphViewState.viewBox = cloneNetworkGraphViewBox(networkGraphViewportBase);
+        svg.setAttribute(
+          "viewBox",
+          `${{networkGraphViewportBase.x.toFixed(2)}} ${{networkGraphViewportBase.y.toFixed(2)}} ${{networkGraphViewportBase.width.toFixed(2)}} ${{networkGraphViewportBase.height.toFixed(2)}}`
+        );
+        legend.innerHTML = "";
+        legend.hidden = true;
+        empty.textContent = `Loading ${{networkGraphEdgeModeLabel(edgeMode)}} link history...`;
+        empty.hidden = false;
+        markNetworkGraphRenderPhase("history_loading", {{
+          nodes: nodes.length,
+          rawEdges: rawStateEdges.length,
+        }});
+        finishNetworkGraphRenderStats("history-loading", {{
+          action: "history-loading",
+          edgeMode,
+          layoutMode,
+          historyLoading: true,
+          nodes: nodes.length,
+          edges: 0,
+          renderedItems: 0,
+          rawEdges: rawStateEdges.length,
+        }});
+        return;
+      }}
       const filteredRawEdges = filterNetworkGraphRawEdgesByMode(rawEdges, edgeMode);
       const searchQuery = (typeof globalNodeSearchQuery === "function")
         ? globalNodeSearchQuery()
@@ -10155,6 +10311,11 @@
         edgeMode,
         searchQuery
       );
+      markNetworkGraphRenderPhase("signature", {{
+        nodes: nodes.length,
+        rawEdges: Array.isArray(rawEdges) ? rawEdges.length : 0,
+        filteredEdges: Array.isArray(filteredRawEdges) ? filteredRawEdges.length : 0,
+      }});
       const canReuseGraphData = (
         networkGraphViewState.renderSourceSignature === graphSourceSignature
         && networkGraphViewState.cachedNodeMap instanceof Map
@@ -10173,10 +10334,18 @@
             historyMode: edgeMode,
             searchQuery,
           }});
+      markNetworkGraphRenderPhase("node_map", {{
+        reused: !!canReuseGraphData,
+        nodeMapSize: nodeMap instanceof Map ? nodeMap.size : 0,
+      }});
 
       const combinedEdges = canReuseGraphData
         ? networkGraphViewState.cachedCombinedEdges
         : combineNetworkGraphEdges(filteredRawEdges, nodeMap, {{ mode: edgeMode }});
+      markNetworkGraphRenderPhase("combine_edges", {{
+        reused: !!canReuseGraphData,
+        edges: Array.isArray(combinedEdges) ? combinedEdges.length : 0,
+      }});
       const canReuseGraphLayout = !!(
         canReuseGraphData
         || (
@@ -10191,6 +10360,11 @@
             ? hydrateNetworkGraphLayoutData(networkGraphViewState.cachedLayout, nodeMap, combinedEdges, safeState)
             : buildNetworkGraphLayout(nodeMap, combinedEdges, safeState)
         );
+      markNetworkGraphRenderPhase("layout", {{
+        reusedData: !!canReuseGraphData,
+        reusedLayout: !!canReuseGraphLayout,
+        items: layout && Array.isArray(layout.items) ? layout.items.length : 0,
+      }});
       if (!canReuseGraphData || networkGraphViewState.cachedLayout !== layout) {{
         networkGraphViewState.renderSourceSignature = graphSourceSignature;
         networkGraphViewState.layoutSourceSignature = graphLayoutSourceSignature;
@@ -10248,6 +10422,14 @@
             empty: true,
           }});
         }}
+        markNetworkGraphRenderPhase("empty_state");
+        finishNetworkGraphRenderStats("empty", {{
+          edgeMode,
+          layoutMode,
+          nodes: nodes.length,
+          edges: Array.isArray(combinedEdges) ? combinedEdges.length : 0,
+          renderedItems: 0,
+        }});
         return;
       }}
 
@@ -10307,6 +10489,10 @@
         )
       );
       renderNetworkGraphNavigationControls(safeState, nodeMap, rootId);
+      markNetworkGraphRenderPhase("bounds_controls", {{
+        renderedItems: layout.items.length,
+        edges: combinedEdges.length,
+      }});
       const previousLayoutSnapshot = networkGraphViewState.renderedLayoutSnapshot;
       const rootChanged = networkGraphViewState.lastRootId !== rootId;
       const selectionChanged = networkGraphViewState.lastSelectedId !== selectedId;
@@ -10372,6 +10558,11 @@
       }} else {{
         applyNetworkGraphViewBox(svg, networkGraphViewState.viewBox);
       }}
+      markNetworkGraphRenderPhase("viewbox", {{
+        selectedCenter: !!selectedNodeCenterViewBox,
+        rootChanged: !!rootChanged,
+        forceCenteredFit: !!shouldForceCenteredFit,
+      }});
       networkGraphViewState.pendingEntryViewportSync = false;
       networkGraphViewState.pendingModeViewportSync = false;
       networkGraphViewState.forceCenteredFitOnce = false;
@@ -10382,6 +10573,9 @@
       networkGraphViewState.lastSelectedId = selectedId;
       networkGraphViewState.renderedPositions = new Map(layout.positions);
       networkGraphViewState.renderedLayoutSnapshot = cloneNetworkGraphLayoutSnapshot(layout);
+      markNetworkGraphRenderPhase("snapshot", {{
+        positions: layout.positions instanceof Map ? layout.positions.size : 0,
+      }});
 
       const scene = {{
         ...layout,
@@ -10394,6 +10588,10 @@
       renderNetworkGraphTagRouteLegend(scene);
       const sceneStructureSignature = buildNetworkGraphSceneStructureSignature(scene);
       const sceneDataSignature = buildNetworkGraphSceneDataSignature(scene, graphSourceSignature);
+      markNetworkGraphRenderPhase("scene_signatures", {{
+        previousStructureMatched: networkGraphViewState.lastSceneStructureSignature === sceneStructureSignature,
+        previousDataMatched: networkGraphViewState.lastSceneDataSignature === sceneDataSignature,
+      }});
       const canSkipSceneDataSync = !!(
         networkGraphViewState.lastSceneDataSignature === sceneDataSignature
         && networkGraphViewState.lastSceneStructureSignature === sceneStructureSignature
@@ -10404,31 +10602,61 @@
         && !rootChanged
         && svg.childElementCount
       );
+      let graphSceneAction = "unknown";
       if (shouldAnimateSceneChange) {{
+        graphSceneAction = "animate";
         animateNetworkGraphScene(svg, previousLayoutSnapshot, scene);
+        markNetworkGraphRenderPhase("scene_animation_start");
       }} else if (canPatchSelectionOnly) {{
+        graphSceneAction = canSkipSceneDataSync ? "selection-only" : "selection-data-sync";
         cancelNetworkGraphSceneAnimation();
         syncNetworkGraphSceneSelection(svg, {{ rootId, selectedId }});
+        markNetworkGraphRenderPhase("scene_selection_sync");
         if (!canSkipSceneDataSync) {{
           syncNetworkGraphSceneData(svg, scene);
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: false }});
+        }} else {{
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: true }});
         }}
       }} else if (canSkipSceneRender) {{
+        graphSceneAction = canSkipSceneDataSync ? "skip" : "data-sync";
         cancelNetworkGraphSceneAnimation();
         if (!canSkipSceneDataSync) {{
           syncNetworkGraphSceneData(svg, scene);
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: false }});
+        }} else {{
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: true }});
         }}
       }} else if (canPatchSceneDataOnly) {{
+        graphSceneAction = canSkipSceneDataSync ? "patch-skip" : "patch-data-sync";
         cancelNetworkGraphSceneAnimation();
         syncNetworkGraphSceneSelection(svg, {{ rootId, selectedId }});
+        markNetworkGraphRenderPhase("scene_selection_sync");
         if (!canSkipSceneDataSync) {{
           syncNetworkGraphSceneData(svg, scene);
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: false }});
+        }} else {{
+          markNetworkGraphRenderPhase("scene_data_sync", {{ skipped: true }});
         }}
       }} else {{
+        graphSceneAction = "replace";
         cancelNetworkGraphSceneAnimation();
-        svg.innerHTML = buildNetworkGraphSceneMarkup(scene);
+        const sceneMarkup = buildNetworkGraphSceneMarkup(scene);
+        markNetworkGraphRenderPhase("scene_markup", {{
+          markupBytes: sceneMarkup.length,
+          renderedItems: layout.items.length,
+          edges: combinedEdges.length,
+        }});
+        svg.innerHTML = sceneMarkup;
+        markNetworkGraphRenderPhase("scene_dom_replace", {{
+          markupBytes: sceneMarkup.length,
+        }});
       }}
       syncNetworkGraphSelectedTagRoute(svg);
       syncNetworkGraphTextZoom(svg, networkGraphViewState.viewBox);
+      markNetworkGraphRenderPhase("post_sync", {{
+        action: graphSceneAction,
+      }});
       networkGraphViewState.lastSceneStructureSignature = sceneStructureSignature;
       networkGraphViewState.lastSceneDataSignature = sceneDataSignature;
       if (perfToken > 0 && typeof markNodeSelectionPerf === "function") {{
@@ -10437,6 +10665,17 @@
           edges: combinedEdges.length,
         }});
       }}
+      finishNetworkGraphRenderStats("complete", {{
+        action: graphSceneAction,
+        edgeMode,
+        layoutMode,
+        reusedData: !!canReuseGraphData,
+        reusedLayout: !!canReuseGraphLayout,
+        skippedSceneDataSync: !!canSkipSceneDataSync,
+        nodes: nodes.length,
+        edges: combinedEdges.length,
+        renderedItems: layout.items.length,
+      }});
     }}
 
     function syncNodeHistoryDock() {{
@@ -11130,7 +11369,7 @@
       if (typeof requestTopbarLayoutMetricsSync === "function") {{
         requestTopbarLayoutMetricsSync();
       }}
-      setActiveNetworkSubview(activeNetworkSubview, {{ persist: false }});
+      setActiveNetworkSubview(activeNetworkSubview, {{ persist: false, render: false }});
 
       const chatViewActive = isChatWorkspaceLayoutView(next);
       if (shell instanceof HTMLElement) {{
@@ -11288,8 +11527,12 @@
         }}
         if (next === "network") {{
           renderNodes(latestState.nodes || []);
-          if (networkGraphActive && typeof renderNetworkGraphView === "function") {{
+          if (networkGraphActive && latestStatePollProfile === "network-graph" && typeof renderNetworkGraphView === "function") {{
             renderNetworkGraphView(latestState);
+          }} else if (networkGraphActive && typeof requestImmediatePoll === "function") {{
+            stateEtag = "";
+            forceStateReloadOnce = true;
+            requestImmediatePoll(0);
           }}
           if (networkRoutesActive) {{
             renderNetworkRoutes(latestState);
