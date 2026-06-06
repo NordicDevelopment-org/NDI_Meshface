@@ -5300,6 +5300,7 @@
       lastSelectedId: "",
       lastSceneStructureSignature: "",
       renderSourceSignature: "",
+      layoutSourceSignature: "",
       cachedNodeMap: null,
       cachedCombinedEdges: null,
       cachedLayout: null,
@@ -7428,6 +7429,7 @@
       }}
       if (changed) {{
         networkGraphViewState.renderSourceSignature = "";
+        networkGraphViewState.layoutSourceSignature = "";
         networkGraphViewState.cachedLayout = null;
         networkGraphViewState.lastSceneStructureSignature = "";
         networkGraphViewState.renderedPositions = new Map();
@@ -7529,6 +7531,7 @@
         // Node-list root changes should rebuild from scratch so we do not keep
         // stale scene/layout state from the previous root.
         networkGraphViewState.renderSourceSignature = "";
+        networkGraphViewState.layoutSourceSignature = "";
         networkGraphViewState.cachedNodeMap = null;
         networkGraphViewState.cachedCombinedEdges = null;
         networkGraphViewState.cachedLayout = null;
@@ -7963,6 +7966,7 @@
 
     function invalidateNetworkGraphRenderCache() {{
       networkGraphViewState.renderSourceSignature = "";
+      networkGraphViewState.layoutSourceSignature = "";
       networkGraphViewState.cachedNodeMap = null;
       networkGraphViewState.cachedCombinedEdges = null;
       networkGraphViewState.cachedLayout = null;
@@ -9834,6 +9838,148 @@
       }};
     }}
 
+    function hydrateNetworkGraphLayoutData(baseLayout, nodeMap, combinedEdges, state) {{
+      const base = (baseLayout && typeof baseLayout === "object") ? baseLayout : {{}};
+      const positions = new Map(
+        Array.from((base.positions instanceof Map ? base.positions : new Map()).entries()).map(([nodeId, position]) => [
+          normalizeNodeId(nodeId),
+          {{
+            ...(position && typeof position === "object" ? position : {{}}),
+          }},
+        ])
+      );
+      const layers = new Map(
+        Array.from((base.layers instanceof Map ? base.layers : new Map()).entries()).map(([layer, nodeIds]) => [
+          layer,
+          Array.isArray(nodeIds) ? nodeIds.slice() : [],
+        ])
+      );
+      const adjacency = buildNetworkGraphAdjacency(nodeMap, combinedEdges);
+      const degreeMeta = new Map();
+      for (const nodeId of nodeMap.keys()) {{
+        const peers = adjacency.get(nodeId) || new Map();
+        let totalWeight = 0;
+        for (const edge of peers.values()) {{
+          totalWeight += Number(edge && edge.weight) || 0;
+        }}
+        degreeMeta.set(nodeId, {{
+          degree: peers.size,
+          weight: totalWeight,
+        }});
+      }}
+      const safeState = (state && typeof state === "object") ? state : {{}};
+      const traffic = (safeState.traffic && typeof safeState.traffic === "object") ? safeState.traffic : {{}};
+      const signalMetaByNodeId = buildNetworkGraphNodeSignalMeta(
+        nodeMap,
+        Array.isArray(traffic.recent_packets) ? traffic.recent_packets : []
+      );
+      const baseItemsByNodeId = new Map(
+        (Array.isArray(base.items) ? base.items : [])
+          .map((item) => [normalizeNodeId(item && item.nodeId), item])
+          .filter(([nodeId]) => !!nodeId)
+      );
+      const items = Array.from(positions.entries()).map(([nodeId, position]) => {{
+        const node = nodeMap.get(nodeId) || null;
+        const baseItem = baseItemsByNodeId.get(nodeId) || {{}};
+        const meta = degreeMeta.get(nodeId) || {{ degree: 0, weight: 0 }};
+        const signalMeta = signalMetaByNodeId.get(nodeId) || null;
+        const fallbackRadius = position.layer === 0
+          ? 13
+          : Math.max(5.5, Math.min(10.5, 5.4 + (Math.log2(Math.max(1, meta.weight) + 1) * 0.9) + Math.min(2.6, meta.degree * 0.2)));
+        const cachedRadius = Number(baseItem.radius);
+        return {{
+          nodeId,
+          node,
+          x: Number(position.x),
+          y: Number(position.y),
+          layer: Number(position.layer || 0),
+          disconnected: !!position.disconnected,
+          detached: !!position.disconnected && !position.broadcastOnly,
+          broadcastOnly: !!position.broadcastOnly,
+          degree: meta.degree,
+          weight: meta.weight,
+          signalMeta,
+          radius: Number.isFinite(cachedRadius) && cachedRadius > 0
+            ? cachedRadius
+            : (position.disconnected ? Math.max(5, fallbackRadius - 0.7) : fallbackRadius),
+          labelOffsetY: (
+            position.labelOffsetY == null
+            || position.labelOffsetY === ""
+            || !Number.isFinite(Number(position.labelOffsetY))
+          )
+            ? null
+            : Number(position.labelOffsetY),
+          showLabel: !!baseItem.showLabel,
+        }};
+      }});
+      return {{
+        ...base,
+        adjacency,
+        degreeMeta,
+        items,
+        positions,
+        layers,
+        rings: Array.isArray(base.rings) ? base.rings.slice() : [],
+        regions: Array.isArray(base.regions) ? base.regions.slice() : [],
+        edges: combinedEdges,
+        signalMetaByNodeId,
+      }};
+    }}
+
+    function buildNetworkGraphLayoutSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "") {{
+      const normalizedEdgeMode = normalizeNetworkGraphEdgeMode(edgeMode);
+      const normalizedSearch = normalizeSearchQuery(searchQuery);
+      let hash = 2166136261;
+      hash = hashMixStr(hash, normalizedEdgeMode);
+      hash = hashMixStr(hash, normalizeNetworkGraphLayoutMode(networkGraphLayoutMode));
+      hash = hashMixStr(hash, normalizeNodeId(networkGraphRootNodeId || ""));
+      hash = hashMixStr(hash, normalizeNodeId(selectedNodeId || ""));
+      hash = hashMixStr(hash, normalizeNodeId(resolveLocalNodeId(state || latestState || {{}}) || ""));
+      hash = hashMixStr(hash, normalizedSearch);
+
+      const safeNodes = Array.isArray(nodes) ? nodes : [];
+      hash = hashMixInt(hash, safeNodes.length);
+      for (const node of safeNodes) {{
+        hash = hashMixStr(hash, normalizeNodeId(node && node.id));
+        hash = hashMixStr(hash, String(node && (node.short_name || "")));
+        hash = hashMixStr(hash, String(node && (node.long_name || "")));
+        if (normalizedEdgeMode === "max") {{
+          hash = hashMixInt(hash, Math.trunc(Number(node && (node.hops_away ?? node.hopsAway)) || 0));
+        }}
+      }}
+
+      const capsEntries = Object.entries((historyCapsRaw && typeof historyCapsRaw === "object") ? historyCapsRaw : {{}})
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+      hash = hashMixInt(hash, capsEntries.length);
+      for (const [nodeId, caps] of capsEntries) {{
+        hash = hashMixStr(hash, normalizeNodeId(nodeId));
+        hash = hashMixStr(hash, String((caps && caps.last_short_name) || ""));
+        hash = hashMixStr(hash, String((caps && caps.last_long_name) || ""));
+        hash = hashMixInt(hash, Math.trunc(Number(caps && caps.last_hops) || 0));
+        hash = hashMixInt(hash, caps && caps.has_position ? 1 : 0);
+        if (normalizedSearch) {{
+          hash = hashMixInt(hash, Math.trunc(Number(caps && caps.last_seen_unix) || 0));
+        }}
+      }}
+
+      const edgeKeys = [];
+      for (const edge of (Array.isArray(rawEdges) ? rawEdges : [])) {{
+        const fromId = normalizeNodeId(edge && edge.from);
+        const toId = normalizeNodeId(edge && edge.to);
+        if (!isSelectableNodeId(fromId) || !isSelectableNodeId(toId) || fromId === toId) continue;
+        const a = fromId < toId ? fromId : toId;
+        const b = fromId < toId ? toId : fromId;
+        edgeKeys.push(`${{a}}::${{b}}`);
+      }}
+      edgeKeys.sort();
+      hash = hashMixInt(hash, edgeKeys.length);
+      for (const edgeKey of edgeKeys) {{
+        hash = hashMixStr(hash, edgeKey);
+      }}
+
+      return `network-graph-layout:${{(hash >>> 0).toString(16)}}`;
+    }}
+
     function buildNetworkGraphSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "") {{
       let hash = 2166136261;
       hash = hashMixStr(hash, normalizeNetworkGraphEdgeMode(edgeMode));
@@ -9925,6 +10071,14 @@
         edgeMode,
         searchQuery
       );
+      const graphLayoutSourceSignature = buildNetworkGraphLayoutSourceSignature(
+        nodes,
+        historyCaps,
+        filteredRawEdges,
+        safeState,
+        edgeMode,
+        searchQuery
+      );
       const canReuseGraphData = (
         networkGraphViewState.renderSourceSignature === graphSourceSignature
         && networkGraphViewState.cachedNodeMap instanceof Map
@@ -9947,11 +10101,23 @@
       const combinedEdges = canReuseGraphData
         ? networkGraphViewState.cachedCombinedEdges
         : combineNetworkGraphEdges(filteredRawEdges, nodeMap, {{ mode: edgeMode }});
+      const canReuseGraphLayout = !!(
+        canReuseGraphData
+        || (
+          networkGraphViewState.layoutSourceSignature === graphLayoutSourceSignature
+          && networkGraphViewState.cachedLayout
+        )
+      );
       const layout = canReuseGraphData
         ? networkGraphViewState.cachedLayout
-        : buildNetworkGraphLayout(nodeMap, combinedEdges, safeState);
-      if (!canReuseGraphData) {{
+        : (
+          canReuseGraphLayout
+            ? hydrateNetworkGraphLayoutData(networkGraphViewState.cachedLayout, nodeMap, combinedEdges, safeState)
+            : buildNetworkGraphLayout(nodeMap, combinedEdges, safeState)
+        );
+      if (!canReuseGraphData || networkGraphViewState.cachedLayout !== layout) {{
         networkGraphViewState.renderSourceSignature = graphSourceSignature;
+        networkGraphViewState.layoutSourceSignature = graphLayoutSourceSignature;
         networkGraphViewState.cachedNodeMap = nodeMap;
         networkGraphViewState.cachedCombinedEdges = combinedEdges;
         networkGraphViewState.cachedLayout = layout;
@@ -9972,6 +10138,7 @@
         networkGraphViewState.lastSelectedId = "";
         networkGraphViewState.lastSceneStructureSignature = "";
         networkGraphViewState.renderSourceSignature = "";
+        networkGraphViewState.layoutSourceSignature = "";
         networkGraphViewState.cachedNodeMap = null;
         networkGraphViewState.cachedCombinedEdges = null;
         networkGraphViewState.cachedLayout = null;
@@ -10092,14 +10259,14 @@
         && !shouldSkipSceneAnimation
       );
       const canPatchSelectionOnly = !!(
-        canReuseGraphData
+        canReuseGraphLayout
         && previousLayoutSnapshot
         && !rootChanged
         && selectionChanged
         && svg.childElementCount
       );
       const canSkipSceneRender = !!(
-        canReuseGraphData
+        canReuseGraphLayout
         && previousLayoutSnapshot
         && !rootChanged
         && !selectionChanged

@@ -260,6 +260,11 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'topSafeInset: resolveNetworkGraphTopSafeInset(svg),' in js
     assert 'networkGraphViewState.resetBounds = {' in js
     assert 'networkGraphViewState.resetCenter = rootPosition' in js
+    assert 'layoutSourceSignature: "",' in js
+    assert 'function buildNetworkGraphLayoutSourceSignature(nodes, historyCapsRaw, rawEdges, state, edgeMode, searchQuery = "")' in js
+    assert 'function hydrateNetworkGraphLayoutData(baseLayout, nodeMap, combinedEdges, state)' in js
+    assert 'const graphLayoutSourceSignature = buildNetworkGraphLayoutSourceSignature(' in js
+    assert 'networkGraphViewState.layoutSourceSignature === graphLayoutSourceSignature' in js
     assert 'networkGraphEdgeMode = loadPreferredNetworkGraphEdgeMode();' in js
     assert 'networkRoutesMode = loadPreferredNetworkRoutesMode();' in js
     assert 'networkRoutesWindow = loadPreferredNetworkRoutesWindow();' in js
