@@ -746,6 +746,22 @@ def _slim_recent_packets_for_network_graph(
     return slimmed
 
 
+def _slim_recent_chat_for_chat_profile(
+    recent_chat: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    slimmed: list[dict[str, object]] = []
+    for entry in recent_chat:
+        if not isinstance(entry, Mapping):
+            continue
+        slim_entry = dict(entry)
+        if slim_entry.get("rx_time") not in (None, ""):
+            slim_entry.pop("captured_at", None)
+        if slim_entry.get("delivery_updated_unix") not in (None, ""):
+            slim_entry.pop("delivery_updated_at", None)
+        slimmed.append(slim_entry)
+    return slimmed
+
+
 def _normalize_modem_preset(value: object) -> Optional[str]:
     if value is None:
         return None
@@ -1192,6 +1208,7 @@ def build_dashboard_state_lite(
     if profile_name == "chat":
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = []
+        slim_recent_chat = _slim_recent_chat_for_chat_profile(slim_recent_chat)
     elif profile_name == "network":
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)

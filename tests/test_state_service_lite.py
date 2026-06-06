@@ -4,6 +4,7 @@ from meshdash.state_service import (
     _slim_edges_for_network,
     _slim_history_caps,
     _slim_nodes_for_chat,
+    _slim_recent_chat_for_chat_profile,
     _slim_recent_packets,
     _slim_recent_packets_for_activity,
     _slim_recent_packets_for_network_graph,
@@ -255,6 +256,42 @@ def test_slim_recent_packets_for_network_graph_promotes_routing_fields() -> None
             "captured_at": "2026-06-05T00:00:00Z",
         }
     ]
+
+
+def test_slim_recent_chat_for_chat_profile_drops_duplicate_timestamps() -> None:
+    slimmed = _slim_recent_chat_for_chat_profile(
+        [
+            {
+                "message_id": 123,
+                "from": "!node-a",
+                "to": "^all",
+                "rx_time": "2026-06-03 00:00:01Z",
+                "captured_at": "2026-06-03 00:00:02Z",
+                "delivery_updated_unix": 1780444801,
+                "delivery_updated_at": "2026-06-03 00:00:01Z",
+                "text": "hello",
+            },
+            {
+                "message_id": 124,
+                "from": "!node-b",
+                "to": "^all",
+                "captured_at": "2026-06-03 00:00:03Z",
+                "delivery_updated_at": "2026-06-03 00:00:03Z",
+                "text": "fallback",
+            },
+        ]
+    )
+
+    assert slimmed[0] == {
+        "message_id": 123,
+        "from": "!node-a",
+        "to": "^all",
+        "rx_time": "2026-06-03 00:00:01Z",
+        "delivery_updated_unix": 1780444801,
+        "text": "hello",
+    }
+    assert slimmed[1]["captured_at"] == "2026-06-03 00:00:03Z"
+    assert slimmed[1]["delivery_updated_at"] == "2026-06-03 00:00:03Z"
 
 
 def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
