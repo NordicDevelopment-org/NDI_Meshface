@@ -124,6 +124,11 @@
     let mapWheelJustArmed = false;
     let mapWheelLease = null;
     let tabHasFocus = (typeof document.hasFocus === "function") ? !!document.hasFocus() : true;
+    let settingsScreenWakeLockEnabled = true;
+    let screenWakeLockSentinel = null;
+    let screenWakeLockRequestInFlight = false;
+    let screenWakeLockLastError = "";
+    let screenWakeLockEventsBound = false;
     let chatSendInFlight = false;
     let macrosSendInFlight = false;
     let macrosPreviewLines = [];

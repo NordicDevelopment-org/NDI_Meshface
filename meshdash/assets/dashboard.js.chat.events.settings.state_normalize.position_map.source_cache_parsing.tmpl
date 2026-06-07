@@ -47,6 +47,7 @@
     function loadSettingsAppearancePreferences() {{
       settingsUniqueNodeColorsEnabled = false;
       settingsUniqueChatColorsEnabled = false;
+      settingsScreenWakeLockEnabled = true;
       try {{
         settingsUniqueNodeColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueNodeColorsStorageKey),
@@ -55,6 +56,10 @@
         settingsUniqueChatColorsEnabled = parseBoolToken(
           window.localStorage.getItem(settingsUniqueChatColorsStorageKey),
           settingsUniqueNodeColorsEnabled
+        );
+        settingsScreenWakeLockEnabled = parseBoolToken(
+          window.localStorage.getItem(settingsScreenWakeLockStorageKey),
+          true
         );
       }} catch (_err) {{
       }}
@@ -70,7 +75,176 @@
           settingsUniqueChatColorsStorageKey,
           settingsUniqueChatColorsEnabled ? "1" : "0"
         );
+        window.localStorage.setItem(
+          settingsScreenWakeLockStorageKey,
+          settingsScreenWakeLockEnabled ? "1" : "0"
+        );
       }} catch (_err) {{
+      }}
+    }}
+
+    function screenWakeLockApiAvailable() {{
+      return !!(
+        typeof navigator !== "undefined"
+        && navigator
+        && navigator.wakeLock
+        && typeof navigator.wakeLock.request === "function"
+      );
+    }}
+
+    function screenWakeLockErrorMessage(err) {{
+      if (!err) return "unknown error";
+      const message = err instanceof Error ? err.message : String(err);
+      const name = err instanceof Error ? err.name : "";
+      const clean = String(message || name || "unknown error").trim();
+      if (!name || clean.toLowerCase().includes(String(name).toLowerCase())) {{
+        return clean;
+      }}
+      return `${{name}}: ${{clean}}`;
+    }}
+
+    function screenWakeLockStatus() {{
+      if (!settingsScreenWakeLockEnabled) {{
+        return {{ text: "", error: false }};
+      }}
+      if (!screenWakeLockApiAvailable()) {{
+        return {{
+          text: "Screen wake lock is unavailable in this browser or page context.",
+          error: true,
+        }};
+      }}
+      if (document.visibilityState && document.visibilityState !== "visible") {{
+        return {{
+          text: "Screen wake lock resumes when this tab is visible.",
+          error: false,
+        }};
+      }}
+      if (screenWakeLockSentinel) {{
+        return {{ text: "Screen wake lock active.", error: false }};
+      }}
+      if (screenWakeLockRequestInFlight) {{
+        return {{ text: "Requesting screen wake lock.", error: false }};
+      }}
+      if (screenWakeLockLastError) {{
+        return {{
+          text: `Screen wake lock blocked: ${{screenWakeLockLastError}}`,
+          error: true,
+        }};
+      }}
+      return {{ text: "Screen wake lock pending.", error: false }};
+    }}
+
+    function syncSettingsScreenWakeLockControls() {{
+      const toggle = document.getElementById("settings-appearance-keep-screen-on");
+      if (toggle instanceof HTMLInputElement) {{
+        toggle.checked = !!settingsScreenWakeLockEnabled;
+      }}
+      const statusEl = document.getElementById("settings-wake-lock-status");
+      if (statusEl instanceof HTMLElement) {{
+        const status = screenWakeLockStatus();
+        statusEl.textContent = status.text;
+        statusEl.classList.toggle("error", !!status.error);
+      }}
+    }}
+
+    async function releaseScreenWakeLock() {{
+      const sentinel = screenWakeLockSentinel;
+      screenWakeLockSentinel = null;
+      if (!sentinel || typeof sentinel.release !== "function") {{
+        syncSettingsScreenWakeLockControls();
+        return;
+      }}
+      try {{
+        await sentinel.release();
+      }} catch (_err) {{
+      }} finally {{
+        syncSettingsScreenWakeLockControls();
+      }}
+    }}
+
+    async function acquireScreenWakeLock() {{
+      if (!settingsScreenWakeLockEnabled) {{
+        await releaseScreenWakeLock();
+        return;
+      }}
+      if (!screenWakeLockApiAvailable()) {{
+        screenWakeLockLastError = "";
+        syncSettingsScreenWakeLockControls();
+        return;
+      }}
+      if (document.visibilityState && document.visibilityState !== "visible") {{
+        await releaseScreenWakeLock();
+        return;
+      }}
+      if (screenWakeLockSentinel || screenWakeLockRequestInFlight) {{
+        syncSettingsScreenWakeLockControls();
+        return;
+      }}
+      screenWakeLockRequestInFlight = true;
+      screenWakeLockLastError = "";
+      syncSettingsScreenWakeLockControls();
+      try {{
+        const sentinel = await navigator.wakeLock.request("screen");
+        screenWakeLockSentinel = sentinel;
+        if (sentinel && typeof sentinel.addEventListener === "function") {{
+          sentinel.addEventListener("release", () => {{
+            if (screenWakeLockSentinel === sentinel) {{
+              screenWakeLockSentinel = null;
+            }}
+            syncSettingsScreenWakeLockControls();
+          }});
+        }}
+      }} catch (err) {{
+        screenWakeLockLastError = screenWakeLockErrorMessage(err);
+      }} finally {{
+        screenWakeLockRequestInFlight = false;
+        syncSettingsScreenWakeLockControls();
+      }}
+    }}
+
+    async function refreshScreenWakeLock() {{
+      if (!settingsScreenWakeLockEnabled) {{
+        await releaseScreenWakeLock();
+        return;
+      }}
+      await acquireScreenWakeLock();
+    }}
+
+    function bindScreenWakeLockLifecycle() {{
+      if (screenWakeLockEventsBound) return;
+      screenWakeLockEventsBound = true;
+      document.addEventListener("visibilitychange", () => {{
+        void refreshScreenWakeLock();
+      }});
+      window.addEventListener("focus", () => {{
+        void refreshScreenWakeLock();
+      }});
+      window.addEventListener("pagehide", () => {{
+        void releaseScreenWakeLock();
+      }});
+    }}
+
+    function initializeScreenWakeLock() {{
+      bindScreenWakeLockLifecycle();
+      syncSettingsScreenWakeLockControls();
+      void refreshScreenWakeLock();
+    }}
+
+    function setSettingsScreenWakeLockEnabled(enabled, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      settingsScreenWakeLockEnabled = !!enabled;
+      screenWakeLockLastError = "";
+      if (opts.persist !== false) {{
+        persistSettingsAppearancePreferences();
+      }}
+      syncSettingsScreenWakeLockControls();
+      void refreshScreenWakeLock();
+      if (opts.announce && typeof setSettingsStatusText === "function") {{
+        setSettingsStatusText(
+          settingsScreenWakeLockEnabled
+            ? "Screen wake lock enabled for this browser."
+            : "Screen wake lock disabled for this browser."
+        );
       }}
     }}
 
@@ -91,6 +265,7 @@
       if (consoleFontSizeSelect instanceof HTMLSelectElement) {{
         consoleFontSizeSelect.value = normalizeConsoleFontSize(consoleFontSize);
       }}
+      syncSettingsScreenWakeLockControls();
       if (typeof syncLayoutViewLauncherButtonState === "function") {{
         syncLayoutViewLauncherButtonState(activeLayoutView);
       }}
