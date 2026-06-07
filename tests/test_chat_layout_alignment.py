@@ -280,6 +280,13 @@ def test_chat_composer_uses_200_byte_mesh_limit(dashboard_html: str, dashboard_j
     assert "Message is too long (${textBytes} bytes). Limit is ${chatComposerMaxBytes} bytes." in dashboard_js
 
 
+def test_chat_history_render_window_is_bounded_for_responsiveness(dashboard_js: str) -> None:
+    assert "const chatFeedMaxEntries = 180;" in dashboard_js
+    assert "const chatHistoryPageSize = 180;" in dashboard_js
+    assert "return chatFeedMaxEntries;" in dashboard_js
+    assert 'params.set("limit", String(chatHistoryPageSize));' in dashboard_js
+
+
 def test_chat_hop_count_uses_nested_routing_metadata(dashboard_js: str) -> None:
     assert 'function hopCountOfChatPacket(msg) {' in dashboard_js
     assert 'const direct = nonNegativeIntegerOrNull(firstNestedValue(msg, [' in dashboard_js
