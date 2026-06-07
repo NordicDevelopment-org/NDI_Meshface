@@ -38,6 +38,15 @@ DEFAULT_DASHBOARD_HTML_KWARGS = {
 }
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-gui-benchmark",
+        action="store_true",
+        default=False,
+        help="Run the local headless browser GUI responsiveness benchmark.",
+    )
+
+
 @pytest.fixture(scope="session")
 def dashboard_js_factory() -> Callable[..., str]:
     def _build(**overrides: object) -> str:

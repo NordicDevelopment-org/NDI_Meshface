@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${MESH_GUI_BENCH_PORT:-8877}"
 URL="${MESH_GUI_BENCH_URL:-http://127.0.0.1:${PORT}/}"
-OUTPUT="${MESH_GUI_BENCH_OUTPUT:-${ROOT_DIR}/benchmarks/gui_responsiveness/results/ci-gui-responsiveness.json}"
-THRESHOLDS="${MESH_GUI_BENCH_THRESHOLDS:-${ROOT_DIR}/benchmarks/gui_responsiveness/ci_thresholds.json}"
-SERVER_LOG="${MESH_GUI_BENCH_SERVER_LOG:-${TMPDIR:-/tmp}/mesh_gui_bench_server.log}"
+OUTPUT="${MESH_GUI_BENCH_OUTPUT:-${ROOT_DIR}/benchmarks/gui_responsiveness/results/local-gui-responsiveness.json}"
+THRESHOLDS="${MESH_GUI_BENCH_THRESHOLDS:-${ROOT_DIR}/benchmarks/gui_responsiveness/local_thresholds.json}"
+SERVER_LOG="${MESH_GUI_BENCH_SERVER_LOG:-${TMPDIR:-/tmp}/mesh_gui_bench_local_server.log}"
 HISTORY_DB="${MESH_GUI_BENCH_HISTORY_DB:-${TMPDIR:-/tmp}/mesh_gui_bench_history.sqlite3}"
 SERVER_PID=""
 
