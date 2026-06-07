@@ -74,6 +74,7 @@ def build_benchmark_url(
     include_api: bool,
     include_selection: bool,
     include_cached_poll: bool,
+    include_interactions: bool,
 ) -> str:
     parts = urlsplit(base_url)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
@@ -87,6 +88,7 @@ def build_benchmark_url(
             "mesh_gui_bench_api": "1" if include_api else "0",
             "mesh_gui_bench_select": "1" if include_selection else "0",
             "mesh_gui_bench_cached_poll": "1" if include_cached_poll else "0",
+            "mesh_gui_bench_interactions": "1" if include_interactions else "0",
             "chat_perf": "1",
             "_mesh_gui_bench": str(os.getpid()),
         }
@@ -158,6 +160,7 @@ def run_benchmark(args: argparse.Namespace) -> dict:
         include_api=not args.no_api,
         include_selection=not args.no_selection,
         include_cached_poll=not args.no_cached_poll,
+        include_interactions=not args.no_interactions,
     )
     extra_args = list(args.browser_arg or [])
     with tempfile.TemporaryDirectory(prefix="mesh-gui-bench-") as user_data_dir:
@@ -274,6 +277,9 @@ def print_summary(result: dict) -> None:
         print("  Slowest labels by p95 work/total:")
         def _label_rank(item: tuple[str, dict]) -> tuple[float, str]:
             label, data = item
+            action_stats = data.get("actionSyncMs") or {}
+            if action_stats.get("count"):
+                return (float(action_stats.get("p95") or 0), label)
             poll_stats = data.get("pollWorkMs") or {}
             if poll_stats.get("count"):
                 return (float(poll_stats.get("p95") or 0), label)
@@ -290,6 +296,12 @@ def print_summary(result: dict) -> None:
             callback_stats = data.get("callbackMs") or {}
             frame_stats = data.get("frameMaxMs") or {}
             poll_stats = data.get("pollWorkMs") or {}
+            action_stats = data.get("actionSyncMs") or {}
+            action_suffix = (
+                f", action p95 {_fmt_ms(action_stats.get('p95'))}"
+                if action_stats.get("count")
+                else ""
+            )
             poll_suffix = (
                 f", poll work p95 {_fmt_ms(poll_stats.get('p95'))}"
                 if poll_stats.get("count")
@@ -300,6 +312,7 @@ def print_summary(result: dict) -> None:
                 f"callback p95 {_fmt_ms(callback_stats.get('p95'))}, "
                 f"max frame {_fmt_ms(frame_stats.get('max'))}, "
                 f"long tasks {data.get('longTaskCount', 0)}"
+                f"{action_suffix}"
                 f"{poll_suffix}"
             )
 
@@ -331,6 +344,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--no-api", action="store_true", help="Skip direct API timing probes.")
     parser.add_argument("--no-selection", action="store_true", help="Skip node selection timing probes.")
     parser.add_argument("--no-cached-poll", action="store_true", help="Skip conditional 304 poll timing samples.")
+    parser.add_argument("--no-interactions", action="store_true", help="Skip chat typing, scroll, roster, reply, and reaction interaction samples.")
     parser.add_argument(
         "--browser-arg",
         action="append",

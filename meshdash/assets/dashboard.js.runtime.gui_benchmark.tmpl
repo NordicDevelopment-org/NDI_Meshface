@@ -77,6 +77,7 @@
       "pollFetchMs",
       "pollJsonMs",
       "pollClientMs",
+      "actionSyncMs",
     ];
 
     function meshGuiBenchmarkOptionalNumber(value) {{
@@ -255,11 +256,15 @@
       const longTaskDurations = longTasks.map((entry) => entry.durationMs);
       const longTaskStats = meshGuiBenchmarkStats(longTaskDurations);
       const timingBreakdown = meshGuiBenchmarkSampleTimingBreakdown(detail, callbackMs);
+      const actionSyncMs = detail && typeof detail === "object"
+        ? meshGuiBenchmarkOptionalNumber(detail.actionSyncMs)
+        : null;
       return {{
         label,
         totalMs: meshGuiBenchmarkRoundMs(totalMs),
         callbackMs: meshGuiBenchmarkRoundMs(callbackMs),
         postCallbackFrameWaitMs: meshGuiBenchmarkRoundMs(postCallbackFrameWaitMs),
+        ...(actionSyncMs !== null ? {{ actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs) }} : {{}}),
         ...timingBreakdown,
         frameSamples: frameStats.count,
         frameP95Ms: frameStats.p95,
@@ -636,6 +641,171 @@
       return meshGuiBenchmarkPollView(viewName, subviewName, {{ forceReload: false }});
     }}
 
+    function meshGuiBenchmarkDispatchInput(el) {{
+      if (!(el instanceof HTMLElement)) return;
+      try {{
+        el.dispatchEvent(new Event("input", {{ bubbles: true, cancelable: true }}));
+      }} catch (_err) {{
+      }}
+      try {{
+        el.dispatchEvent(new Event("change", {{ bubbles: true, cancelable: true }}));
+      }} catch (_err) {{
+      }}
+    }}
+
+    async function meshGuiBenchmarkTypeChatInput() {{
+      const input = document.getElementById("chat-input");
+      if (!(input instanceof HTMLTextAreaElement) && !(input instanceof HTMLInputElement)) {{
+        return {{ skipped: true, reason: "chat input missing" }};
+      }}
+      const previousValue = String(input.value || "");
+      const text = `benchmark responsiveness ${{Date.now()}}`;
+      input.focus();
+      input.value = "";
+      meshGuiBenchmarkDispatchInput(input);
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      for (const ch of text) {{
+        input.value += ch;
+        meshGuiBenchmarkDispatchInput(input);
+      }}
+      const actionSyncMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      await meshGuiBenchmarkNextFrame();
+      const typedLength = input.value.length;
+      input.value = previousValue;
+      meshGuiBenchmarkDispatchInput(input);
+      return {{
+        skipped: false,
+        typedLength,
+        actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        inputLoopMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        restoredLength: previousValue.length,
+      }};
+    }}
+
+    async function meshGuiBenchmarkScrollChatFeed() {{
+      const scroller = (typeof getChatScroller === "function")
+        ? getChatScroller()
+        : null;
+      const feed = document.getElementById("chat-feed");
+      if (!(scroller instanceof HTMLElement)) {{
+        return {{ skipped: true, reason: "chat scroller missing", feedPresent: feed instanceof HTMLElement }};
+      }}
+      const previousTop = Number(scroller.scrollTop) || 0;
+      const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      if (maxTop <= 0) {{
+        return {{ skipped: true, reason: "chat feed not scrollable", scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight }};
+      }}
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event("scroll", {{ bubbles: true }}));
+      const topAfterFirstSet = Number(scroller.scrollTop) || 0;
+      scroller.scrollTop = maxTop;
+      scroller.dispatchEvent(new Event("scroll", {{ bubbles: true }}));
+      const finalTop = Number(scroller.scrollTop) || 0;
+      const actionSyncMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      await meshGuiBenchmarkNextFrame();
+      scroller.scrollTop = Math.max(0, Math.min(maxTop, previousTop));
+      scroller.dispatchEvent(new Event("scroll", {{ bubbles: true }}));
+      return {{
+        skipped: false,
+        actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        scrollerClass: String(scroller.className || ""),
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+        topAfterFirstSet: meshGuiBenchmarkRoundMs(topAfterFirstSet),
+        finalTop: meshGuiBenchmarkRoundMs(finalTop),
+      }};
+    }}
+
+    function meshGuiBenchmarkFirstRosterSearchTerm() {{
+      const row = document.querySelector("#chat-room-unread-list .chat-member-item[data-node-id], #chat-room-meshtastic-list .chat-member-item[data-node-id], #chat-room-pinned-list .chat-member-item[data-node-id], #chat-room-list .chat-member-item[data-node-id]");
+      if (!(row instanceof HTMLElement)) return "";
+      const nameEl = row.querySelector(".chat-member-name");
+      const rawName = nameEl instanceof HTMLElement ? String(nameEl.textContent || "").trim() : "";
+      const rawId = String(row.dataset.nodeId || "").trim();
+      const source = rawName || rawId;
+      return source.split(/\s+/).find((part) => part.length >= 2) || source.slice(0, 6);
+    }}
+
+    async function meshGuiBenchmarkSearchChatRoster() {{
+      const input = document.getElementById("chat-user-search-input");
+      if (!(input instanceof HTMLInputElement)) {{
+        return {{ skipped: true, reason: "chat roster search missing" }};
+      }}
+      const term = meshGuiBenchmarkFirstRosterSearchTerm();
+      if (!term) {{
+        return {{ skipped: true, reason: "no roster term" }};
+      }}
+      const previousValue = String(input.value || "");
+      input.focus();
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      input.value = term;
+      meshGuiBenchmarkDispatchInput(input);
+      const visibleAfterSearch = document.querySelectorAll("#chat-room-unread-list .chat-member-item:not([hidden]), #chat-room-meshtastic-list .chat-member-item:not([hidden]), #chat-room-pinned-list .chat-member-item:not([hidden]), #chat-room-list .chat-member-item:not([hidden])").length;
+      const actionSyncMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      await meshGuiBenchmarkNextFrame();
+      input.value = previousValue;
+      meshGuiBenchmarkDispatchInput(input);
+      return {{
+        skipped: false,
+        actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        term,
+        visibleAfterSearch,
+        restoredLength: previousValue.length,
+      }};
+    }}
+
+    async function meshGuiBenchmarkClickChatReply() {{
+      const button = document.querySelector("#chat-feed .chat-reply-btn");
+      if (!(button instanceof HTMLElement)) {{
+        return {{ skipped: true, reason: "reply button missing" }};
+      }}
+      const replyContext = document.getElementById("chat-reply-context");
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      button.click();
+      const contextVisible = replyContext instanceof HTMLElement ? !replyContext.hidden : false;
+      const actionSyncMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      await meshGuiBenchmarkNextFrame();
+      const clearButton = document.getElementById("chat-reply-clear-btn");
+      if (clearButton instanceof HTMLElement) {{
+        clearButton.click();
+      }}
+      return {{
+        skipped: false,
+        actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        messageId: String(button.dataset.messageId || ""),
+        contextVisible,
+      }};
+    }}
+
+    async function meshGuiBenchmarkOpenReactionPopover() {{
+      const button = document.querySelector("#chat-feed .chat-reaction-summary");
+      const popover = document.getElementById("chat-reaction-popover");
+      if (!(button instanceof HTMLElement)) {{
+        return {{ skipped: true, reason: "reaction summary missing" }};
+      }}
+      const startedAtMs = meshGuiBenchmarkNowMs();
+      if (typeof openReactionPopoverForSummary === "function") {{
+        openReactionPopoverForSummary(button);
+      }} else {{
+        button.click();
+      }}
+      const popoverVisible = popover instanceof HTMLElement ? !popover.hidden : false;
+      const actionSyncMs = meshGuiBenchmarkNowMs() - startedAtMs;
+      await meshGuiBenchmarkNextFrame();
+      if (typeof closeReactionPopover === "function") {{
+        closeReactionPopover(true);
+      }} else if (popover instanceof HTMLElement) {{
+        popover.hidden = true;
+      }}
+      return {{
+        skipped: false,
+        actionSyncMs: meshGuiBenchmarkRoundMs(actionSyncMs),
+        replyId: String(button.dataset.replyId || ""),
+        popoverVisible,
+      }};
+    }}
+
     async function meshGuiBenchmarkSwitchView(viewName, subviewName = "") {{
       const view = normalizeLayoutView(viewName || activeLayoutView);
       const subview = view === "network" ? normalizeNetworkSubview(subviewName || activeNetworkSubview) : "";
@@ -751,6 +921,7 @@
         includeApi: meshGuiBenchmarkQueryValue("mesh_gui_bench_api") !== "0",
         includeSelection: meshGuiBenchmarkQueryValue("mesh_gui_bench_select") !== "0",
         includeCachedPoll: meshGuiBenchmarkQueryValue("mesh_gui_bench_cached_poll") !== "0",
+        includeInteractions: meshGuiBenchmarkQueryValue("mesh_gui_bench_interactions") !== "0",
       }};
     }}
 
@@ -837,6 +1008,28 @@
               () => meshGuiBenchmarkSelectNode(),
               {{ iteration, view: "network", subview: "map" }}
             ));
+          }}
+        }}
+        if (opts.includeInteractions) {{
+          applyLayoutView("chat", false);
+          await meshGuiBenchmarkForcePoll("chat", "");
+          const interactionIterations = Math.min(opts.iterations, 8);
+          const interactionActions = [
+            ["interact:chat-type", meshGuiBenchmarkTypeChatInput],
+            ["interact:chat-scroll", meshGuiBenchmarkScrollChatFeed],
+            ["interact:roster-search", meshGuiBenchmarkSearchChatRoster],
+            ["interact:reply-open", meshGuiBenchmarkClickChatReply],
+            ["interact:reaction-open", meshGuiBenchmarkOpenReactionPopover],
+          ];
+          for (let iteration = 0; iteration < interactionIterations; iteration += 1) {{
+            for (const [label, action] of interactionActions) {{
+              samples.push(await meshGuiBenchmarkMeasure(
+                label,
+                action,
+                {{ iteration, view: "chat", interaction: true }}
+              ));
+              await meshGuiBenchmarkSleep(opts.settleMs);
+            }}
           }}
         }}
       }} finally {{
