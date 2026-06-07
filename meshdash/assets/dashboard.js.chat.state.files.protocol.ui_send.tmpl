@@ -460,6 +460,41 @@
       renderFileTransferConsole();
     }}
 
+    function syncFileTransferAutoAcceptToggle() {{
+      const toggle = document.getElementById("files-auto-accept-toggle");
+      if (!(toggle instanceof HTMLInputElement)) return;
+      toggle.checked = fileTransferAutoAcceptInboundEnabled();
+      toggle.disabled = !fileTransferFeatureEnabled;
+      toggle.title = toggle.checked
+        ? "Direct inbound file transfers are accepted automatically."
+        : "Direct inbound file transfers require manual acceptance.";
+    }}
+
+    function bindFileTransferAutoAcceptToggle() {{
+      const toggle = document.getElementById("files-auto-accept-toggle");
+      if (!(toggle instanceof HTMLInputElement) || toggle.dataset.bound === "1") return;
+      toggle.dataset.bound = "1";
+      toggle.addEventListener("change", () => {{
+        const enabled = !!toggle.checked;
+        setFileTransferAutoAcceptInbound(enabled);
+        setFileTransferStatus(
+          enabled
+            ? "Auto accept enabled for received files."
+            : "Auto accept disabled for received files."
+        );
+        appendFileTransferConsole(
+          enabled
+            ? "Auto accept enabled for direct inbound file transfers."
+            : "Auto accept disabled for direct inbound file transfers."
+        );
+        if (enabled) {{
+          scheduleFileTransferMaintenance(latestState);
+          requestImmediatePoll(40);
+          void poll();
+        }}
+      }});
+    }}
+
     function setFileTransferBusy(isBusy) {{
       fileTransferSendInFlight = !!isBusy;
       const sendBtn = document.getElementById("files-send-btn");
@@ -995,5 +1030,7 @@
         }});
       }}
       bindFilesConsoleControls();
+      bindFileTransferAutoAcceptToggle();
+      syncFileTransferAutoAcceptToggle();
       syncFileTransferDestinationInput();
     }}

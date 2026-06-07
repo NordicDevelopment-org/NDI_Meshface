@@ -15,6 +15,7 @@ from meshdash.config import (
     DEFAULT_APP_VERSION_FALLBACK,
     DEFAULT_BBS_ENABLED,
     DEFAULT_CHAT_MAX_BYTES,
+    DEFAULT_FILE_TRANSFER_AUTO_ACCEPT,
     DEFAULT_FILE_TRANSFER_ENABLED,
     DEFAULT_FILE_TRANSFER_MAX_BYTES,
     DEFAULT_GATEWAY_HOST,
@@ -465,6 +466,7 @@ def _build_render_html_fn_with_theme(
     settings = theme_preset_settings or _build_theme_preset_settings(args)
     bbs_enabled = bool(getattr(args, "bbs_enable", False))
     file_transfer_enabled = bool(getattr(args, "file_transfer_enable", False))
+    file_transfer_auto_accept = bool(getattr(args, "file_transfer_auto_accept", False))
     games_enabled = bool(getattr(args, "games_enable", False))
     file_transfer_max_bytes = _normalize_file_transfer_max_bytes(
         getattr(args, "file_transfer_max_bytes", DEFAULT_FILE_TRANSFER_MAX_BYTES)
@@ -478,6 +480,7 @@ def _build_render_html_fn_with_theme(
             dark_theme_vars=selected.get("dark"),
             bbs_enabled=bbs_enabled,
             file_transfer_enabled=file_transfer_enabled,
+            file_transfer_auto_accept=file_transfer_auto_accept,
             games_enabled=games_enabled,
             file_transfer_max_bytes=file_transfer_max_bytes,
         )
@@ -675,9 +678,11 @@ def main() -> None:
         default_bbs_enable=DEFAULT_BBS_ENABLED,
         env_bbs_enable=os.environ.get("MESH_DASH_BBS_ENABLE"),
         default_file_transfer_enable=DEFAULT_FILE_TRANSFER_ENABLED,
+        default_file_transfer_auto_accept=DEFAULT_FILE_TRANSFER_AUTO_ACCEPT,
         default_games_enable=DEFAULT_GAMES_ENABLED,
         default_file_transfer_max_bytes=DEFAULT_FILE_TRANSFER_MAX_BYTES,
         env_file_transfer_enable=os.environ.get("MESH_DASH_FILE_TRANSFER_ENABLE"),
+        env_file_transfer_auto_accept=os.environ.get("MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT"),
         env_games_enable=os.environ.get("MESH_DASH_GAMES_ENABLE"),
         env_file_transfer_max_bytes=os.environ.get("MESH_DASH_FILE_TRANSFER_MAX_BYTES"),
         env_accept_file_transfer_traffic_disclaimer=os.environ.get(

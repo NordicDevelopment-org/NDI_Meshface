@@ -183,10 +183,22 @@
           continue;
         }}
         if (requiresInboundAccept) {{
-          const inboundDecision = fileTransferInboundDecisionForKey(transferKey);
+          let inboundDecision = fileTransferInboundDecisionForKey(transferKey);
           const inboundFlowState = fileTransferInboundFlowStateForKey(transferKey);
           const inboundCanceledByReceiver = inboundFlowState === "canceled-by-receiver";
           const inboundCanceledBySender = inboundFlowState === "canceled-by-sender";
+          if (inboundDecision !== "accepted") {{
+            const autoAccepted = autoAcceptInboundFileTransferIfEnabled(
+              transfer,
+              transferKey,
+              senderId,
+              receiverId,
+              localNodeId
+            );
+            if (autoAccepted) {{
+              inboundDecision = "accepted";
+            }}
+          }}
           if (inboundDecision !== "accepted") {{
             fileTransferAckSentState.delete(transferKey);
             fileTransferAckObservedChunksByKey.delete(transferKey);

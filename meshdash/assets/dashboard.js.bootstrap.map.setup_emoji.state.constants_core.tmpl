@@ -333,6 +333,7 @@
     const bbsFeatureEnabled = !!Number({bbs_enabled});
     const chatMessageMaxBytes = Math.max(1, Math.trunc(Number({chat_max_bytes}) || 0));
     const fileTransferFeatureEnabled = !!Number({file_transfer_enabled});
+    const fileTransferAutoAcceptDefault = !!Number({file_transfer_auto_accept});
     const fileTransferProtocolPrefix = "MF_FILE_V1";
     const fileTransferChatMaxBytes = chatMessageMaxBytes;
     const fileTransferMaxFileBytes = Math.max(1024, Math.trunc(Number({file_transfer_max_bytes}) || 0));
@@ -347,6 +348,7 @@
     const fileTransferCompressionMinMatchBytes = 4;
     const fileTransferCompressionMaxMatchBytes = 130;
     const fileTransferDestinationStorageKey = "meshDashboardFileTransferDestinationV1";
+    const fileTransferAutoAcceptStorageKey = "meshDashboardFileTransferAutoAcceptV1";
     const fileTransferDismissedStorageKey = "meshDashboardFileTransferDismissedV1";
     const fileTransferInboundDecisionStorageKey = "meshDashboardFileTransferInboundDecisionV1";
     const fileTransferInboundFlowStorageKey = "meshDashboardFileTransferInboundFlowV1";

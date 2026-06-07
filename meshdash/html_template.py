@@ -26,6 +26,7 @@ def render_html(
     dark_theme_vars: dict | None = None,
     bbs_enabled: bool = False,
     file_transfer_enabled: bool = False,
+    file_transfer_auto_accept: bool = False,
     games_enabled: bool = False,
     file_transfer_max_bytes: int = _DEFAULT_FILE_TRANSFER_MAX_BYTES,
 ) -> str:
@@ -46,6 +47,7 @@ def render_html(
         debug_mode=debug_mode,
         bbs_enabled=bbs_enabled,
         file_transfer_enabled=file_transfer_enabled,
+        file_transfer_auto_accept=file_transfer_auto_accept,
         games_enabled=games_enabled,
         file_transfer_max_bytes=file_transfer_max_bytes,
     )

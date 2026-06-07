@@ -183,6 +183,7 @@ def build_dashboard_js(
     debug_mode: bool = False,
     bbs_enabled: bool = False,
     file_transfer_enabled: bool = False,
+    file_transfer_auto_accept: bool = False,
     games_enabled: bool = False,
     file_transfer_max_bytes: int = _DEFAULT_FILE_TRANSFER_MAX_BYTES,
 ) -> str:
@@ -207,6 +208,7 @@ def build_dashboard_js(
         "bbs_enabled": 1 if bool(bbs_enabled) else 0,
         "chat_max_bytes": normalized_chat_max_bytes,
         "file_transfer_enabled": 1 if bool(file_transfer_enabled) else 0,
+        "file_transfer_auto_accept": 1 if bool(file_transfer_auto_accept) else 0,
         "games_enabled": 1 if bool(games_enabled) else 0,
         "file_transfer_max_bytes": normalized_file_transfer_max_bytes,
     }

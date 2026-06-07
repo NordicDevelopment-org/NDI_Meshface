@@ -476,6 +476,7 @@ MESH_DASH_HISTORY_DB=/opt/meshyface/mesh_dashboard_history.sqlite3
 MESH_DASH_BBS_ENABLE=0
 MESH_DASH_GAMES_ENABLE=0
 MESH_DASH_FILE_TRANSFER_ENABLE=0
+MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT=0
 MESH_DASH_FILE_TRANSFER_MAX_BYTES=65536
 MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER=0
 PYTHONUNBUFFERED=1
@@ -535,6 +536,12 @@ Optional file-transfer size cap:
 - `--file-transfer-max-bytes <bytes>` or
   `MESH_DASH_FILE_TRANSFER_MAX_BYTES=<bytes>`
 - Valid range is clamped to `1024` .. `512000` bytes
+
+Optional received-file acceptance default:
+
+- `--file-transfer-auto-accept` / `--no-file-transfer-auto-accept` or
+  `MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT=1|0`
+- The Files view toggle persists per browser and overrides this startup default
 
 Deploy helper example:
 
@@ -670,6 +677,7 @@ Related environment variables:
 
 - `--bbs-enable` / `--no-bbs-enable`
 - `--file-transfer-enable` / `--no-file-transfer-enable`
+- `--file-transfer-auto-accept` / `--no-file-transfer-auto-accept`
 - `--file-transfer-max-bytes <bytes>`
 - `--accept-file-transfer-traffic-disclaimer` /
   `--no-accept-file-transfer-traffic-disclaimer`
@@ -677,6 +685,7 @@ Related environment variables:
 Related environment variables:
 
 - `MESH_DASH_FILE_TRANSFER_ENABLE`
+- `MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT`
 - `MESH_DASH_FILE_TRANSFER_MAX_BYTES`
 - `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
 
@@ -694,6 +703,7 @@ The bundled service/deploy flow commonly uses:
 - `MESH_DASH_BBS_ENABLE`
 - `MESH_DASH_GAMES_ENABLE`
 - `MESH_DASH_FILE_TRANSFER_ENABLE`
+- `MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT`
 - `MESH_DASH_FILE_TRANSFER_MAX_BYTES`
 - `MESH_DASH_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
 - `PYTHONUNBUFFERED`
@@ -724,6 +734,7 @@ The deploy helper also accepts:
 - `MESH_DASH_DEPLOY_PYTHON_UNBUFFERED`
 - `MESH_DASH_DEPLOY_BBS_ENABLE`
 - `MESH_DASH_DEPLOY_FILE_TRANSFER_ENABLE`
+- `MESH_DASH_DEPLOY_FILE_TRANSFER_AUTO_ACCEPT`
 - `MESH_DASH_DEPLOY_FILE_TRANSFER_MAX_BYTES`
 - `MESH_DASH_DEPLOY_ACCEPT_FILE_TRANSFER_TRAFFIC_DISCLAIMER`
 

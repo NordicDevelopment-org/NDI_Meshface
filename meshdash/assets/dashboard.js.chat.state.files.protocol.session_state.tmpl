@@ -232,6 +232,98 @@
       }}
     }}
 
+    function normalizeFileTransferAutoAcceptValue(rawValue, fallback = false) {{
+      if (rawValue == null) return !!fallback;
+      const clean = String(rawValue).trim().toLowerCase();
+      if (!clean) return !!fallback;
+      if (clean === "1" || clean === "true" || clean === "yes" || clean === "on") return true;
+      if (clean === "0" || clean === "false" || clean === "no" || clean === "off") return false;
+      return !!fallback;
+    }}
+
+    function ensureFileTransferAutoAcceptPreferenceLoaded() {{
+      if (fileTransferAutoAcceptLoaded) return;
+      fileTransferAutoAcceptLoaded = true;
+      let stored = null;
+      try {{
+        stored = window.localStorage.getItem(fileTransferAutoAcceptStorageKey);
+      }} catch (_err) {{
+        stored = null;
+      }}
+      fileTransferAutoAcceptInbound = normalizeFileTransferAutoAcceptValue(
+        stored,
+        fileTransferAutoAcceptDefault
+      );
+    }}
+
+    function persistFileTransferAutoAcceptPreference() {{
+      try {{
+        window.localStorage.setItem(
+          fileTransferAutoAcceptStorageKey,
+          fileTransferAutoAcceptInbound ? "1" : "0"
+        );
+      }} catch (_err) {{
+      }}
+    }}
+
+    function setFileTransferAutoAcceptInbound(enabledRaw, options = null) {{
+      ensureFileTransferAutoAcceptPreferenceLoaded();
+      const enabled = !!enabledRaw;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      fileTransferAutoAcceptInbound = enabled;
+      if (!(opts && opts.persist === false)) {{
+        persistFileTransferAutoAcceptPreference();
+      }}
+      syncFileTransferAutoAcceptToggle();
+      return fileTransferAutoAcceptInbound;
+    }}
+
+    function fileTransferAutoAcceptInboundEnabled() {{
+      ensureFileTransferAutoAcceptPreferenceLoaded();
+      return !!fileTransferAutoAcceptInbound;
+    }}
+
+    function autoAcceptInboundFileTransferIfEnabled(
+      transfer,
+      transferKey,
+      senderIdRaw = "",
+      receiverIdRaw = "",
+      localNodeIdRaw = ""
+    ) {{
+      if (!fileTransferFeatureEnabled) return false;
+      if (!fileTransferAutoAcceptInboundEnabled()) return false;
+      const key = String(transferKey || (transfer && transfer.key) || "").trim();
+      if (!key) return false;
+      const senderId = normalizeNodeId(senderIdRaw || (transfer && transfer.fromId) || "");
+      const receiverId = normalizeNodeId(receiverIdRaw || (transfer && transfer.toId) || "");
+      const localNodeId = normalizeNodeId(
+        localNodeIdRaw || resolveLocalNodeId(latestState || {{}}) || ""
+      );
+      if (!fileTransferInboundTransferNeedsAccept(senderId, receiverId, localNodeId)) {{
+        return false;
+      }}
+      const priorDecision = fileTransferInboundDecisionForKey(key);
+      if (priorDecision === "accepted" || priorDecision === "declined") {{
+        return false;
+      }}
+      const flowState = fileTransferInboundFlowStateForKey(key);
+      if (flowState === "canceled-by-sender" || flowState === "canceled-by-receiver") {{
+        return false;
+      }}
+      const entry = setFileTransferInboundDecisionByKey(key, "accepted", {{
+        transferId: transfer && transfer.transferId,
+        senderId,
+        receiverId,
+        fileName: transfer && transfer.fileName,
+        totalChunks: transfer && transfer.totalChunks,
+      }});
+      if (!entry) return false;
+      appendFileTransferConsole(
+        `Auto-accepted inbound transfer ${{fileTransferShortTransferId(transfer && transfer.transferId)}} from ${{senderId}}.`
+      );
+      return true;
+    }}
+
     function fileTransferInboundFlowStateForKey(transferKey) {{
       const key = String(transferKey || "").trim();
       if (!key) return "";
