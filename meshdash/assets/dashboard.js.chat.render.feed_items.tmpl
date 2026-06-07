@@ -371,14 +371,12 @@
         const hasReactions = reactionGroups.length > 0;
         const reactionSummary = messageId
           ? (() => {{
-              const summaryAria = hasReactions
-                ? `Reactions: ${{reactionSummaryTitle}}`
-                : "Add reaction";
-              return `<button type="button" class="chat-reaction-summary${{hasReactions ? "" : " is-empty"}}" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(summaryAria)}}">
-                <span class="chat-reaction-summary-icons">${{hasReactions ? reactionSummaryIcons : '<span class="chat-reaction-summary-emoji chat-reaction-summary-emoji-placeholder">&#9786;&#65038;</span>'}}</span>
-                ${{hasReactions
-                  ? `<span class="chat-reaction-summary-total">${{reactionTotal}}</span>`
-                  : '<span class="chat-reaction-summary-label">React</span>'}}
+              if (!hasReactions) {{
+                return `<button type="button" class="chat-reaction-summary is-empty" data-reaction-summary="[]" data-reply-id="${{escAttr(messageId)}}" aria-label="Add reaction">React</button>`;
+              }}
+              return `<button type="button" class="chat-reaction-summary" data-reaction-summary="${{escAttr(JSON.stringify(reactionGroups))}}" data-reply-id="${{escAttr(messageId)}}" aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}">
+                <span class="chat-reaction-summary-icons">${{reactionSummaryIcons}}</span>
+                <span class="chat-reaction-summary-total">${{reactionTotal}}</span>
               </button>`;
             }})()
           : "";
@@ -422,7 +420,7 @@
           : "";
         const retryReplyId = Number.isInteger(replyToId) && replyToId > 0 ? replyToId : "";
         const replyButton = canReply
-          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message" aria-label="Reply to this message"><span class="chat-reply-btn-icon" aria-hidden="true">↩</span><span class="chat-reply-btn-text">Reply</span></button>`
+          ? `<button type="button" class="chat-reply-btn" data-message-id="${{escAttr(messageId)}}" title="Reply to this message" aria-label="Reply to this message">↩ Reply</button>`
           : "";
         const whoisButton = "";
         const retryButton = (

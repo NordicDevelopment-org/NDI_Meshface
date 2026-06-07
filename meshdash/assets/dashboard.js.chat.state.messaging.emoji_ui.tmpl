@@ -333,7 +333,6 @@
       for (const node of document.querySelectorAll(".chat-reaction-summary.is-empty")) {{
         if (!(node instanceof HTMLButtonElement)) continue;
         const label = node.querySelector(".chat-reaction-summary-label");
-        if (!(label instanceof HTMLElement)) continue;
         if (!node.dataset.defaultReactionAria) {{
           node.dataset.defaultReactionAria = node.getAttribute("aria-label") || "Add reaction";
         }}
@@ -343,8 +342,10 @@
         const nextText = state === "expanded"
           ? "Less reactions"
           : (state === "preview" ? "More reactions" : "React");
-        if (label.textContent !== nextText) {{
+        if (label instanceof HTMLElement && label.textContent !== nextText) {{
           label.textContent = nextText;
+        }} else if (!(label instanceof HTMLElement) && node.textContent !== nextText) {{
+          node.textContent = nextText;
         }}
         node.dataset.reactionAnchorState = state;
         node.classList.toggle("is-reaction-preview", state === "preview");

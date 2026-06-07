@@ -714,9 +714,11 @@ def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> N
     assert "suppressChatReactionContextTooltip(chatEmojiAnchorElement);" in emoji_src
     assert 'openReactionPickerFromAnchor(summary, {{ expand: true, toggleExpanded: true }});' in bindings_src
     assert 'openReactionPickerFromAnchor(anchor, {{ expand: false }});' in bindings_src
-    assert 'aria-label="${{escAttr(summaryAria)}}">' in feed_src
+    assert 'aria-label="Add reaction">React</button>' in feed_src
+    assert 'aria-label="${{escAttr(`Reactions: ${{reactionSummaryTitle}}`)}}">' in feed_src
     assert '"Add reaction"' in feed_src
-    assert 'chat-reaction-summary-label">React<' in feed_src
+    assert 'chat-reaction-summary-label">React<' not in feed_src
+    assert 'node.textContent = nextText;' in emoji_src
     assert 'title="${{escAttr(summaryTitle)}}"' not in feed_src
     assert 'title="${{escAttr(`${{reactionSummaryTitle}} • React to this message`)}}"' not in layout_src
     assert 'title="Add reaction"' not in layout_src
