@@ -73,6 +73,7 @@ def build_benchmark_url(
     settle_ms: int,
     include_api: bool,
     include_selection: bool,
+    include_cached_poll: bool,
 ) -> str:
     parts = urlsplit(base_url)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
@@ -85,6 +86,7 @@ def build_benchmark_url(
             "mesh_gui_bench_settle_ms": str(settle_ms),
             "mesh_gui_bench_api": "1" if include_api else "0",
             "mesh_gui_bench_select": "1" if include_selection else "0",
+            "mesh_gui_bench_cached_poll": "1" if include_cached_poll else "0",
             "chat_perf": "1",
             "_mesh_gui_bench": str(os.getpid()),
         }
@@ -155,6 +157,7 @@ def run_benchmark(args: argparse.Namespace) -> dict:
         settle_ms=args.settle_ms,
         include_api=not args.no_api,
         include_selection=not args.no_selection,
+        include_cached_poll=not args.no_cached_poll,
     )
     extra_args = list(args.browser_arg or [])
     with tempfile.TemporaryDirectory(prefix="mesh-gui-bench-") as user_data_dir:
@@ -214,6 +217,9 @@ def _fmt_ms(value: object) -> str:
 def print_summary(result: dict) -> None:
     summary = result.get("summary") or {}
     total = summary.get("totalMs") or {}
+    callback = summary.get("callbackMs") or {}
+    poll_work = summary.get("pollWorkMs") or {}
+    poll_overhead = summary.get("pollOverheadMs") or {}
     frame_max = summary.get("frameMaxMs") or {}
     frame_p95 = summary.get("frameP95Ms") or {}
     state = result.get("state") or {}
@@ -233,6 +239,20 @@ def print_summary(result: dict) -> None:
         f"p95 {_fmt_ms(total.get('p95'))}, "
         f"max {_fmt_ms(total.get('max'))}"
     )
+    if callback.get("count"):
+        print(
+            "  sample callback: "
+            f"p50 {_fmt_ms(callback.get('p50'))}, "
+            f"p95 {_fmt_ms(callback.get('p95'))}, "
+            f"max {_fmt_ms(callback.get('max'))}"
+        )
+    if poll_work.get("count"):
+        print(
+            "  poll work: "
+            f"p50 {_fmt_ms(poll_work.get('p50'))}, "
+            f"p95 {_fmt_ms(poll_work.get('p95'))}, "
+            f"overhead p95 {_fmt_ms(poll_overhead.get('p95'))}"
+        )
     print(
         "  frame delay: "
         f"p95 {_fmt_ms(frame_p95.get('p95'))}, "
@@ -251,19 +271,36 @@ def print_summary(result: dict) -> None:
             print(f"    {label}: {ok} HTTP {status}, {_fmt_ms(total_ms)}, {size} bytes")
     by_label = summary.get("byLabel") or {}
     if by_label:
-        print("  Slowest labels by p95 total:")
+        print("  Slowest labels by p95 work/total:")
+        def _label_rank(item: tuple[str, dict]) -> tuple[float, str]:
+            label, data = item
+            poll_stats = data.get("pollWorkMs") or {}
+            if poll_stats.get("count"):
+                return (float(poll_stats.get("p95") or 0), label)
+            total_stats = data.get("totalMs") or {}
+            return (float(total_stats.get("p95") or 0), label)
+
         ranked = sorted(
             by_label.items(),
-            key=lambda item: (((item[1].get("totalMs") or {}).get("p95") or 0), item[0]),
+            key=_label_rank,
             reverse=True,
         )
         for label, data in ranked[:8]:
             stats = data.get("totalMs") or {}
+            callback_stats = data.get("callbackMs") or {}
             frame_stats = data.get("frameMaxMs") or {}
+            poll_stats = data.get("pollWorkMs") or {}
+            poll_suffix = (
+                f", poll work p95 {_fmt_ms(poll_stats.get('p95'))}"
+                if poll_stats.get("count")
+                else ""
+            )
             print(
                 f"    {label}: p95 {_fmt_ms(stats.get('p95'))}, "
+                f"callback p95 {_fmt_ms(callback_stats.get('p95'))}, "
                 f"max frame {_fmt_ms(frame_stats.get('max'))}, "
                 f"long tasks {data.get('longTaskCount', 0)}"
+                f"{poll_suffix}"
             )
 
 
@@ -293,6 +330,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--json", action="store_true", help="Print full benchmark JSON instead of text summary.")
     parser.add_argument("--no-api", action="store_true", help="Skip direct API timing probes.")
     parser.add_argument("--no-selection", action="store_true", help="Skip node selection timing probes.")
+    parser.add_argument("--no-cached-poll", action="store_true", help="Skip conditional 304 poll timing samples.")
     parser.add_argument(
         "--browser-arg",
         action="append",

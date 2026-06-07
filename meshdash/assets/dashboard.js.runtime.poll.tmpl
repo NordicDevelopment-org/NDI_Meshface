@@ -42,6 +42,41 @@
       }}
     }}
 
+    function refreshUnchangedChatWorkspace(state = latestState, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const safeState = state && typeof state === "object" ? state : (latestState || {{}});
+      runPollStep("refreshUnchangedChatWorkspace.syncTopbar", () => {{
+        if (typeof syncTopbarChatContext === "function") {{
+          syncTopbarChatContext(safeState);
+        }}
+      }});
+      runPollStep("refreshUnchangedChatWorkspace.changeSummary", () => {{
+        if (typeof renderChatChangeSummary === "function") {{
+          renderChatChangeSummary(nowUnix);
+        }}
+      }});
+      runPollStep("refreshUnchangedChatWorkspace.bindChangeSummary", () => {{
+        if (typeof bindChatChangeSummaryControls === "function") {{
+          bindChatChangeSummaryControls();
+        }}
+      }});
+      runPollStep("refreshUnchangedChatWorkspace.autoDismiss", () => {{
+        if (typeof syncChatChangeAutoDismiss === "function") {{
+          syncChatChangeAutoDismiss();
+        }}
+      }});
+      runPollStep("refreshUnchangedChatWorkspace.drawer", () => {{
+        if (
+          typeof syncChatNodeDetailsDrawer === "function"
+          && typeof isChatNodeDetailsDrawerExpanded === "function"
+          && isChatNodeDetailsDrawerExpanded()
+        ) {{
+          syncChatNodeDetailsDrawer(safeState, {{
+            fetchHistory: false,
+          }});
+        }}
+      }});
+    }}
+
     function pollPerfEnabled() {{
       return !!(
         typeof window !== "undefined"
@@ -315,9 +350,10 @@
             renderFavorites(latestState, cachedHistory304, loadingId304);
           }}
           let chatRenderedThisPoll304 = false;
+          let chatMaintainedThisPoll304 = false;
           if (isChatWorkspaceLayoutView(activeLayoutView)) {{
-            renderChat(latestState, {{ allowPollSkip: true }});
-            chatRenderedThisPoll304 = true;
+            refreshUnchangedChatWorkspace(latestState, Math.floor(Date.now() / 1000));
+            chatMaintainedThisPoll304 = true;
             if (activeLayoutView === "chatlabs") {{
               renderChatLabsView(latestState);
             }}
@@ -325,7 +361,10 @@
             renderChat(latestState);
             chatRenderedThisPoll304 = true;
           }}
-          markPollPerfPhase(pollPerfRun, "not-modified-chat", {{ chatRendered: chatRenderedThisPoll304 }});
+          markPollPerfPhase(pollPerfRun, "not-modified-chat", {{
+            chatRendered: chatRenderedThisPoll304,
+            chatMaintained: chatMaintainedThisPoll304,
+          }});
           if (
             !chatRenderedThisPoll304
             &&
