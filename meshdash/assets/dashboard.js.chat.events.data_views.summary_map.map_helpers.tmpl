@@ -965,6 +965,10 @@
       const emoji = resolveMapNodeEmoji(nodeId, state);
       if (!emoji) return null;
       const flashStrength = mapNodeActivityFlashStrength(nodeId);
+      const markerStyleForRing = resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind, markerConfidence, state);
+      const ringColor = String(markerStyleForRing && markerStyleForRing.color ? markerStyleForRing.color : "#86a9ff");
+      const ringWidthRaw = Number(markerStyleForRing && markerStyleForRing.weight);
+      const ringWidth = clampMapLinkValue(Number.isFinite(ringWidthRaw) ? ringWidthRaw : 2, 1, 3.4);
       const markerClasses = [
         "map-node-emoji-marker",
         isSelected ? "is-selected" : "",
@@ -978,7 +982,7 @@
         html: `
           <div
             class="${{markerClasses}}"
-            style="--map-node-flash:${{Number(flashStrength.toFixed(3))}};"
+            style="--map-node-flash:${{Number(flashStrength.toFixed(3))}}; --map-node-ring-color:${{escAttr(ringColor)}}; --map-node-ring-width:${{ringWidth.toFixed(1)}}px;"
           >
             <span class="map-node-emoji-glyph" aria-hidden="true">${{escAttr(emoji)}}</span>
           </div>

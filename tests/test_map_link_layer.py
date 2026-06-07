@@ -307,6 +307,26 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "syncNetworkMapPacketActivity(state);" in js
 
 
+def test_dashboard_map_emoji_marker_ring_uses_node_marker_color() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert (
+        "const markerStyleForRing = resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind, markerConfidence, state);"
+        in js
+    )
+    assert 'const ringColor = String(markerStyleForRing && markerStyleForRing.color ? markerStyleForRing.color : "#86a9ff");' in js
+    assert "--map-node-ring-color:${escAttr(ringColor)}" in js
+    assert "--map-node-ring-width:${ringWidth.toFixed(1)}px" in js
+    assert "border: var(--map-node-ring-width, 2px) solid var(--map-node-ring-color, #86a9ff);" in css
+    assert "border-color: var(--map-node-ring-color, #adc0ff);" in css
+    assert "border-color: var(--map-node-ring-color, #9db5ff);" in css
+
+
 def test_record_direct_edge_observation_tracks_signal_metrics() -> None:
     session_edges: dict[tuple[str, str], dict[str, object]] = {}
     historical_edges: dict[tuple[str, str], dict[str, object]] = {}
