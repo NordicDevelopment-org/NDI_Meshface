@@ -4,7 +4,7 @@ import struct
 import pytest
 
 
-@pytest.mark.parametrize("kib", [8, 16, 32, 64])
+@pytest.mark.parametrize("kib", [1, 2, 4, 8, 16, 32, 64])
 def test_file_transfer_fixture_is_exact_size_png(kib: int) -> None:
     fixture = (
         Path(__file__).resolve().parent
