@@ -1,12 +1,19 @@
 from pathlib import Path
 import struct
 
+import pytest
 
-def test_file_transfer_64k_fixture_is_exact_size_png() -> None:
-    fixture = Path(__file__).resolve().parent / "fixtures" / "file_transfer_64k.png"
+
+@pytest.mark.parametrize("kib", [8, 16, 32, 64])
+def test_file_transfer_fixture_is_exact_size_png(kib: int) -> None:
+    fixture = (
+        Path(__file__).resolve().parent
+        / "fixtures"
+        / f"file_transfer_{kib}k.png"
+    )
     data = fixture.read_bytes()
 
-    assert len(data) == 64 * 1024
+    assert len(data) == kib * 1024
     assert data.startswith(b"\x89PNG\r\n\x1a\n")
     assert data[12:16] == b"IHDR"
 
