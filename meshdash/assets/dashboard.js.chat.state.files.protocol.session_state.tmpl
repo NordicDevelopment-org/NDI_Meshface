@@ -321,6 +321,9 @@
       appendFileTransferConsole(
         `Auto-accepted inbound transfer ${{fileTransferShortTransferId(transfer && transfer.transferId)}} from ${{senderId}}.`
       );
+      if (typeof refreshScreenWakeLock === "function") {{
+        void refreshScreenWakeLock();
+      }}
       return true;
     }}
 
@@ -655,6 +658,9 @@
         ackWatermarkUnix: Math.max(0, Math.trunc(Number(session.ackWatermarkUnix) || nowUnix)),
       }};
       fileTransferOutgoingByToken.set(token, normalized);
+      if (typeof refreshScreenWakeLock === "function") {{
+        void refreshScreenWakeLock();
+      }}
       return normalized;
     }}
 
