@@ -1358,6 +1358,19 @@
       targetList.addEventListener("click", (ev) => {{
         const target = ev.target;
         if (!(target instanceof Element)) return;
+        const showMoreBtn = target.closest(".chat-roster-load-btn");
+        if (showMoreBtn instanceof HTMLButtonElement && targetList.contains(showMoreBtn)) {{
+          ev.preventDefault();
+          ev.stopPropagation();
+          const baseLimit = Math.max(1, Math.trunc(Number(chatRosterMaxEntries) || 180));
+          const currentLimit = Math.max(baseLimit, Math.trunc(Number(chatRosterVisibleLimit) || baseLimit));
+          const hiddenCount = Math.max(0, Math.trunc(Number(showMoreBtn.dataset.rosterHiddenCount) || 0));
+          chatRosterVisibleLimit = currentLimit + Math.max(1, Math.min(baseLimit, hiddenCount || baseLimit));
+          if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
+            renderChatNodeNavigatorList(latestState);
+          }}
+          return;
+        }}
         const removeBtn = target.closest(".chat-peer-remove-btn");
         if (removeBtn instanceof HTMLButtonElement) {{
           ev.preventDefault();
@@ -2443,8 +2456,41 @@
       }}
       const orderedRoomRows = historyPriorityRows.concat(regularRows);
       const pinnedSectionCount = pinnedUnreadRows.length + meshtasticRows.length + pinnedManualRows.length;
-      const nextRoomListHtml = orderedRoomRows.length > 0
-        ? orderedRoomRows.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
+      const rosterBaseLimit = Math.max(1, Math.trunc(Number(chatRosterMaxEntries) || 180));
+      const currentRosterLimit = Math.max(
+        rosterBaseLimit,
+        Math.trunc(Number(chatRosterVisibleLimit) || rosterBaseLimit)
+      );
+      const hasRosterQuery = String(rosterQuery || "").trim().length > 0;
+      const selectedRoomRowIndex = (() => {{
+        const selectedId = normalizeNodeId(selectedNodeId || "");
+        if (!isSelectableNodeId(selectedId)) return -1;
+        return orderedRoomRows.findIndex((item) => normalizeNodeId(item && item.id) === selectedId);
+      }})();
+      const traceRoomRowIndex = (() => {{
+        if (typeof syncChatNodeNavigatorTraceVisibilityState !== "function") return -1;
+        const traceState = syncChatNodeNavigatorTraceVisibilityState();
+        const traceTargetId = normalizeNodeId(traceState && traceState.targetId);
+        if (!(traceState && traceState.active && isSelectableNodeId(traceTargetId))) return -1;
+        return orderedRoomRows.findIndex((item) => normalizeNodeId(item && item.id) === traceTargetId);
+      }})();
+      const shouldWindowRoomRows = !hasRosterQuery && orderedRoomRows.length > 0;
+      let roomRowRenderLimit = shouldWindowRoomRows
+        ? Math.max(0, currentRosterLimit - pinnedSectionCount)
+        : orderedRoomRows.length;
+      if (selectedRoomRowIndex >= 0) {{
+        roomRowRenderLimit = Math.max(roomRowRenderLimit, selectedRoomRowIndex + 1);
+      }}
+      if (traceRoomRowIndex >= 0) {{
+        roomRowRenderLimit = Math.max(roomRowRenderLimit, traceRoomRowIndex + 1);
+      }}
+      roomRowRenderLimit = Math.max(0, Math.min(orderedRoomRows.length, Math.trunc(Number(roomRowRenderLimit) || 0)));
+      const visibleRoomRows = shouldWindowRoomRows
+        ? orderedRoomRows.slice(0, roomRowRenderLimit)
+        : orderedRoomRows;
+      const hiddenRoomRowCount = Math.max(0, orderedRoomRows.length - visibleRoomRows.length);
+      const renderedRoomRowsHtml = visibleRoomRows.length > 0
+        ? visibleRoomRows.map((item) => buildChatNodeNavigatorMemberHtml(item, {{
             nowUnix,
             nodesById,
             historyCapsById,
@@ -2456,6 +2502,15 @@
             linkQualityByNode,
             resolveChatNodeFreshnessFn,
           }})).join("")
+        : "";
+      const rosterLoadControlHtml = hiddenRoomRowCount > 0
+        ? `<div class="chat-roster-load-row">
+            <button type="button" class="chat-roster-load-btn" data-roster-hidden-count="${{escAttr(String(hiddenRoomRowCount))}}" title="Show more users">Show more users</button>
+            <span class="chat-roster-load-detail">${{escAttr(String(Math.min(rosterFiltered.length, pinnedSectionCount + visibleRoomRows.length)))}} of ${{escAttr(String(rosterFiltered.length))}} shown</span>
+          </div>`
+        : "";
+      const nextRoomListHtml = orderedRoomRows.length > 0
+        ? `${{renderedRoomRowsHtml}}${{rosterLoadControlHtml}}`
         : ((pinnedSectionCount <= 0 && rosterQuery)
             ? '<div class="chat-member-empty">No users match this search.</div>'
             : (pinnedSectionCount <= 0

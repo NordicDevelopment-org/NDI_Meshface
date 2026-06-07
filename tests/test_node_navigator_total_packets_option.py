@@ -236,6 +236,29 @@ def test_dashboard_js_supports_dm_history_first_toggle_in_node_navigator() -> No
     assert "function chatNodeNavigatorDirectHistoryPeerIds(state = latestState) {" in js
 
 
+def test_dashboard_js_windows_chat_roster_dom_for_responsiveness() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+    css = build_dashboard_css(theme_css="")
+
+    assert "const chatRosterMaxEntries = 180;" in js
+    assert "let chatRosterVisibleLimit = chatRosterMaxEntries;" in js
+    assert "const rosterBaseLimit = Math.max(1, Math.trunc(Number(chatRosterMaxEntries) || 180));" in js
+    assert "const hasRosterQuery = String(rosterQuery || \"\").trim().length > 0;" in js
+    assert "const shouldWindowRoomRows = !hasRosterQuery && orderedRoomRows.length > 0;" in js
+    assert "const visibleRoomRows = shouldWindowRoomRows" in js
+    assert "selectedRoomRowIndex + 1" in js
+    assert "traceRoomRowIndex + 1" in js
+    assert 'class="chat-roster-load-btn"' in js
+    assert "data-roster-hidden-count" in js
+    assert "chatRosterVisibleLimit = currentLimit + Math.max(1, Math.min(baseLimit, hiddenCount || baseLimit));" in js
+    assert ".chat-roster-load-row {" in css
+    assert "[data-theme=\"dark\"] .chat-roster-load-row {" in css
+
+
 def test_dashboard_js_prefers_numeric_roster_sort_for_numeric_like_values() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
