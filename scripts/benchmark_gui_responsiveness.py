@@ -98,6 +98,22 @@ def build_benchmark_url(
     return urlunsplit((parts.scheme, parts.netloc, path, urlencode(query), parts.fragment))
 
 
+def redact_url_credentials(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    try:
+        parts = urlsplit(value)
+    except ValueError:
+        return value
+    if not parts.username and not parts.password:
+        return value
+    hostname = parts.hostname or ""
+    if ":" in hostname and not hostname.startswith("["):
+        hostname = f"[{hostname}]"
+    port = f":{parts.port}" if parts.port is not None else ""
+    return urlunsplit((parts.scheme, f"[redacted]@{hostname}{port}", parts.path, parts.query, parts.fragment))
+
+
 def browser_command(
     browser: str,
     url: str,
@@ -202,9 +218,11 @@ def run_benchmark(args: argparse.Namespace) -> dict:
             raise SystemExit(
                 f"{exc}\nBrowser stderr:\n{stderr_tail}" if stderr_tail else str(exc)
             ) from exc
+    if "location" in result:
+        result["location"] = redact_url_credentials(result.get("location"))
     result["_runner"] = {
         "browser": browser,
-        "url": args.url,
+        "url": redact_url_credentials(args.url),
         "window_size": args.window_size,
         "virtual_time_budget_ms": args.virtual_time_budget_ms,
     }

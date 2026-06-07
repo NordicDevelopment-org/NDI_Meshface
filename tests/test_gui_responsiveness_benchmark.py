@@ -119,3 +119,13 @@ def test_gui_responsiveness_thresholds_report_budget_failures() -> None:
     assert "max /summary/domTotalElements/p95: expected <= 2000, got 2400" in failures
     assert "max /summary/missingMetric/p95: expected 1, got missing" in failures
     assert "min /summary/domTotalElements/p95: expected >= 2500, got 2400" in failures
+
+
+def test_gui_responsiveness_redacts_url_credentials_from_saved_results() -> None:
+    benchmark = _load_benchmark_module()
+
+    assert (
+        benchmark.redact_url_credentials("http://j:j@192.168.1.87:8877/path?x=1")
+        == "http://[redacted]@192.168.1.87:8877/path?x=1"
+    )
+    assert benchmark.redact_url_credentials("http://192.168.1.87:8877/") == "http://192.168.1.87:8877/"
