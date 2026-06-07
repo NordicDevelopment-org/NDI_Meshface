@@ -80,6 +80,21 @@
       "actionSyncMs",
     ];
 
+    const meshGuiBenchmarkCountMetricNames = [
+      "domTotalElements",
+      "domBodyHtmlBytes",
+      "domActiveSurfaceElements",
+      "domChatFeedItems",
+      "domChatRosterItems",
+      "domChatRosterVisibleItems",
+      "domNodesTableRows",
+      "domMapMarkers",
+      "domNetworkGraphNodes",
+      "domNetworkGraphEdges",
+      "domSensorElements",
+      "domEnvironmentChartElements",
+    ];
+
     function meshGuiBenchmarkOptionalNumber(value) {{
       const numberValue = Number(value);
       return Number.isFinite(numberValue) ? numberValue : null;
@@ -101,11 +116,20 @@
           for (const metricName of meshGuiBenchmarkTimingMetricNames) {{
             byLabel[label][metricName] = [];
           }}
+          for (const metricName of meshGuiBenchmarkCountMetricNames) {{
+            byLabel[label][metricName] = [];
+          }}
         }}
         byLabel[label].totalMs.push(Number(sample.totalMs) || 0);
         byLabel[label].frameMaxMs.push(Number(sample.frameMaxMs) || 0);
         byLabel[label].frameP95Ms.push(Number(sample.frameP95Ms) || 0);
         for (const metricName of meshGuiBenchmarkTimingMetricNames) {{
+          const value = meshGuiBenchmarkOptionalNumber(sample && sample[metricName]);
+          if (value !== null) {{
+            byLabel[label][metricName].push(value);
+          }}
+        }}
+        for (const metricName of meshGuiBenchmarkCountMetricNames) {{
           const value = meshGuiBenchmarkOptionalNumber(sample && sample[metricName]);
           if (value !== null) {{
             byLabel[label][metricName].push(value);
@@ -126,6 +150,9 @@
         for (const metricName of meshGuiBenchmarkTimingMetricNames) {{
           labels[label][metricName] = meshGuiBenchmarkStats(data[metricName] || []);
         }}
+        for (const metricName of meshGuiBenchmarkCountMetricNames) {{
+          labels[label][metricName] = meshGuiBenchmarkStats(data[metricName] || []);
+        }}
       }}
       const summary = {{
         samples: rows.length,
@@ -143,7 +170,123 @@
             .filter((value) => value !== null)
         );
       }}
+      for (const metricName of meshGuiBenchmarkCountMetricNames) {{
+        summary[metricName] = meshGuiBenchmarkStats(
+          rows
+            .map((sample) => meshGuiBenchmarkOptionalNumber(sample && sample[metricName]))
+            .filter((value) => value !== null)
+        );
+      }}
       return summary;
+    }}
+
+    function meshGuiBenchmarkQueryCount(selector, root = document) {{
+      if (!selector || !root || typeof root.querySelectorAll !== "function") return 0;
+      try {{
+        return root.querySelectorAll(selector).length;
+      }} catch (_err) {{
+        return 0;
+      }}
+    }}
+
+    function meshGuiBenchmarkElementCount(root) {{
+      if (!(root instanceof Element) && !(root instanceof Document)) return 0;
+      return 1 + meshGuiBenchmarkQueryCount("*", root);
+    }}
+
+    function meshGuiBenchmarkHtmlBytes(root) {{
+      if (!(root instanceof Element)) return 0;
+      return String(root.innerHTML || "").length;
+    }}
+
+    function meshGuiBenchmarkRootById(id) {{
+      return document.getElementById(String(id || "").trim());
+    }}
+
+    function meshGuiBenchmarkActiveSurfaceRoots() {{
+      const view = normalizeLayoutView(activeLayoutView || "chat");
+      const subview = view === "network" ? normalizeNetworkSubview(activeNetworkSubview || "map") : "";
+      let selectors = [];
+      if (view === "chat") {{
+        selectors = ["#chat-left-panel", ".card.chat"];
+      }} else if (view === "network") {{
+        selectors = [".card.map"];
+        if (subview === "sensors") selectors.push("#network-sensors-host");
+        if (subview === "graph") selectors.push("#network-graph-svg");
+      }} else if (view === "history") {{
+        selectors = [".card.history-chat"];
+      }} else if (view === "settings") {{
+        selectors = [".card.settings"];
+      }} else if (view === "console") {{
+        selectors = [".card.console"];
+      }} else if (view === "environment") {{
+        selectors = [".card.environment"];
+      }} else if (view === "saved") {{
+        selectors = [".card.summary", ".card.favorites", ".card.map"];
+      }} else {{
+        selectors = [`.card.${{view}}`];
+      }}
+      const seen = new Set();
+      const roots = [];
+      for (const selector of selectors) {{
+        const root = document.querySelector(selector);
+        if (!(root instanceof Element) || seen.has(root)) continue;
+        seen.add(root);
+        roots.push(root);
+      }}
+      return roots;
+    }}
+
+    function meshGuiBenchmarkDomSnapshot() {{
+      const body = document.body instanceof HTMLElement ? document.body : null;
+      const chatFeed = meshGuiBenchmarkRootById("chat-feed");
+      const chatLeftPanel = meshGuiBenchmarkRootById("chat-left-panel");
+      const nodesTable = meshGuiBenchmarkRootById("nodes-table");
+      const networkGraphSvg = meshGuiBenchmarkRootById("network-graph-svg");
+      const sensorsHost = meshGuiBenchmarkRootById("network-sensors-host");
+      const envChart = meshGuiBenchmarkRootById("env-metrics-chart");
+      const activeRoots = meshGuiBenchmarkActiveSurfaceRoots();
+      return {{
+        totalElements: meshGuiBenchmarkQueryCount("*"),
+        bodyHtmlBytes: body ? meshGuiBenchmarkHtmlBytes(body) : 0,
+        activeSurfaceElements: activeRoots.reduce((sum, root) => sum + meshGuiBenchmarkElementCount(root), 0),
+        activeSurfaceHtmlBytes: activeRoots.reduce((sum, root) => sum + meshGuiBenchmarkHtmlBytes(root), 0),
+        chatFeedItems: meshGuiBenchmarkQueryCount(".chat-feed-item", chatFeed || document),
+        chatFeedElements: meshGuiBenchmarkElementCount(chatFeed),
+        chatFeedHtmlBytes: meshGuiBenchmarkHtmlBytes(chatFeed),
+        chatRosterItems: meshGuiBenchmarkQueryCount(".chat-member-item[data-node-id]", chatLeftPanel || document),
+        chatRosterVisibleItems: meshGuiBenchmarkQueryCount(".chat-member-item[data-node-id]:not([hidden])", chatLeftPanel || document),
+        chatRosterElements: meshGuiBenchmarkElementCount(chatLeftPanel),
+        nodesTableRows: meshGuiBenchmarkQueryCount("tbody tr", nodesTable || document),
+        nodesTableElements: meshGuiBenchmarkElementCount(nodesTable),
+        mapMarkers: meshGuiBenchmarkQueryCount(".leaflet-marker-icon"),
+        mapPaths: meshGuiBenchmarkQueryCount(".leaflet-overlay-pane path, .leaflet-marker-pane path, .leaflet-interactive"),
+        networkGraphNodes: meshGuiBenchmarkQueryCount(".network-graph-node", networkGraphSvg || document),
+        networkGraphEdges: meshGuiBenchmarkQueryCount(".network-graph-edge", networkGraphSvg || document),
+        networkGraphElements: meshGuiBenchmarkElementCount(networkGraphSvg),
+        sensorElements: meshGuiBenchmarkElementCount(sensorsHost),
+        environmentChartElements: meshGuiBenchmarkElementCount(envChart),
+        environmentLegendItems: meshGuiBenchmarkQueryCount(".env-metrics-legend-item, .env-metrics-node-item"),
+        environmentTimelineMarks: meshGuiBenchmarkQueryCount("#env-metrics-timeline .signal-timeline-mark"),
+      }};
+    }}
+
+    function meshGuiBenchmarkSampleDomFields(domSnapshot) {{
+      const dom = (domSnapshot && typeof domSnapshot === "object") ? domSnapshot : {{}};
+      return {{
+        domTotalElements: Math.max(0, Math.trunc(Number(dom.totalElements) || 0)),
+        domBodyHtmlBytes: Math.max(0, Math.trunc(Number(dom.bodyHtmlBytes) || 0)),
+        domActiveSurfaceElements: Math.max(0, Math.trunc(Number(dom.activeSurfaceElements) || 0)),
+        domChatFeedItems: Math.max(0, Math.trunc(Number(dom.chatFeedItems) || 0)),
+        domChatRosterItems: Math.max(0, Math.trunc(Number(dom.chatRosterItems) || 0)),
+        domChatRosterVisibleItems: Math.max(0, Math.trunc(Number(dom.chatRosterVisibleItems) || 0)),
+        domNodesTableRows: Math.max(0, Math.trunc(Number(dom.nodesTableRows) || 0)),
+        domMapMarkers: Math.max(0, Math.trunc(Number(dom.mapMarkers) || 0)),
+        domNetworkGraphNodes: Math.max(0, Math.trunc(Number(dom.networkGraphNodes) || 0)),
+        domNetworkGraphEdges: Math.max(0, Math.trunc(Number(dom.networkGraphEdges) || 0)),
+        domSensorElements: Math.max(0, Math.trunc(Number(dom.sensorElements) || 0)),
+        domEnvironmentChartElements: Math.max(0, Math.trunc(Number(dom.environmentChartElements) || 0)),
+      }};
     }}
 
     function meshGuiBenchmarkLastRunFromDetail(detail, key) {{
@@ -256,6 +399,7 @@
       const longTaskDurations = longTasks.map((entry) => entry.durationMs);
       const longTaskStats = meshGuiBenchmarkStats(longTaskDurations);
       const timingBreakdown = meshGuiBenchmarkSampleTimingBreakdown(detail, callbackMs);
+      const domSnapshot = meshGuiBenchmarkDomSnapshot();
       const actionSyncMs = detail && typeof detail === "object"
         ? meshGuiBenchmarkOptionalNumber(detail.actionSyncMs)
         : null;
@@ -272,6 +416,8 @@
         longTaskCount: longTasks.length,
         longTaskTotalMs: meshGuiBenchmarkRoundMs(longTaskDurations.reduce((sum, value) => sum + value, 0)),
         longTaskMaxMs: longTaskStats.max,
+        ...meshGuiBenchmarkSampleDomFields(domSnapshot),
+        dom: domSnapshot,
         meta: (meta && typeof meta === "object") ? {{ ...meta }} : {{}},
         detail: detail && typeof detail === "object" ? detail : {{}},
         error,
@@ -319,6 +465,7 @@
         recentChat: Array.isArray(rawTraffic.recent_chat) ? rawTraffic.recent_chat.length : 0,
         recentPackets: Array.isArray(rawTraffic.recent_packets) ? rawTraffic.recent_packets.length : 0,
         edges: Array.isArray(rawTraffic.edges) ? rawTraffic.edges.length : 0,
+        dom: meshGuiBenchmarkDomSnapshot(),
         chatRender: chatStats ? {{
           status: chatStats.status || "",
           totalMs: meshGuiBenchmarkRoundMs(chatStats.totalMs),

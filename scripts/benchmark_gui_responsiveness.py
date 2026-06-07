@@ -217,6 +217,26 @@ def _fmt_ms(value: object) -> str:
         return "n/a"
 
 
+def _fmt_count(value: object) -> str:
+    try:
+        return f"{int(round(float(value))):,}"
+    except (TypeError, ValueError):
+        return "n/a"
+
+
+def _fmt_bytes(value: object) -> str:
+    try:
+        size = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    units = ["B", "KB", "MB"]
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(round(size))} B"
+        size /= 1024
+    return "n/a"
+
+
 def print_summary(result: dict) -> None:
     summary = result.get("summary") or {}
     total = summary.get("totalMs") or {}
@@ -236,6 +256,24 @@ def print_summary(result: dict) -> None:
         f"{state.get('historyCaps', 0)} history caps, "
         f"{state.get('recentChat', 0)} recent chat rows"
     )
+    dom = state.get("dom") or {}
+    if dom:
+        print(
+            "  DOM: "
+            f"{_fmt_count(dom.get('totalElements'))} elements, "
+            f"{_fmt_bytes(dom.get('bodyHtmlBytes'))} body HTML, "
+            f"{_fmt_count(dom.get('activeSurfaceElements'))} active surface elements"
+        )
+        print(
+            "  DOM surfaces: "
+            f"chat {_fmt_count(dom.get('chatFeedItems'))} feed / "
+            f"{_fmt_count(dom.get('chatRosterVisibleItems'))} visible roster, "
+            f"nodes {_fmt_count(dom.get('nodesTableRows'))} rows, "
+            f"map {_fmt_count(dom.get('mapMarkers'))} markers, "
+            f"graph {_fmt_count(dom.get('networkGraphNodes'))} nodes / "
+            f"{_fmt_count(dom.get('networkGraphEdges'))} edges, "
+            f"sensors {_fmt_count(dom.get('sensorElements'))} elems"
+        )
     print(
         "  sample total: "
         f"p50 {_fmt_ms(total.get('p50'))}, "
@@ -297,6 +335,7 @@ def print_summary(result: dict) -> None:
             frame_stats = data.get("frameMaxMs") or {}
             poll_stats = data.get("pollWorkMs") or {}
             action_stats = data.get("actionSyncMs") or {}
+            active_dom_stats = data.get("domActiveSurfaceElements") or {}
             action_suffix = (
                 f", action p95 {_fmt_ms(action_stats.get('p95'))}"
                 if action_stats.get("count")
@@ -307,6 +346,11 @@ def print_summary(result: dict) -> None:
                 if poll_stats.get("count")
                 else ""
             )
+            dom_suffix = (
+                f", active DOM p95 {_fmt_count(active_dom_stats.get('p95'))}"
+                if active_dom_stats.get("count")
+                else ""
+            )
             print(
                 f"    {label}: p95 {_fmt_ms(stats.get('p95'))}, "
                 f"callback p95 {_fmt_ms(callback_stats.get('p95'))}, "
@@ -314,6 +358,7 @@ def print_summary(result: dict) -> None:
                 f"long tasks {data.get('longTaskCount', 0)}"
                 f"{action_suffix}"
                 f"{poll_suffix}"
+                f"{dom_suffix}"
             )
 
 
