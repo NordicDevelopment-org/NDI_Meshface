@@ -77,6 +77,35 @@
       }});
     }}
 
+    const pollFreshnessUiThrottleMs = 12000;
+    let pollFreshnessUiLastTickMs = 0;
+    let pollFreshnessUiLastStateKey = "";
+
+    function maybeTickFreshnessUIForPoll(state = latestState, options = null) {{
+      const opts = options && typeof options === "object" ? options : {{}};
+      const safeState = state && typeof state === "object" ? state : (latestState || {{}});
+      if (!safeState || typeof safeState !== "object" || typeof tickFreshnessUI !== "function") return false;
+      const nowMs = Date.now();
+      const stateKey = String(opts.stateKey || stateEtag || "").trim();
+      const force = opts.force === true;
+      const stateChanged = !!stateKey && stateKey !== pollFreshnessUiLastStateKey;
+      const elapsedMs = Math.max(0, nowMs - (Number(pollFreshnessUiLastTickMs) || 0));
+      if (
+        !force
+        && !stateChanged
+        && pollFreshnessUiLastTickMs > 0
+        && elapsedMs < pollFreshnessUiThrottleMs
+      ) {{
+        return false;
+      }}
+      tickFreshnessUI(safeState);
+      pollFreshnessUiLastTickMs = nowMs;
+      if (stateKey) {{
+        pollFreshnessUiLastStateKey = stateKey;
+      }}
+      return true;
+    }}
+
     function pollPerfEnabled() {{
       return !!(
         typeof window !== "undefined"
@@ -215,6 +244,7 @@
           ? `${{stateUrlBase}}&_=${{Date.now()}}`
           : stateUrlBase;
         forceStateReloadOnce = false;
+        const previousStateEtag = String(stateEtag || "");
         const headers = {{}};
         if (stateEtag && stateUrl === stateUrlBase) {{
           headers["If-None-Match"] = stateEtag;
@@ -389,14 +419,19 @@
             }}
           }}
           scheduleFileTransferMaintenance(latestState);
-          tickFreshnessUI(latestState);
-          markPollPerfPhase(pollPerfRun, "not-modified-maintenance");
+          const freshnessTicked304 = maybeTickFreshnessUIForPoll(latestState, {{
+            stateKey: stateEtag,
+          }});
+          markPollPerfPhase(pollPerfRun, "not-modified-maintenance", {{
+            freshnessTicked: freshnessTicked304,
+          }});
           return;
         }}
         if (!resp.ok) throw new Error(`API ${{resp.status}}`);
         const newEtag = resp.headers && resp.headers.get ? resp.headers.get("ETag") : null;
+        const responseStateEtag = newEtag ? String(newEtag) : "";
         if (newEtag) {{
-          stateEtag = String(newEtag);
+          stateEtag = responseStateEtag;
         }}
         const rawState = await resp.json();
         markPollPerfPhase(pollPerfRun, "json");
@@ -708,10 +743,14 @@
 
 
         scheduleFileTransferMaintenance(state);
-        tickFreshnessUI(state);
+        const freshnessTicked = maybeTickFreshnessUIForPoll(state, {{
+          stateKey: responseStateEtag || stateEtag,
+          force: !responseStateEtag || responseStateEtag !== previousStateEtag,
+        }});
         markPollPerfPhase(pollPerfRun, "maintenance", {{
           historyRelevant,
           profile: pollProfile,
+          freshnessTicked,
         }});
         pollPerfStatus = "ok";
         pollPerfExtra = {{ httpStatus: resp.status, profile: pollProfile }};
