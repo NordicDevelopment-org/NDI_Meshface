@@ -5020,11 +5020,23 @@
 
       const normalizedView = normalizeLayoutView(activeLayoutView);
       const showTabbedSubview = normalizedView === "network";
+      const previousUsesMap = networkSubviewUsesMap(previous);
       const nextUsesMap = networkSubviewUsesMap(next);
       const showMapPanel = !showTabbedSubview || nextUsesMap;
       const root = document.getElementById("network-map-subviews");
       if (root instanceof HTMLElement) {{
         root.dataset.activeSubview = next;
+      }}
+      if (showTabbedSubview && previousUsesMap && !nextUsesMap) {{
+        try {{
+          if (typeof hideSignalHeatmapLayers === "function") {{
+            hideSignalHeatmapLayers();
+          }}
+          if (typeof clearLinkEstimateHeatmapLayer === "function") {{
+            clearLinkEstimateHeatmapLayer();
+          }}
+        }} catch (_err) {{
+        }}
       }}
 
       for (const btn of document.querySelectorAll(".network-map-subview-tab")) {{

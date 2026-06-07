@@ -115,6 +115,13 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert 'let lastSignalHeatmapSignature = "";' in js
     assert "const heatSignature = `signal-heatmap:${(heatSignatureHash >>> 0).toString(16)}`;" in js
     assert "heatSignature === lastSignalHeatmapSignature && heatLayerPresenceMatches" in js
+    assert "const desiredLayerVisible = !!(shouldShow && !(savedSingleNodeMode && i > 0));" in js
+    assert "if (!desiredLayerVisible) {" in js
+    assert "removeSignalHeatmapLayerSafely(layer);" in js
+    assert "function hideSignalHeatmapLayers()" in js
+    assert "function cancelSignalHeatmapLayerFrame(layer)" in js
+    assert "typeof hideSignalHeatmapLayers === \"function\"" in js
+    assert "typeof clearLinkEstimateHeatmapLayer === \"function\"" in js
     assert "hideEstimatedMarkers: false," in js
     assert "hideEstimatedMarkers: clouds.length > 0," in js
     assert "cloudLinks" in js

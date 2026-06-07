@@ -192,7 +192,13 @@
 
     function clearLinkEstimateHeatmapLayer() {{
       if (!linkEstimateHeatmapLayer) return;
-      linkEstimateHeatmapLayer.setLatLngs([]);
+      if (linkEstimateHeatmapLayer._frame && window.L && L.Util && typeof L.Util.cancelAnimFrame === "function") {{
+        try {{
+          L.Util.cancelAnimFrame(linkEstimateHeatmapLayer._frame);
+        }} catch (_err) {{
+        }}
+        linkEstimateHeatmapLayer._frame = null;
+      }}
       if (map.hasLayer(linkEstimateHeatmapLayer)) {{
         map.removeLayer(linkEstimateHeatmapLayer);
       }}
@@ -215,17 +221,17 @@
         ? linkDensity.heatPoints
         : [];
       const shouldShow = !!show && mapDrawable && heatPoints.length > 0;
-      layer.setLatLngs(heatPoints);
-      if (shouldShow) {{
-        if (!map.hasLayer(layer)) {{
-          layer.addTo(map);
-        }}
-        if (typeof forceHeatLayerPointerPassthrough === "function") {{
-          forceHeatLayerPointerPassthrough(layer);
-        }}
-      }} else if (map.hasLayer(layer)) {{
-        map.removeLayer(layer);
+      if (!shouldShow) {{
+        clearLinkEstimateHeatmapLayer();
+        return;
       }}
+      if (!map.hasLayer(layer)) {{
+        layer.addTo(map);
+      }}
+      if (typeof forceHeatLayerPointerPassthrough === "function") {{
+        forceHeatLayerPointerPassthrough(layer);
+      }}
+      layer.setLatLngs(heatPoints);
     }}
 
     function bindMapLinkLegendControls(legend) {{

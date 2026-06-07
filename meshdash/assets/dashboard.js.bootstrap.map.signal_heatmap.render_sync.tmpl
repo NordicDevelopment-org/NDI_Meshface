@@ -124,11 +124,9 @@
 
       for (let i = 0; i < layers.length; i++) {{
         const layer = layers[i];
-        if (savedSingleNodeMode && i > 0) {{
-          layer.setLatLngs([]);
-          if (map.hasLayer(layer)) {{
-            map.removeLayer(layer);
-          }}
+        const desiredLayerVisible = !!(shouldShow && !(savedSingleNodeMode && i > 0));
+        if (!desiredLayerVisible) {{
+          removeSignalHeatmapLayerSafely(layer);
           continue;
         }}
         const bucket = signalHeatBucketDefs[i] || {{}};
@@ -170,17 +168,41 @@
               minOpacity: baseVisual.minOpacity,
               gradient,
             }};
+        if (!map.hasLayer(layer)) {{
+          layer.addTo(map);
+        }}
+        forceHeatLayerPointerPassthrough(layer);
         if (typeof layer.setOptions === "function") {{
           layer.setOptions(visual);
         }}
         layer.setLatLngs((buckets[i] || []));
-        if (shouldShow) {{
-          if (!map.hasLayer(layer)) {{
-            layer.addTo(map);
-          }}
-          forceHeatLayerPointerPassthrough(layer);
-        }} else if (map.hasLayer(layer)) {{
-          map.removeLayer(layer);
+      }}
+    }}
+
+    function cancelSignalHeatmapLayerFrame(layer) {{
+      if (!layer || typeof layer !== "object") return;
+      const frame = layer._frame;
+      if (frame && window.L && L.Util && typeof L.Util.cancelAnimFrame === "function") {{
+        try {{
+          L.Util.cancelAnimFrame(frame);
+        }} catch (_err) {{
         }}
       }}
+      layer._frame = null;
+    }}
+
+    function removeSignalHeatmapLayerSafely(layer) {{
+      if (!layer || typeof layer !== "object") return;
+      cancelSignalHeatmapLayerFrame(layer);
+      if (map && typeof map.hasLayer === "function" && map.hasLayer(layer)) {{
+        map.removeLayer(layer);
+      }}
+    }}
+
+    function hideSignalHeatmapLayers() {{
+      const layers = Array.isArray(signalHeatmapLayers) ? signalHeatmapLayers : [];
+      for (const layer of layers) {{
+        removeSignalHeatmapLayerSafely(layer);
+      }}
+      lastSignalHeatmapSignature = "";
     }}
