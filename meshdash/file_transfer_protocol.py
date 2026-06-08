@@ -147,11 +147,16 @@ def build_file_transfer_ack_frame(
         if idx is None or idx < 0 or idx >= total:
             continue
         indexes.add(int(idx))
-    max_index = max(indexes) if indexes else 0
-    byte_len = max(1, (max_index // 8) + 1)
-    bitmap = bytearray(byte_len)
-    for idx in indexes:
-        bitmap[idx // 8] |= 1 << (idx % 8)
+    if len(indexes) >= total:
+        # The count is authoritative for completion. Keep the final ACK small enough
+        # to fit in one chat frame even for transfers with many chunks.
+        bitmap = bytearray(1)
+    else:
+        max_index = max(indexes) if indexes else 0
+        byte_len = max(1, (max_index // 8) + 1)
+        bitmap = bytearray(byte_len)
+        for idx in indexes:
+            bitmap[idx // 8] |= 1 << (idx % 8)
     encoded = base64.b64encode(bytes(bitmap)).decode("ascii")
     return f"{FILE_TRANSFER_PROTOCOL_NAME}|A|{clean_id}|{len(indexes)}|{total}|{encoded}"
 

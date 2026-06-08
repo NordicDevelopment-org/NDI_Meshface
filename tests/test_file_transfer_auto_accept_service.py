@@ -49,8 +49,23 @@ def test_file_transfer_protocol_parses_meta_and_builds_compact_ack() -> None:
             total_chunks=2,
             received_indexes={0, 1},
         )
-        == "MF_FILE_V1|A|abcd1234|2|2|Aw=="
+        == "MF_FILE_V1|A|abcd1234|2|2|AA=="
     )
+
+
+def test_file_transfer_protocol_final_ack_stays_compact_for_large_transfers() -> None:
+    frame = build_file_transfer_ack_frame(
+        transfer_id="abcd1234",
+        total_chunks=1024,
+        received_indexes=range(1024),
+    )
+
+    assert frame == "MF_FILE_V1|A|abcd1234|1024|1024|AA=="
+    assert len(frame.encode("utf-8")) < 200
+    parsed = parse_file_transfer_frame_text(frame)
+    assert parsed is not None
+    assert parsed["received_count"] == 1024
+    assert parsed["total_chunks"] == 1024
 
 
 def test_auto_accept_sends_initial_ack_for_direct_meta() -> None:
@@ -95,7 +110,7 @@ def test_auto_accept_acks_chunk_progress_and_final_completion() -> None:
     assert [row["text"] for row in sent_messages] == [
         "MF_FILE_V1|A|abcd1234|0|2|AA==",
         "MF_FILE_V1|A|abcd1234|1|2|AQ==",
-        "MF_FILE_V1|A|abcd1234|2|2|Aw==",
+        "MF_FILE_V1|A|abcd1234|2|2|AA==",
     ]
 
 

@@ -263,9 +263,11 @@
           observedIndexes.add(idx);
         }}
         const mergedIndexes = Array.from(observedIndexes).sort((a, b) => a - b);
-        const bitmap = buildFileTransferChunkBitmapBase64(totalChunks, mergedIndexes);
-        if (!bitmap) continue;
         const receivedCount = Math.max(0, Math.min(totalChunks, mergedIndexes.length));
+        const bitmap = receivedCount >= totalChunks
+          ? "AA=="
+          : buildFileTransferChunkBitmapBase64(totalChunks, mergedIndexes);
+        if (!bitmap) continue;
         fileTransferAckObservedChunksByKey.set(transferKey, {{
           totalChunks,
           indexes: observedIndexes,
