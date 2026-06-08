@@ -1227,12 +1227,16 @@ def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     files_splitter_section = css.split(".files-transfer-console-splitter {", 1)[1].split("}", 1)[0]
 
     assert "background: transparent;" in files_section
+    assert "height: 100%;" in files_section
     assert "border: 0;" in files_section
     assert "box-shadow: none;" in files_section
     assert "overflow: visible;" in files_section
     assert "background: transparent;" in files_body_section
+    assert "flex: 1 1 auto;" in files_body_section
+    assert "height: 100%;" in files_body_section
     assert "padding: 0;" in files_body_section
     assert "flex: 1 1 auto;" in files_console_section
+    assert "overflow: hidden;" in files_console_section
     assert "flex: 1 1 auto;" in files_console_log_section
     assert "max-height: none;" in files_console_log_section
     assert "flex: 0 0 var(--files-transfer-list-height);" in files_transfers_section
