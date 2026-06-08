@@ -154,6 +154,22 @@ def test_dashboard_html_labels_files_destination_as_node() -> None:
     assert 'placeholder="Select a node or enter !1234abcd"' in html_template
 
 
+def test_dashboard_html_orders_files_controls_table_and_console() -> None:
+    html_template = (Path(__file__).resolve().parents[1] / "meshdash/assets/dashboard.html.tmpl").read_text(encoding="utf-8")
+
+    channel_idx = html_template.index('<span class="files-label">Send Channel</span>')
+    destination_idx = html_template.index('<span class="files-label">Destination Node</span>')
+    file_row_idx = html_template.index('<div class="files-file-row">')
+    file_input_idx = html_template.index('id="files-input"', file_row_idx)
+    send_btn_idx = html_template.index('id="files-send-btn"', file_row_idx)
+    table_idx = html_template.index('id="files-transfer-table"')
+    console_idx = html_template.index('<div class="files-console">')
+
+    assert channel_idx < destination_idx
+    assert file_row_idx < file_input_idx < send_btn_idx
+    assert table_idx < console_idx
+
+
 def test_dashboard_js_syncs_files_destination_from_node_selection() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,

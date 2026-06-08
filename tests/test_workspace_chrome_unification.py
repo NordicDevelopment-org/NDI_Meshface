@@ -1241,7 +1241,7 @@ def test_files_view_uses_theme_tokens_in_light_and_dark_modes() -> None:
     dark_caption_section = css.split("[data-theme=\"dark\"] .files-caption,", 1)[1].split("}", 1)[0]
     dark_console_log_section = css.split("[data-theme=\"dark\"] .files-console-log {", 1)[1].split("}", 1)[0]
     dark_table_head_section = css.rsplit("[data-theme=\"dark\"] #files-transfer-table thead th {", 1)[1].split("}", 1)[0]
-    dark_secondary_btn_section = css.split("[data-theme=\"dark\"] .files-controls .btn.btn-secondary {", 1)[1].split("}", 1)[0]
+    dark_secondary_btn_section = css.split("[data-theme=\"dark\"] .files-console .btn.btn-secondary {", 1)[1].split("}", 1)[0]
 
     assert "var(--panel)" in light_card_section
     assert "var(--ui-text" in light_card_section

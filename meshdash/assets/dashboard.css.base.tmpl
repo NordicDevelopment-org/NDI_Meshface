@@ -3974,6 +3974,12 @@
       line-height: 1.35;
       color: var(--surface-tint-text-soft, #5c7567);
     }}
+    .files-file-row {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }}
     .files-input {{
       width: 100%;
       min-width: 0;
@@ -4016,12 +4022,14 @@
       gap: 8px;
       flex-wrap: wrap;
     }}
-    .files-controls .btn.btn-secondary {{
+    .files-controls .btn.btn-secondary,
+    .files-console .btn.btn-secondary {{
       background: color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 72%, white 28%);
       border-color: color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 76%, var(--ui-border, #c2d8c7) 24%);
       color: var(--surface-tint-text, #294735);
     }}
-    .files-controls .btn.btn-secondary:hover {{
+    .files-controls .btn.btn-secondary:hover,
+    .files-console .btn.btn-secondary:hover {{
       background: color-mix(in srgb, var(--surface-tint-bg, #d1e6d8) 70%, white 30%);
       border-color: var(--surface-tint-border-strong, #9ac5aa);
     }}
