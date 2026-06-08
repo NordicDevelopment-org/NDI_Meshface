@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from collections.abc import Mapping
@@ -19,9 +20,12 @@ from .dashboard_runtime_context import (
     DashboardRuntimeContext,
     build_dashboard_runtime_context,
 )
+from .dashboard_setup import open_optional_history_store
 from .dashboard_server import (
     build_dashboard_server,
 )
+from .helpers import format_epoch, to_int
+from .history_profile import build_shared_history_db_path
 from .runtime_types import (
     BuildNodeHistoryLoaderFn,
     BuildOnlineActivityLoaderFn,
@@ -43,6 +47,7 @@ from .runtime_types import (
     ToIntFn,
     UtcNowFn,
 )
+from .state_summary import apply_node_historical_names, apply_node_saved_counts
 
 
 @dataclass(frozen=True)
@@ -182,6 +187,77 @@ def _enable_serial_auto_reconnect(args: DashboardArgs) -> bool:
     return True
 
 
+def _cached_history_node_rows(
+    history_store: object | None,
+) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
+    if history_store is None:
+        return [], {}
+
+    load_capabilities_fn = getattr(history_store, "load_node_capabilities", None)
+    load_saved_counts_fn = getattr(history_store, "load_node_saved_counts", None)
+    if not callable(load_capabilities_fn) and not callable(load_saved_counts_fn):
+        return [], {}
+
+    try:
+        raw_caps = load_capabilities_fn() if callable(load_capabilities_fn) else {}
+    except Exception:
+        raw_caps = {}
+    try:
+        raw_saved_counts = load_saved_counts_fn() if callable(load_saved_counts_fn) else {}
+    except Exception:
+        raw_saved_counts = {}
+
+    caps_by_id = {
+        str(node_id or "").strip(): dict(caps)
+        for node_id, caps in (raw_caps.items() if isinstance(raw_caps, Mapping) else [])
+        if str(node_id or "").strip() and isinstance(caps, Mapping)
+    }
+    saved_counts = {
+        str(node_id or "").strip(): dict(stats)
+        for node_id, stats in (raw_saved_counts.items() if isinstance(raw_saved_counts, Mapping) else [])
+        if str(node_id or "").strip() and isinstance(stats, Mapping)
+    }
+
+    rows: list[dict[str, object]] = []
+    for node_id in sorted(set(caps_by_id) | set(saved_counts)):
+        caps = caps_by_id.get(node_id, {})
+        last_seen_unix = to_int(caps.get("last_seen_unix")) or 0
+        num: int | None = None
+        if len(node_id) == 9 and node_id.startswith("!"):
+            try:
+                num = int(node_id[1:], 16)
+            except ValueError:
+                num = None
+        rows.append(
+            {
+                "id": node_id,
+                "num": num,
+                "short_name": caps.get("last_short_name"),
+                "long_name": caps.get("last_long_name") or node_id,
+                "hardware_model": None,
+                "role": None,
+                "is_licensed": None,
+                "last_heard": caps.get("last_seen") or format_epoch(last_seen_unix),
+                "last_heard_unix": last_seen_unix,
+                "snr": None,
+                "rssi": None,
+                "hops_away": caps.get("last_hops"),
+                "is_favorite": None,
+                "battery_level": caps.get("battery_level"),
+                "voltage": None,
+                "channel_utilization": None,
+                "air_util_tx": None,
+                "lat": None,
+                "lon": None,
+            }
+        )
+
+    apply_node_saved_counts(rows, saved_counts)
+    apply_node_historical_names(rows, caps_by_id)
+    rows.sort(key=lambda item: int(to_int(item.get("last_heard_unix")) or 0), reverse=True)
+    return rows, caps_by_id
+
+
 def _build_offline_state_loader(
     *,
     target: str,
@@ -190,6 +266,7 @@ def _build_offline_state_loader(
     connecting: bool,
     started_at: float,
     utc_now_fn: UtcNowFn,
+    history_store: object | None = None,
 ):
     revision_payload = {}
     as_dict = getattr(revision_info, "as_dict", None)
@@ -212,13 +289,19 @@ def _build_offline_state_loader(
 
     def state_fn() -> dict[str, object]:
         uptime_seconds = int(max(0, time.time() - started_at))
+        cached_nodes, history_caps = _cached_history_node_rows(history_store)
+        cached_position_count = sum(
+            1
+            for caps in history_caps.values()
+            if isinstance(caps, Mapping) and bool(caps.get("has_position"))
+        )
         return {
             "generated_at": utc_now_fn(),
             "summary": {
                 "target": target,
                 "uptime_seconds": uptime_seconds,
-                "node_count": 0,
-                "nodes_with_position": 0,
+                "node_count": len(cached_nodes),
+                "nodes_with_position": cached_position_count,
                 "live_packet_count": 0,
                 "edge_count": 0,
                 "real_edge_count": 0,
@@ -226,6 +309,9 @@ def _build_offline_state_loader(
                 "modem_preset": None,
                 "disk": {"free_percent": "n/a"},
                 "revision": revision_payload,
+                "saved_node_count": len(cached_nodes),
+                "online_node_count": 0,
+                "online_node_count_source": "offline",
                 "radio_connection": radio_connection_summary,
             },
             "summary_error": None,
@@ -239,8 +325,8 @@ def _build_offline_state_loader(
             "tracker_error": tracker_error_text,
             "tracker_saved_counts_error": None,
             "tracker_capabilities_error": None,
-            "nodes": [],
-            "history_caps": {},
+            "nodes": cached_nodes,
+            "history_caps": history_caps,
             "nodes_full": [],
             "traffic": {
                 "edges": [],
@@ -272,6 +358,7 @@ def _build_offline_runtime_context(
     *,
     startup_error: Exception,
     connecting: bool,
+    history_store_cls: HistoryStoreFactory | None = None,
     mesh_target_label_fn: MeshTargetLabelFn,
     revision_info_fn: RevisionInfoFn,
     utc_now_fn: UtcNowFn,
@@ -279,6 +366,17 @@ def _build_offline_runtime_context(
     target = mesh_target_label_fn(args)
     revision_info = revision_info_fn()
     started_at = time.time()
+    history_db_path = ""
+    history_store = None
+    if history_store_cls is not None:
+        history_db_path = build_shared_history_db_path(
+            os.path.abspath(os.path.expanduser(args.history_db))
+        )
+        history_store = open_optional_history_store(
+            args,
+            history_store_cls=history_store_cls,
+            history_db_path=history_db_path,
+        )
     state_fn = _build_offline_state_loader(
         target=target,
         revision_info=revision_info,
@@ -286,14 +384,15 @@ def _build_offline_runtime_context(
         connecting=connecting,
         started_at=started_at,
         utc_now_fn=utc_now_fn,
+        history_store=history_store,
     )
     if bool(getattr(args, "games_enable", False)):
         _attach_standalone_zork_service(state_fn)
     return DashboardRuntimeContext(
         target=target,
         iface=_NoopCloseResource(),
-        history_db_path="",
-        history_store=None,
+        history_db_path=history_db_path if history_store is not None else "",
+        history_store=history_store,
         tracker=_OfflineTracker(),
         send_lock=threading.Lock(),
         started_at=started_at,
@@ -303,7 +402,7 @@ def _build_offline_runtime_context(
         online_activity_fn=None,  # type: ignore[arg-type]
         summary_metrics_fn=None,  # type: ignore[arg-type]
         send_chat_fn=None,  # type: ignore[arg-type]
-        history_enabled=False,
+        history_enabled=history_store is not None,
     )
 
 
@@ -468,6 +567,7 @@ def run_dashboard_runtime(
                 args,
                 startup_error=startup_error,
                 connecting=connecting,
+                history_store_cls=history_store_cls,
                 mesh_target_label_fn=mesh_target_label_fn,
                 revision_info_fn=revision_info_fn,
                 utc_now_fn=utc_now_fn,
@@ -506,6 +606,7 @@ def run_dashboard_runtime(
                     args,
                     startup_error=exc,
                     connecting=True,
+                    history_store_cls=history_store_cls,
                     mesh_target_label_fn=mesh_target_label_fn,
                     revision_info_fn=revision_info_fn,
                     utc_now_fn=utc_now_fn,
