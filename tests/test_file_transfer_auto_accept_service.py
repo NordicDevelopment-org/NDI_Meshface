@@ -1,0 +1,230 @@
+from types import SimpleNamespace
+
+from meshdash.dashboard_runtime_context import build_dashboard_runtime_context
+from meshdash.dashboard_runtime_loaders import DashboardRuntimeLoaders
+from meshdash.file_transfer_protocol import (
+    build_file_transfer_ack_frame,
+    parse_file_transfer_frame_text,
+)
+from meshdash.services_file_transfer_auto_accept import (
+    build_file_transfer_auto_accept_service,
+)
+
+
+def _make_iface(*, local_num: int = 0x12345678, sender_num: int = 0x01020304):
+    return SimpleNamespace(
+        nodesByNum={
+            local_num: {"user": {"id": f"!{local_num:08x}"}},
+            sender_num: {"user": {"id": f"!{sender_num:08x}"}},
+        }
+    )
+
+
+def _packet(text: str, *, to_num: int = 0x12345678, channel: int = 2) -> dict[str, object]:
+    return {
+        "from": 0x01020304,
+        "to": to_num,
+        "channel": channel,
+        "decoded": {"text": text, "portnum": "TEXT_MESSAGE_APP"},
+    }
+
+
+def test_file_transfer_protocol_parses_meta_and_builds_compact_ack() -> None:
+    parsed = parse_file_transfer_frame_text(
+        "MF_FILE_V1|M|abcd1234|hello%20mesh.txt|128|2|raw|128"
+    )
+
+    assert parsed == {
+        "kind": "meta",
+        "transfer_id": "abcd1234",
+        "file_name": "hello mesh.txt",
+        "file_size": 128,
+        "total_chunks": 2,
+        "codec": "raw",
+        "original_file_size": 128,
+    }
+    assert (
+        build_file_transfer_ack_frame(
+            transfer_id="abcd1234",
+            total_chunks=2,
+            received_indexes={0, 1},
+        )
+        == "MF_FILE_V1|A|abcd1234|2|2|Aw=="
+    )
+
+
+def test_auto_accept_sends_initial_ack_for_direct_meta() -> None:
+    sent_messages: list[dict[str, object]] = []
+    service = build_file_transfer_auto_accept_service(
+        local_node_id_fn=lambda: "!12345678",
+        send_chat_fn=lambda **kwargs: sent_messages.append(dict(kwargs)) or {"ok": True},
+        now_monotonic_fn=lambda: 10.0,
+    )
+
+    service.on_receive(
+        _packet("MF_FILE_V1|M|abcd1234|sample.bin|128|2|raw|128"),
+        _make_iface(),
+    )
+
+    assert sent_messages == [
+        {
+            "text": "MF_FILE_V1|A|abcd1234|0|2|AA==",
+            "destination": "!01020304",
+            "channel_index": 2,
+        }
+    ]
+
+
+def test_auto_accept_acks_chunk_progress_and_final_completion() -> None:
+    sent_messages: list[dict[str, object]] = []
+    now = {"value": 10.0}
+    service = build_file_transfer_auto_accept_service(
+        local_node_id_fn=lambda: "!12345678",
+        send_chat_fn=lambda **kwargs: sent_messages.append(dict(kwargs)) or {"ok": True},
+        now_monotonic_fn=lambda: now["value"],
+        ack_cooldown_seconds=0,
+    )
+    iface = _make_iface()
+
+    service.on_receive(_packet("MF_FILE_V1|M|abcd1234|sample.bin|128|2|raw|128"), iface)
+    now["value"] = 10.1
+    service.on_receive(_packet("MF_FILE_V1|C|abcd1234|0|AQID"), iface)
+    now["value"] = 10.2
+    service.on_receive(_packet("MF_FILE_V1|C|abcd1234|1|BAUG"), iface)
+
+    assert [row["text"] for row in sent_messages] == [
+        "MF_FILE_V1|A|abcd1234|0|2|AA==",
+        "MF_FILE_V1|A|abcd1234|1|2|AQ==",
+        "MF_FILE_V1|A|abcd1234|2|2|Aw==",
+    ]
+
+
+def test_auto_accept_ignores_disabled_and_broadcast_transfers() -> None:
+    sent_messages: list[dict[str, object]] = []
+    disabled = build_file_transfer_auto_accept_service(
+        local_node_id_fn=lambda: "!12345678",
+        send_chat_fn=lambda **kwargs: sent_messages.append(dict(kwargs)) or {"ok": True},
+        enabled=False,
+    )
+    enabled = build_file_transfer_auto_accept_service(
+        local_node_id_fn=lambda: "!12345678",
+        send_chat_fn=lambda **kwargs: sent_messages.append(dict(kwargs)) or {"ok": True},
+    )
+
+    disabled.on_receive(
+        _packet("MF_FILE_V1|M|abcd1234|sample.bin|128|2|raw|128"),
+        _make_iface(),
+    )
+    enabled.on_receive(
+        _packet(
+            "MF_FILE_V1|M|abcd1234|sample.bin|128|2|raw|128",
+            to_num=0xFFFFFFFF,
+        ),
+        _make_iface(),
+    )
+
+    assert sent_messages == []
+
+
+class _RevisionInfo:
+    version = "0.1.0"
+    commit = "test"
+    label = "Rev: test"
+    title = "Dashboard revision: test"
+
+
+class _Tracker:
+    def __init__(self, packet_limit: int, history_store: object) -> None:
+        self.packet_limit = packet_limit
+        self.history_store = history_store
+
+    def on_receive(self, *_args: object, **_kwargs: object) -> None:
+        return None
+
+
+def test_runtime_wires_backend_auto_accept_when_enabled(tmp_path) -> None:
+    subscriptions: list[tuple[object, str]] = []
+    sent_messages: list[dict[str, object]] = []
+    iface = _make_iface()
+    args = SimpleNamespace(
+        history_db=str(tmp_path / "history.sqlite3"),
+        no_history=True,
+        seed_from_node_db=False,
+        history_max_rows=1000,
+        history_retention_days=7,
+        history_event_max_rows=1000,
+        history_event_retention_days=30,
+        history_rollup_retention_days=365,
+        packet_limit=25,
+        show_secrets=False,
+        debug_mode=False,
+        node_history_hours=72,
+        node_history_max_points=1440,
+        refresh_ms=3000,
+        reset_ticker_scale_on_restart=False,
+        http_host="127.0.0.1",
+        http_port=0,
+        games_enable=False,
+        bbs_enable=False,
+        file_transfer_enable=True,
+        file_transfer_auto_accept=True,
+    )
+
+    def _loaders(**_kwargs: object) -> DashboardRuntimeLoaders:
+        def _state() -> dict[str, object]:
+            return {}
+
+        return DashboardRuntimeLoaders(
+            state_fn=_state,
+            node_history_fn=lambda *_args, **_kwargs: {},
+            online_activity_fn=lambda *_args, **_kwargs: {},
+            summary_metrics_fn=lambda *_args, **_kwargs: {},
+            send_chat_fn=lambda **kwargs: sent_messages.append(dict(kwargs)) or {"ok": True},
+        )
+
+    build_dashboard_runtime_context(
+        args,
+        mesh_target_label_fn=lambda _args: "/dev/ttyUSB0 (serial)",
+        open_mesh_interface_fn=lambda _args: iface,
+        history_store_cls=lambda **_kwargs: object(),
+        dashboard_tracker_cls=_Tracker,
+        subscribe_fn=lambda callback, topic: subscriptions.append((callback, topic)),
+        seed_tracker_fn=lambda _tracker, _iface: None,
+        revision_info_fn=_RevisionInfo,
+        send_chat_message_fn=lambda **_kwargs: {},
+        send_reaction_packet_fn=lambda **_kwargs: None,
+        get_local_node_id_fn=lambda _iface: "!12345678",
+        normalize_single_emoji_fn=lambda _value: (None, None),
+        to_int_fn=lambda _value: None,
+        utc_now_fn=lambda: "2026-06-07T00:00:00Z",
+        build_state_fn=lambda **_kwargs: {},
+        build_state_snapshot_loader_fn=lambda *_args, **_kwargs: lambda: {},
+        build_node_history_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_online_activity_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_summary_metrics_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        build_send_chat_loader_fn=lambda *_args, **_kwargs: lambda **_kw: {},
+        default_chat_max_bytes=200,
+        build_dashboard_runtime_loaders_fn=_loaders,
+    )
+
+    service_callbacks = [
+        callback
+        for callback, topic in subscriptions
+        if topic == "meshtastic.receive"
+        and getattr(getattr(callback, "__self__", None), "__class__", None).__name__
+        == "FileTransferAutoAcceptService"
+    ]
+    assert len(service_callbacks) == 1
+
+    service_callbacks[0](
+        _packet("MF_FILE_V1|M|abcd1234|sample.bin|128|2|raw|128"),
+        iface,
+    )
+
+    assert sent_messages == [
+        {
+            "text": "MF_FILE_V1|A|abcd1234|0|2|AA==",
+            "destination": "!01020304",
+            "channel_index": 2,
+        }
+    ]

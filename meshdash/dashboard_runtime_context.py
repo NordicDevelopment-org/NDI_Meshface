@@ -552,6 +552,42 @@ def build_dashboard_runtime_context(
             except Exception:
                 pass
 
+    if bool(getattr(args, "file_transfer_enable", False)) and bool(
+        getattr(args, "file_transfer_auto_accept", False)
+    ):
+        try:
+            from .services_file_transfer_auto_accept import (
+                build_file_transfer_auto_accept_service as _build_file_transfer_auto_accept_service,
+            )
+        except Exception:
+            _build_file_transfer_auto_accept_service = None
+
+        if _build_file_transfer_auto_accept_service is not None:
+            file_transfer_auto_accept_service = _build_file_transfer_auto_accept_service(
+                local_node_id_fn=lambda: get_local_node_id_fn(iface),
+                send_chat_fn=loaders.send_chat_fn,
+                max_ack_frame_bytes=default_chat_max_bytes,
+            )
+            subscribe_fn(file_transfer_auto_accept_service.on_receive, "meshtastic.receive")
+            try:
+                setattr(
+                    loaders.state_fn,
+                    "get_file_transfer_auto_accept_runtime_fn",
+                    file_transfer_auto_accept_service.get_runtime,
+                )
+            except Exception:
+                pass
+            state_lite_fn = getattr(loaders.state_fn, "lite", None)
+            if callable(state_lite_fn):
+                try:
+                    setattr(
+                        state_lite_fn,
+                        "get_file_transfer_auto_accept_runtime_fn",
+                        file_transfer_auto_accept_service.get_runtime,
+                    )
+                except Exception:
+                    pass
+
     if bool(getattr(args, "bbs_enable", False)):
         try:
             from .services_bbs_host import build_bbs_host_service as _build_bbs_host_service

@@ -104,8 +104,8 @@ def add_http_runtime_args(
         action=argparse.BooleanOptionalAction,
         default=default_file_transfer_auto_accept,
         help=(
-            "Default browser preference for automatically accepting direct inbound "
-            "Meshyface file transfers "
+            "Automatically accept direct inbound Meshyface file transfers in the "
+            "backend, and use the same value as the browser preference default "
             f"(default: {default_file_transfer_auto_accept})"
         ),
     )

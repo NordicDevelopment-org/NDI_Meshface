@@ -541,7 +541,11 @@ Optional received-file acceptance default:
 
 - `--file-transfer-auto-accept` / `--no-file-transfer-auto-accept` or
   `MESH_DASH_FILE_TRANSFER_AUTO_ACCEPT=1|0`
-- The Files view toggle persists per browser and overrides this startup default
+- When enabled, the backend accepts and ACKs direct inbound transfers even if
+  no browser tab is open
+- The Files view toggle persists per browser and overrides the browser-side
+  default for that browser; it does not disable backend auto accept set at
+  startup
 
 Deploy helper example:
 

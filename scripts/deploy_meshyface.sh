@@ -51,9 +51,9 @@ Options:
   --file-transfer-enable   Enable file transfer in dashboard.env (requires disclaimer).
   --no-file-transfer-enable Disable file transfer in dashboard.env.
   --file-transfer-auto-accept
-                           Default browser preference for auto accepting received files.
+                           Enable backend auto accept and default browser preference.
   --no-file-transfer-auto-accept
-                           Default browser preference for manually accepting received files.
+                           Disable backend auto accept; default browsers to manual accept.
   --file-transfer-max-bytes <bytes>
                            Max file transfer size written to dashboard.env.
   --accept-file-transfer-traffic-disclaimer
