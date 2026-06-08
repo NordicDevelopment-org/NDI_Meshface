@@ -163,11 +163,12 @@ def test_dashboard_html_orders_files_controls_table_and_console() -> None:
     file_input_idx = html_template.index('id="files-input"', file_row_idx)
     send_btn_idx = html_template.index('id="files-send-btn"', file_row_idx)
     table_idx = html_template.index('id="files-transfer-table"')
+    splitter_idx = html_template.index('id="files-transfer-console-splitter"')
     console_idx = html_template.index('<div class="files-console">')
 
     assert channel_idx < destination_idx
     assert file_row_idx < file_input_idx < send_btn_idx
-    assert table_idx < console_idx
+    assert table_idx < splitter_idx < console_idx
 
 
 def test_dashboard_js_syncs_files_destination_from_node_selection() -> None:

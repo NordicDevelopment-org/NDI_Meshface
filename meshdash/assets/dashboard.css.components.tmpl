@@ -2414,6 +2414,21 @@
       background: #08120d;
       background: var(--workspace-shell-bg);
     }}
+    [data-theme="dark"] .files-transfer-console-splitter {{
+      border-color: var(--workspace-shell-border-muted);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--workspace-shell-bg-alt) 88%, black 12%),
+        color-mix(in srgb, var(--workspace-shell-bg) 82%, var(--surface-tint-color, #2d8f5d) 18%)
+      );
+    }}
+    [data-theme="dark"] .files-transfer-console-splitter::before {{
+      background: var(--workspace-shell-border-strong);
+    }}
+    [data-theme="dark"] .files-transfer-console-splitter:hover::before,
+    [data-theme="dark"] .files-transfer-console-splitter.active::before {{
+      background: var(--workspace-shell-text);
+    }}
     [data-theme="dark"] #files-transfer-table thead th {{
       background: color-mix(in srgb, var(--workspace-shell-bg-alt) 86%, black 14%);
       border-bottom-color: var(--workspace-shell-border);

@@ -134,6 +134,25 @@
       return Math.max(min, Math.min(max, Math.round(numeric)));
     }}
 
+    function clampFilesTransferListHeightPx(value) {{
+      const numeric = Number(value);
+      const fallback = 96;
+      const shell = document.querySelector(".files-shell");
+      if (!(shell instanceof HTMLElement)) {{
+        return Number.isFinite(numeric) ? Math.max(48, Math.min(220, Math.round(numeric))) : fallback;
+      }}
+      const shellHeight = shell.getBoundingClientRect().height;
+      if (!Number.isFinite(shellHeight) || shellHeight < 220) {{
+        return Number.isFinite(numeric) ? Math.max(48, Math.min(220, Math.round(numeric))) : fallback;
+      }}
+      const controls = shell.querySelector(".files-controls");
+      const controlsHeight = controls instanceof HTMLElement ? controls.getBoundingClientRect().height : 0;
+      const consoleMin = 120;
+      const chrome = controlsHeight + 24;
+      const max = Math.max(48, Math.min(360, shellHeight - chrome - consoleMin));
+      return Number.isFinite(numeric) ? Math.max(48, Math.min(max, Math.round(numeric))) : Math.min(fallback, max);
+    }}
+
     function applySplitState() {{
       const layout = document.querySelector(".layout");
       if (!(layout instanceof HTMLElement)) return;
@@ -275,6 +294,13 @@
         : window.innerWidth;
       macrosPanelWidthPx = clampMacrosPanelWidthPx(macrosPanelWidthPx, containerWidth);
       layout.style.setProperty("--macros-panel-width", `${{macrosPanelWidthPx}}px`);
+    }}
+
+    function applyFilesTransferListSplitState() {{
+      const shell = document.querySelector(".files-shell");
+      if (!(shell instanceof HTMLElement)) return;
+      filesTransferListHeightPx = clampFilesTransferListHeightPx(filesTransferListHeightPx);
+      shell.style.setProperty("--files-transfer-list-height", `${{filesTransferListHeightPx}}px`);
     }}
 
     function loadSplitState() {{
@@ -500,4 +526,18 @@
       }} catch (_err) {{
       }}
       applyMacrosPanelSplitState();
+    }}
+
+    function loadFilesTransferListSplitState() {{
+      try {{
+        const raw = window.localStorage.getItem(filesTransferListSplitStorageKey) || "";
+        if (raw) {{
+          const parsed = Number(raw);
+          if (Number.isFinite(parsed)) {{
+            filesTransferListHeightPx = clampFilesTransferListHeightPx(parsed);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      applyFilesTransferListSplitState();
     }}

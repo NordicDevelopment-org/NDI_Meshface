@@ -3889,6 +3889,7 @@
       flex-direction: column;
     }}
     .files-shell {{
+      --files-transfer-list-height: 96px;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -4103,12 +4104,44 @@
       font-weight: 700;
     }}
     .files-transfers-scroll {{
-      flex: 0 1 auto;
-      min-height: 0;
-      max-height: clamp(64px, 18vh, 220px);
+      flex: 0 0 var(--files-transfer-list-height);
+      height: var(--files-transfer-list-height);
+      min-height: 48px;
+      max-height: none;
       border: 1px solid var(--surface-tint-border, #c2d8c7);
       border-radius: 8px;
       background: color-mix(in srgb, var(--panel, #ffffff) 96%, var(--bg, #edf6ec) 4%);
+    }}
+    .files-transfer-console-splitter {{
+      position: relative;
+      flex: 0 0 8px;
+      min-height: 8px;
+      border: 1px solid color-mix(in srgb, var(--surface-tint-border, #c2d8c7) 84%, transparent);
+      border-radius: 8px;
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--surface-tint-bg-soft, #f0f8f2) 92%, white 8%),
+        color-mix(in srgb, var(--surface-tint-bg-alt, #e1f2e7) 92%, white 8%)
+      );
+      cursor: row-resize;
+      touch-action: none;
+      user-select: none;
+      box-sizing: border-box;
+    }}
+    .files-transfer-console-splitter::before {{
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      border-radius: 1px;
+      background: var(--surface-tint-border-strong, #7ab18a);
+    }}
+    .files-transfer-console-splitter:hover::before,
+    .files-transfer-console-splitter.active::before {{
+      background: var(--surface-tint-text, #294735);
     }}
     #files-transfer-table {{
       width: 100%;

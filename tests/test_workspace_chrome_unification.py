@@ -1224,6 +1224,7 @@ def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     files_console_section = css.split(".files-console {", 1)[1].split("}", 1)[0]
     files_console_log_section = css.split(".files-console-log {", 1)[1].split("}", 1)[0]
     files_transfers_section = css.split(".files-transfers-scroll {", 1)[1].split("}", 1)[0]
+    files_splitter_section = css.split(".files-transfer-console-splitter {", 1)[1].split("}", 1)[0]
 
     assert "background: transparent;" in files_section
     assert "border: 0;" in files_section
@@ -1234,8 +1235,49 @@ def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     assert "flex: 1 1 auto;" in files_console_section
     assert "flex: 1 1 auto;" in files_console_log_section
     assert "max-height: none;" in files_console_log_section
-    assert "flex: 0 1 auto;" in files_transfers_section
-    assert "max-height: clamp(64px, 18vh, 220px);" in files_transfers_section
+    assert "flex: 0 0 var(--files-transfer-list-height);" in files_transfers_section
+    assert "height: var(--files-transfer-list-height);" in files_transfers_section
+    assert "max-height: none;" in files_transfers_section
+    assert "cursor: row-resize;" in files_splitter_section
+
+
+def test_files_view_uses_persistent_transfer_console_splitter() -> None:
+    html = build_html_shell(
+        app_title="Meshyface",
+        app_heading="Meshyface",
+        style_css="",
+        app_js="",
+        revision_title="rev",
+        revision_label="rev",
+        safety_label="safe",
+        packet_limit=100,
+        history_label="history",
+        refresh_ms=1000,
+    )
+    css = build_dashboard_css(theme_css="")
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+        file_transfer_enabled=True,
+    )
+
+    dark_splitter_section = css.split("[data-theme=\"dark\"] .files-transfer-console-splitter {", 1)[1].split("}", 1)[0]
+
+    assert 'id="files-transfer-console-splitter"' in html
+    assert 'aria-orientation="horizontal"' in html
+    assert ".files-transfer-console-splitter::before {" in css
+    assert "var(--workspace-shell-border-muted)" in dark_splitter_section
+    assert 'const filesTransferListSplitStorageKey = "meshDashboardFilesTransferListHeightPxV1";' in js
+    assert "let filesTransferListHeightPx = 96;" in js
+    assert "function clampFilesTransferListHeightPx(value) {" in js
+    assert "function applyFilesTransferListSplitState() {" in js
+    assert "function loadFilesTransferListSplitState() {" in js
+    assert "function persistFilesTransferListSplitState() {" in js
+    assert "function bindFilesTransferConsoleSplitter() {" in js
+    assert 'runBootStep("loadFilesTransferListSplitState", () => loadFilesTransferListSplitState());' in js
+    assert 'runBootStep("bindFilesTransferConsoleSplitter", () => bindFilesTransferConsoleSplitter());' in js
+    assert 'if (next === "files" && typeof applyFilesTransferListSplitState === "function") {' in js
 
 
 def test_files_view_uses_theme_tokens_in_light_and_dark_modes() -> None:

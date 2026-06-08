@@ -465,6 +465,53 @@
       }});
     }}
 
+    function bindFilesTransferConsoleSplitter() {{
+      const splitter = document.getElementById("files-transfer-console-splitter");
+      if (!(splitter instanceof HTMLElement) || splitter.dataset.bound === "1") return;
+      const shell = splitter.closest(".files-shell");
+      const transfers = splitter.previousElementSibling;
+      if (!(shell instanceof HTMLElement) || !(transfers instanceof HTMLElement)) return;
+      splitter.dataset.bound = "1";
+
+      splitter.addEventListener("pointerdown", (ev) => {{
+        if (activeLayoutView !== "files") return;
+        ev.preventDefault();
+        splitter.classList.add("active");
+        document.body.classList.add("resizing-panels-y");
+        splitter.setPointerCapture(ev.pointerId);
+
+        const startY = ev.clientY;
+        const transferRect = transfers.getBoundingClientRect();
+        const startHeight = Number.isFinite(transferRect.height) && transferRect.height > 0
+          ? transferRect.height
+          : filesTransferListHeightPx;
+
+        const updateFromClientY = (clientY) => {{
+          filesTransferListHeightPx = clampFilesTransferListHeightPx(startHeight + (clientY - startY));
+          applyFilesTransferListSplitState();
+        }};
+
+        updateFromClientY(ev.clientY);
+
+        const onMove = (moveEv) => {{
+          updateFromClientY(moveEv.clientY);
+        }};
+
+        const onUp = () => {{
+          splitter.classList.remove("active");
+          document.body.classList.remove("resizing-panels-y");
+          persistFilesTransferListSplitState();
+          splitter.removeEventListener("pointermove", onMove);
+          splitter.removeEventListener("pointerup", onUp);
+          splitter.removeEventListener("pointercancel", onUp);
+        }};
+
+        splitter.addEventListener("pointermove", onMove);
+        splitter.addEventListener("pointerup", onUp);
+        splitter.addEventListener("pointercancel", onUp);
+      }});
+    }}
+
     function bindSavedNodeSplitter() {{
       const handles = [
         document.getElementById("saved-map-splitter"),
