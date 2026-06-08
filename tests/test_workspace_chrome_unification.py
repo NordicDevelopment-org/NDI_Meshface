@@ -1221,6 +1221,9 @@ def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     css = build_dashboard_css(theme_css="")
     files_section = css.split(".layout.view-files .files {", 1)[1].split("}", 1)[0]
     files_body_section = css.split(".layout.view-files .files .body {", 1)[1].split("}", 1)[0]
+    files_console_section = css.split(".files-console {", 1)[1].split("}", 1)[0]
+    files_console_log_section = css.split(".files-console-log {", 1)[1].split("}", 1)[0]
+    files_transfers_section = css.split(".files-transfers-scroll {", 1)[1].split("}", 1)[0]
 
     assert "background: transparent;" in files_section
     assert "border: 0;" in files_section
@@ -1228,6 +1231,11 @@ def test_files_view_removes_outer_card_shell_for_full_app_canvas() -> None:
     assert "overflow: visible;" in files_section
     assert "background: transparent;" in files_body_section
     assert "padding: 0;" in files_body_section
+    assert "flex: 1 1 auto;" in files_console_section
+    assert "flex: 1 1 auto;" in files_console_log_section
+    assert "max-height: none;" in files_console_log_section
+    assert "flex: 0 1 auto;" in files_transfers_section
+    assert "max-height: clamp(64px, 18vh, 220px);" in files_transfers_section
 
 
 def test_files_view_uses_theme_tokens_in_light_and_dark_modes() -> None:

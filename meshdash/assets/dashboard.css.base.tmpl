@@ -3904,6 +3904,7 @@
       display: flex;
       flex-direction: column;
       gap: 7px;
+      flex: 0 0 auto;
     }}
     .files-caption {{
       font-size: 11px;
@@ -4046,6 +4047,8 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      flex: 1 1 auto;
+      min-height: 0;
     }}
     .files-console-head {{
       display: flex;
@@ -4073,8 +4076,9 @@
     }}
     .files-console-log {{
       margin: 0;
-      min-height: 92px;
-      max-height: 168px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: none;
       overflow: auto;
       border: 1px solid var(--surface-tint-border-strong, #7ab18a);
       border-radius: 7px;
@@ -4099,9 +4103,9 @@
       font-weight: 700;
     }}
     .files-transfers-scroll {{
-      flex: 1 1 auto;
+      flex: 0 1 auto;
       min-height: 0;
-      max-height: none;
+      max-height: clamp(64px, 18vh, 220px);
       border: 1px solid var(--surface-tint-border, #c2d8c7);
       border-radius: 8px;
       background: color-mix(in srgb, var(--panel, #ffffff) 96%, var(--bg, #edf6ec) 4%);
