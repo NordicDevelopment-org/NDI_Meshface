@@ -11,7 +11,12 @@
     function chatNodeNavigatorDefaultSortDirForKey(sortKeyRaw) {{
       const sortKey = normalizeChatNodeNavigatorSortKeyPref(sortKeyRaw);
       if (sortKey === "last_heard") return "desc";
+      if (sortKey === "links" || sortKey === "location_points") return "desc";
       return normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorDefaultSortDir);
+    }}
+
+    function chatNodeNavigatorUsesPrioritySections(sortKeyRaw = chatNodeNavigatorSortKey) {{
+      return normalizeChatNodeNavigatorSortKeyPref(sortKeyRaw) === chatNodeNavigatorDefaultSortKey;
     }}
 
     function normalizeChatNodeNavigatorPinDirectHistoryPref(value) {{
@@ -77,6 +82,13 @@
       return fallbackToDefaults
         ? nodeExplorerDefaultRosterMetadataFieldIds()
         : [];
+    }}
+
+    function chatNodeNavigatorMetaFieldIdsIncludeLegacyLastHeard(rawIds) {{
+      const source = Array.isArray(rawIds)
+        ? rawIds
+        : (rawIds == null ? [] : [rawIds]);
+      return source.some((value) => normalizeNodeExplorerFieldId(value) === "last_heard");
     }}
 
     function chatNodeNavigatorMetaFieldIdsEqual(a, b) {{
@@ -241,8 +253,15 @@
       const nextShowCity = normalizeChatNodeNavigatorShowCityPref(
         prefs.showCity != null ? prefs.showCity : chatNodeNavigatorShowCity
       );
+      const rawMetaFieldIds = prefs.metaFields != null ? prefs.metaFields : chatNodeNavigatorMetaFieldIds;
+      const legacyLastHeardMetaAsFreshness = (
+        prefs.metaFields != null
+        && chatNodeNavigatorMetaFieldIdsIncludeLegacyLastHeard(prefs.metaFields)
+      );
       const nextShowIdle = normalizeChatNodeNavigatorShowIdlePref(
-        prefs.showIdle != null ? prefs.showIdle : chatNodeNavigatorShowIdle
+        prefs.showIdle != null
+          ? prefs.showIdle
+          : (legacyLastHeardMetaAsFreshness ? true : chatNodeNavigatorShowIdle)
       );
       const nextShowStatusDots = normalizeChatNodeNavigatorShowStatusDotsPref(
         prefs.showStatusDots != null ? prefs.showStatusDots : chatNodeNavigatorShowStatusDots
@@ -251,7 +270,7 @@
         prefs.showPacketDirection != null ? prefs.showPacketDirection : chatNodeNavigatorShowPacketDirection
       );
       const nextMetaFieldIds = normalizeChatNodeNavigatorMetaFieldIdsPref(
-        prefs.metaFields != null ? prefs.metaFields : chatNodeNavigatorMetaFieldIds,
+        rawMetaFieldIds,
         {{ fallbackToDefaults: false }}
       );
       const changed = (
@@ -1013,6 +1032,7 @@
       const sourceLinkQualityByNode = linkQualityByNode instanceof Map ? linkQualityByNode : new Map();
       const sortKey = normalizeChatNodeNavigatorSortKeyPref(chatNodeNavigatorSortKey);
       const sortDir = normalizeChatNodeNavigatorSortDirPref(chatNodeNavigatorSortDir);
+      const usePrioritySections = chatNodeNavigatorUsesPrioritySections(sortKey);
       const projectionById = new Map();
       const projectionFor = (entry) => {{
         const nodeId = normalizeNodeId(entry && entry.id);
@@ -1026,6 +1046,7 @@
             nowUnix,
             historyCaps: sourceHistoryCaps.get(nodeId) || null,
             linkQuality: sourceLinkQualityByNode.get(nodeId) || null,
+            freshnessUnix: entry && entry.lastSeenUnix,
           }}
         );
         projectionById.set(nodeId, projection);
@@ -1038,7 +1059,7 @@
         );
         if (unreadDiff !== 0) return unreadDiff;
 
-        const pinDiff = activeChatChannel === "direct"
+        const pinDiff = activeChatChannel === "direct" && usePrioritySections
           ? (Number(!!(b && b.p2pPinned)) - Number(!!(a && a.p2pPinned)))
           : 0;
         if (pinDiff !== 0) return pinDiff;
@@ -1725,6 +1746,7 @@
             nowUnix,
             historyCaps: historyCapsById.get(nodeId) || null,
             linkQuality: linkQualityByNode.get(nodeId) || null,
+            freshnessUnix: snapshot && snapshot.lastSeenUnix,
           }}
         );
         const caps = historyCapsById.get(nodeId) || null;
@@ -1870,6 +1892,12 @@
             }});
         const showLinkQuality = Array.isArray(visibleMetaFieldIds)
           && visibleMetaFieldIds.includes("link_quality");
+        const showHops = Array.isArray(visibleMetaFieldIds)
+          && visibleMetaFieldIds.includes("hops");
+        const showSnr = Array.isArray(visibleMetaFieldIds)
+          && visibleMetaFieldIds.includes("snr");
+        const showLastHeardMeta = Array.isArray(visibleMetaFieldIds)
+          && visibleMetaFieldIds.includes("last_heard");
         const linkQuality = linkQualityByNode.get(nodeId) || null;
         const linkQualityBarsRaw = Number(linkQuality && linkQuality.bars);
         const linkQualityBars = Number.isFinite(linkQualityBarsRaw)
@@ -1918,14 +1946,30 @@
         const removeBtn = (activeChatChannel === "direct" && item && item.p2pPinned)
           ? `<button type="button" class="chat-peer-remove-btn" data-node-id="${{escAttr((item && item.id) || nodeId)}}" title="Remove from peer-to-peer list" aria-label="Remove ${{escAttr((item && item.id) || nodeId)}} from peer-to-peer list">&times;</button>`
           : "";
-        const idleRowTitle = Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
-          ? `Last seen ${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}}`
-          : "Last seen n/a";
-        const idleRowHtml = showIdle
-          ? `<span class="chat-member-idle-time" title="${{escAttr(idleRowTitle)}}">Idle: ${{escAttr(idleText)}}</span>`
+        const freshnessInline = (showIdle || showLastHeardMeta)
+          ? (
+              typeof nodeFreshnessInlineLabel === "function"
+                ? nodeFreshnessInlineLabel(snapshot && snapshot.lastSeenUnix, snapshot && snapshot.status, nowUnix)
+                : {{
+                    text: `Idle: ${{idleText}}`,
+                    title: Number.isFinite(Number(snapshot && snapshot.lastSeenUnix))
+                      ? `Last seen ${{formatLocalChatTime(snapshot.lastSeenUnix, "n/a", nowUnix)}}`
+                      : "Last seen n/a",
+                    mode: "idle",
+                  }}
+            )
+          : null;
+        const idleRowHtml = freshnessInline
+          ? `<span class="chat-member-idle-time" data-freshness-inline-mode="${{escAttr(freshnessInline.mode || "")}}" title="${{escAttr(freshnessInline.title)}}">${{escAttr(freshnessInline.text)}}</span>`
           : "";
-        const hopsInlineHtml = hopsValue != null
+        const hopsInlineHtml = showHops && hopsValue != null
           ? `<span class="chat-member-hops-inline" title="Last known hops away: ${{escAttr(hopsText)}}">Hops ${{escAttr(hopsText)}}</span>`
+          : "";
+        const snrField = nodeProjection && nodeProjection.fields ? nodeProjection.fields.snr : null;
+        const snrInlineText = String((snrField && snrField.text != null) ? snrField.text : "n/a").trim() || "n/a";
+        const snrInlineTitle = String((snrField && snrField.title != null) ? snrField.title : snrInlineText).trim() || snrInlineText;
+        const snrInlineHtml = showSnr
+          ? `<span class="chat-member-snr-inline" title="${{escAttr(`SNR: ${{snrInlineTitle}}`)}}">SNR ${{escAttr(snrInlineText)}}</span>`
           : "";
         const linkQualityInlineHtml = (showLinkQuality && linkQualityBars != null)
           ? `<span class="chat-member-link-quality is-${{escAttr(linkQualityLevel)}}" title="${{escAttr(linkQualityTitle)}}" aria-label="${{escAttr(linkQualityAria)}}">
@@ -1973,6 +2017,7 @@
         if (idleRowHtml) memberMetaRowParts.push(idleRowHtml);
         if (hopsInlineHtml) memberMetaRowParts.push(hopsInlineHtml);
         if (linkQualityInlineHtml) memberMetaRowParts.push(linkQualityInlineHtml);
+        if (snrInlineHtml) memberMetaRowParts.push(snrInlineHtml);
         const memberMetaRowHtml = memberMetaRowParts.length > 0
           ? `<span class="chat-member-meta-row">${{memberMetaRowParts.join("")}}</span>`
           : "";
@@ -1982,7 +2027,7 @@
           const chips = [];
           for (const fieldIdRaw of visibleFieldIds) {{
             const fieldId = normalizeNodeExplorerFieldId(fieldIdRaw);
-            if (!fieldId || fieldId === "favorite" || fieldId === "hops" || fieldId === "link_quality") continue;
+            if (!fieldId || fieldId === "favorite" || fieldId === "hops" || fieldId === "link_quality" || fieldId === "snr" || fieldId === "last_heard") continue;
             const def = nodeExplorerFieldDef(fieldId);
             const field = nodeProjection && nodeProjection.fields ? nodeProjection.fields[fieldId] : null;
             if (!def || !field) continue;
@@ -2157,6 +2202,23 @@
         const fallbackStatusHtml = fallbackShowStatusDots
           ? '<span class="chat-member-status chat-member-status-dot status-unknown" title="Status: Unknown" aria-label="Status: Unknown">●</span>'
           : '<span class="chat-member-status chat-member-status-dot status-unknown is-hidden" aria-hidden="true">●</span>';
+        const fallbackShowIdle = (typeof normalizeChatNodeNavigatorShowIdlePref === "function")
+          ? normalizeChatNodeNavigatorShowIdlePref(chatNodeNavigatorShowIdle)
+          : !!chatNodeNavigatorShowIdle;
+        const fallbackVisibleMetaFieldIds = (typeof normalizeChatNodeNavigatorMetaFieldIdsPref === "function")
+          ? normalizeChatNodeNavigatorMetaFieldIdsPref(chatNodeNavigatorMetaFieldIds, {{
+              fallbackToDefaults: false,
+            }})
+          : [];
+        const fallbackShowLastHeardMeta = Array.isArray(fallbackVisibleMetaFieldIds)
+          && fallbackVisibleMetaFieldIds.includes("last_heard");
+        const fallbackFreshnessInline = (fallbackShowIdle || fallbackShowLastHeardMeta)
+          ? (
+              typeof nodeFreshnessInlineLabel === "function"
+                ? nodeFreshnessInlineLabel(null, "unknown")
+                : {{ text: "Last Heard: n/a", title: "Last seen n/a", mode: "last_heard" }}
+            )
+          : null;
         return `<div class="chat-member-item status-unknown${{fallbackStatusVisibilityClass}}${{selectedNodeId === fallbackId ? " selected-node" : ""}}" data-node-id="${{escAttr(fallbackId)}}" data-node-tint-outline-seed="${{escAttr(fallbackOutlineSeed)}}" data-node-tint-start-seed="${{escAttr(fallbackStartSeed)}}" data-node-tint-end-seed="${{escAttr(fallbackEndSeed)}}" style="${{escAttr(fallbackTintStyle)}}" title="Node navigator fallback row">
           ${{fallbackStatusHtml}}
           <span class="chat-member-main">
@@ -2166,7 +2228,7 @@
               </span>
               <span class="chat-member-actions"></span>
             </span>
-            ${{(typeof normalizeChatNodeNavigatorShowIdlePref === "function" ? normalizeChatNodeNavigatorShowIdlePref(chatNodeNavigatorShowIdle) : !!chatNodeNavigatorShowIdle) ? '<span class="chat-member-idle-time">Idle: n/a</span>' : ''}}
+            ${{fallbackFreshnessInline ? `<span class="chat-member-idle-time" data-freshness-inline-mode="${{escAttr(fallbackFreshnessInline.mode || "")}}" title="${{escAttr(fallbackFreshnessInline.title)}}">${{escAttr(fallbackFreshnessInline.text)}}</span>` : ""}}
           </span>
         </div>`;
       }}
@@ -2370,6 +2432,7 @@
         }})
       ));
       chatRosterModel = rosterAll;
+      const usePrioritySections = chatNodeNavigatorUsesPrioritySections(chatNodeNavigatorSortKey);
       const meshtasticFavoriteIds = (typeof meshtasticFavoriteNodeIdsFromState === "function")
         ? meshtasticFavoriteNodeIdsFromState(safeState)
         : new Set();
@@ -2380,6 +2443,10 @@
       const regularRows = [];
       for (const item of rosterFiltered) {{
         const nodeId = normalizeNodeId(item && item.id);
+        if (!usePrioritySections) {{
+          regularRows.push(item);
+          continue;
+        }}
         if (chatNodeNavigatorUnreadDirectCount(unreadDirectByPeer, nodeId) > 0) {{
           pinnedUnreadRows.push(item);
         }} else if (meshtasticFavoriteIds.has(nodeId)) {{
@@ -2407,7 +2474,7 @@
         resolveChatNodeFreshnessFn,
       }};
       if (unreadShell instanceof HTMLElement && unreadList instanceof HTMLElement) {{
-        const nextUnreadHtml = pinnedUnreadRows.length > 0
+        const nextUnreadHtml = usePrioritySections && pinnedUnreadRows.length > 0
           ? pinnedUnreadRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
           : "";
         const previousUnreadHtml = (typeof unreadList.__meshLastInnerHtml_chat_room_unread_list === "string")
@@ -2417,15 +2484,23 @@
           unreadList.innerHTML = nextUnreadHtml;
           unreadList.__meshLastInnerHtml_chat_room_unread_list = nextUnreadHtml;
         }}
-        unreadShell.hidden = pinnedUnreadRows.length <= 0;
+        if (usePrioritySections) {{
+          unreadShell.hidden = pinnedUnreadRows.length <= 0;
+        }} else {{
+          unreadShell.hidden = true;
+        }}
         if (unreadCountEl instanceof HTMLElement) {{
-          unreadCountEl.textContent = String(pinnedUnreadRows.length);
+          unreadCountEl.textContent = String(usePrioritySections ? pinnedUnreadRows.length : 0);
         }}
       }}
       if (meshtasticShell instanceof HTMLElement && meshtasticList instanceof HTMLElement) {{
-        const nextMeshtasticHtml = meshtasticRows.length > 0
-          ? meshtasticRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
-          : '<div class="chat-member-empty">No Meshtastic favorites yet.</div>';
+        const nextMeshtasticHtml = usePrioritySections
+          ? (
+              meshtasticRows.length > 0
+                ? meshtasticRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
+                : '<div class="chat-member-empty">No Meshtastic favorites yet.</div>'
+            )
+          : "";
         const previousMeshtasticHtml = (typeof meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list === "string")
           ? meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list
           : null;
@@ -2433,13 +2508,17 @@
           meshtasticList.innerHTML = nextMeshtasticHtml;
           meshtasticList.__meshLastInnerHtml_chat_room_meshtastic_list = nextMeshtasticHtml;
         }}
-        meshtasticShell.hidden = false;
+        if (usePrioritySections) {{
+          meshtasticShell.hidden = false;
+        }} else {{
+          meshtasticShell.hidden = true;
+        }}
         if (meshtasticCountEl instanceof HTMLElement) {{
-          meshtasticCountEl.textContent = String(meshtasticRows.length);
+          meshtasticCountEl.textContent = String(usePrioritySections ? meshtasticRows.length : 0);
         }}
       }}
       if (pinnedShell instanceof HTMLElement && pinnedList instanceof HTMLElement) {{
-        const nextPinnedHtml = pinnedManualRows.length > 0
+        const nextPinnedHtml = usePrioritySections && pinnedManualRows.length > 0
           ? pinnedManualRows.map((item) => buildChatNodeNavigatorMemberHtml(item, rowRenderContext)).join("")
           : "";
         const previousPinnedHtml = (typeof pinnedList.__meshLastInnerHtml_chat_room_pinned_list === "string")
@@ -2449,13 +2528,19 @@
           pinnedList.innerHTML = nextPinnedHtml;
           pinnedList.__meshLastInnerHtml_chat_room_pinned_list = nextPinnedHtml;
         }}
-        pinnedShell.hidden = pinnedManualRows.length <= 0;
+        if (usePrioritySections) {{
+          pinnedShell.hidden = pinnedManualRows.length <= 0;
+        }} else {{
+          pinnedShell.hidden = true;
+        }}
         if (pinnedCountEl instanceof HTMLElement) {{
-          pinnedCountEl.textContent = String(pinnedManualRows.length);
+          pinnedCountEl.textContent = String(usePrioritySections ? pinnedManualRows.length : 0);
         }}
       }}
       const orderedRoomRows = historyPriorityRows.concat(regularRows);
-      const pinnedSectionCount = pinnedUnreadRows.length + meshtasticRows.length + pinnedManualRows.length;
+      const pinnedSectionCount = usePrioritySections
+        ? (pinnedUnreadRows.length + meshtasticRows.length + pinnedManualRows.length)
+        : 0;
       const rosterBaseLimit = Math.max(1, Math.trunc(Number(chatRosterMaxEntries) || 180));
       const currentRosterLimit = Math.max(
         rosterBaseLimit,
@@ -2654,7 +2739,7 @@
           </label>`
           + `<label class="chat-node-navigator-field-option">
             <input type="checkbox" data-nav-toggle-id="idle"${{showIdle ? " checked" : ""}} />
-            <span>Idle</span>
+            <span>Idle / Last Heard</span>
           </label>`
           + `<label class="chat-node-navigator-field-option">
             <input type="checkbox" data-nav-toggle-id="status-dots"${{showStatusDots ? " checked" : ""}} />

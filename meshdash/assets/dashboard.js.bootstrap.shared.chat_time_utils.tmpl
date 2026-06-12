@@ -356,6 +356,32 @@
       return "unknown";
     }}
 
+    function nodeFreshnessInlineLabel(lastSeenUnix, status, nowUnix = Math.floor(Date.now() / 1000)) {{
+      const key = normalizeFreshnessKey(status);
+      const showLastHeard = key === "stale" || key === "unknown";
+      const ts = Number(lastSeenUnix);
+      if (!Number.isFinite(ts) || ts <= 0) {{
+        return {{
+          text: showLastHeard ? "Last Heard: n/a" : "Idle: n/a",
+          title: "Last seen n/a",
+          mode: showLastHeard ? "last_heard" : "idle",
+        }};
+      }}
+      const lastSeenText = formatLocalChatTime(ts, "n/a", nowUnix);
+      if (showLastHeard) {{
+        return {{
+          text: `Last Heard: ${{lastSeenText}}`,
+          title: `Last seen ${{lastSeenText}}`,
+          mode: "last_heard",
+        }};
+      }}
+      return {{
+        text: `Idle: ${{formatIdleAge(ts, nowUnix)}}`,
+        title: `Last seen ${{lastSeenText}}`,
+        mode: "idle",
+      }};
+    }}
+
     function applyFreshnessClass(el, status) {{
       if (!(el instanceof HTMLElement)) return;
       const key = normalizeFreshnessKey(status);

@@ -13,16 +13,18 @@
       "encription-traffic-table": {{ index: 2, dir: "desc" }},
     }};
     const nodeExplorerFieldDefs = Object.freeze([
-      Object.freeze({{ id: "last_heard", label: "Last Heard", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "last_heard", label: "Last Heard", sortable: true, rosterMeta: false, rosterDefault: false }}),
       Object.freeze({{ id: "id", label: "ID", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "name", label: "Name", sortable: true, rosterMeta: false, rosterDefault: false }}),
       Object.freeze({{ id: "hardware", label: "HW", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "snr", label: "SNR", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "hops", label: "Hops", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "link_quality", label: "Link", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "links", label: "Links", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "battery", label: "Battery", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "saved", label: "Total Packets", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "pos", label: "Pos", sortable: true, rosterMeta: true, rosterDefault: false }}),
+      Object.freeze({{ id: "location_points", label: "Location Points", sortable: true, rosterMeta: true, rosterDefault: false }}),
       Object.freeze({{ id: "favorite", label: "Tag", sortable: false, rosterMeta: true, rosterDefault: false }}),
     ]);
     const nodeExplorerFieldDefById = new Map(
@@ -39,12 +41,14 @@
       Object.freeze({{ id: "snr", label: "SNR" }}),
       Object.freeze({{ id: "hops", label: "Hops" }}),
       Object.freeze({{ id: "link_quality", label: "Link quality" }}),
+      Object.freeze({{ id: "links", label: "Links" }}),
       Object.freeze({{ id: "battery", label: "Battery" }}),
       Object.freeze({{ id: "favorite", label: "Tagged" }}),
       Object.freeze({{ id: "saved", label: "Total Packets" }}),
       Object.freeze({{ id: "hardware", label: "HW" }}),
       Object.freeze({{ id: "id", label: "ID" }}),
       Object.freeze({{ id: "pos", label: "Pos" }}),
+      Object.freeze({{ id: "location_points", label: "Location Points" }}),
     ]);
     const chatNodeNavigatorSortDefById = new Map(
       chatNodeNavigatorSortDefs.map((def) => [String(def.id || ""), def])
@@ -89,9 +93,28 @@
 
       const lastHeardUnixRaw = Number(node && (node.last_heard_unix ?? node.last_heard_epoch ?? 0));
       const lastHeardUnix = Number.isFinite(lastHeardUnixRaw) ? Math.trunc(lastHeardUnixRaw) : 0;
+      const freshnessUnixRaw = Number(opts.freshnessUnix ?? opts.lastSeenUnix);
+      const freshnessUnix = Number.isFinite(freshnessUnixRaw) && freshnessUnixRaw > 0
+        ? Math.trunc(freshnessUnixRaw)
+        : 0;
+      const displayLastHeardUnix = freshnessUnix > 0 ? freshnessUnix : lastHeardUnix;
       const lastHeardText = (typeof nodeLastHeardLabel === "function")
+        ? (
+            freshnessUnix > 0 && freshnessUnix !== lastHeardUnix && typeof formatLocalChatTime === "function"
+              ? formatLocalChatTime(freshnessUnix, "n/a", nowUnix)
+              : nodeLastHeardLabel(node, "n/a", nowUnix)
+          )
+        : (String(node && node.last_heard || "").trim() || "n/a");
+      const liveLastHeardText = (typeof nodeLastHeardLabel === "function")
         ? nodeLastHeardLabel(node, "n/a", nowUnix)
         : (String(node && node.last_heard || "").trim() || "n/a");
+      const lastHeardTitle = (
+        freshnessUnix > 0
+        && lastHeardUnix > 0
+        && freshnessUnix !== lastHeardUnix
+      )
+        ? `Last seen ${{lastHeardText}} | node record ${{liveLastHeardText}}`
+        : lastHeardText;
       const hardwareText = String((node && (node.hardware_model || node.hardware)) || "").trim() || "n/a";
       const snrRaw = Number(node && node.snr);
       const snrNum = Number.isFinite(snrRaw) ? snrRaw : null;
@@ -150,6 +173,31 @@
       const savedTitle = savedPoints > 0
         ? `${{savedPackets}} packets across ${{savedPoints}} minute buckets`
         : "No saved history yet";
+      const linkCountRaw = Number(node && (node.link_count ?? node.links));
+      const linkCount = Number.isFinite(linkCountRaw)
+        ? Math.max(0, Math.trunc(linkCountRaw))
+        : 0;
+      const linkPacketCountRaw = Number(node && (node.link_packet_count ?? node.link_packets));
+      const linkPacketCount = Number.isFinite(linkPacketCountRaw)
+        ? Math.max(0, Math.trunc(linkPacketCountRaw))
+        : 0;
+      const linkCountTitle = linkPacketCount > 0
+        ? `${{linkCount}} linked node${{linkCount === 1 ? "" : "s"}} · ${{linkPacketCount}} link packet${{linkPacketCount === 1 ? "" : "s"}}`
+        : `${{linkCount}} linked node${{linkCount === 1 ? "" : "s"}}`;
+      const positionPointsRaw = Number(node && (node.position_points ?? node.location_points));
+      const positionPoints = Number.isFinite(positionPointsRaw)
+        ? Math.max(0, Math.trunc(positionPointsRaw))
+        : 0;
+      const positionLastSeenRaw = Number(node && node.position_last_seen_unix);
+      const positionLastSeenUnix = Number.isFinite(positionLastSeenRaw) && positionLastSeenRaw > 0
+        ? Math.trunc(positionLastSeenRaw)
+        : 0;
+      const positionLastSeenText = positionLastSeenUnix > 0 && typeof formatLocalChatTime === "function"
+        ? formatLocalChatTime(positionLastSeenUnix, "n/a", nowUnix)
+        : String((node && node.position_last_seen) || "").trim();
+      const locationPointsTitle = positionPoints > 0
+        ? `${{positionPoints}} saved location point${{positionPoints === 1 ? "" : "s"}}${{positionLastSeenText ? ` · Last ${{positionLastSeenText}}` : ""}}`
+        : "No saved location points";
       const latRaw = Number(node && node.lat);
       const lonRaw = Number(node && node.lon);
       const hasPosition = Number.isFinite(latRaw) && Number.isFinite(lonRaw);
@@ -167,23 +215,25 @@
         ? `Tag: ${{tagName}}`
         : "No tag";
       const status = (typeof freshnessStatus === "function")
-        ? freshnessStatus(lastHeardUnix, nowUnix)
+        ? freshnessStatus(displayLastHeardUnix, nowUnix)
         : "unknown";
       const statusSort = (typeof statusRank === "function")
         ? statusRank(status)
         : 99;
 
       const fields = {{
-        last_heard: {{ sort: lastHeardUnix, text: lastHeardText, title: lastHeardText }},
+        last_heard: {{ sort: displayLastHeardUnix, text: lastHeardText, title: lastHeardTitle }},
         id: {{ sort: nodeId, text: nodeId || "n/a", title: String((node && (node.id || nodeId)) || "n/a") }},
         name: {{ sort: name, text: name, title: name }},
         hardware: {{ sort: hardwareText, text: hardwareText, title: hardwareText }},
         snr: {{ sort: (snrNum == null ? "" : snrNum), text: (snrNum == null ? "n/a" : String(snrNum)), title: (snrNum == null ? "n/a" : `${{snrNum}} dB`) }},
         hops: {{ sort: (hopsNum == null ? "" : hopsNum), text: (hopsNum == null ? "n/a" : String(hopsNum)), title: (hopsNum == null ? "n/a" : String(hopsNum)) }},
         link_quality: {{ sort: (linkQualityScore == null ? -1 : linkQualityScore), text: linkQualityText, title: linkQualityTitle }},
+        links: {{ sort: linkCount, text: String(linkCount), title: linkCountTitle }},
         battery: {{ sort: (batteryNum == null ? "" : batteryNum), text: (batteryNum == null ? "n/a" : String(batteryNum)), title: (batteryNum == null ? "n/a" : `${{batteryNum}}%`) }},
         saved: {{ sort: savedPackets, text: String(savedPackets), title: savedTitle }},
         pos: {{ sort: (hasPosition ? latRaw : ""), text: posText, title: posText }},
+        location_points: {{ sort: positionPoints, text: String(positionPoints), title: locationPointsTitle }},
         favorite: {{ sort: favorite ? 1 : 0, text: tagName, title: tagTitle }},
       }};
 

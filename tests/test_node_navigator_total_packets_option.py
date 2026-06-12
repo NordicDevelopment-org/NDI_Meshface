@@ -17,6 +17,31 @@ def test_dashboard_js_labels_saved_history_field_as_total_packets() -> None:
 
     assert 'id: "saved", label: "Total Packets", sortable: true, rosterMeta: true' in js
     assert 'id: "saved", label: "Total Packets"' in js
+    assert 'id: "last_heard", label: "Last Heard", sortable: true, rosterMeta: false' in js
+
+
+def test_dashboard_js_adds_links_and_location_points_sort_options() -> None:
+    js = build_dashboard_js(
+        refresh_ms=1000,
+        node_history_hours=24,
+        node_history_max_points=240,
+    )
+
+    assert 'id: "links", label: "Links", sortable: true, rosterMeta: true' in js
+    assert 'id: "links", label: "Links"' in js
+    assert 'id: "location_points", label: "Location Points", sortable: true, rosterMeta: true' in js
+    assert 'id: "location_points", label: "Location Points"' in js
+    assert 'links: { sort: linkCount, text: String(linkCount), title: linkCountTitle }' in js
+    assert (
+        'location_points: { sort: positionPoints, text: String(positionPoints), title: locationPointsTitle }'
+        in js
+    )
+    assert 'if (sortKey === "links" || sortKey === "location_points") return "desc";' in js
+    assert "function chatNodeNavigatorUsesPrioritySections(" in js
+    assert "const usePrioritySections = chatNodeNavigatorUsesPrioritySections(chatNodeNavigatorSortKey);" in js
+    assert "if (!usePrioritySections) {" in js
+    assert "regularRows.push(item);" in js
+    assert "const pinnedSectionCount = usePrioritySections" in js
 
 
 def test_dashboard_js_adds_link_quality_metadata_field_and_sort_option() -> None:
@@ -32,6 +57,20 @@ def test_dashboard_js_adds_link_quality_metadata_field_and_sort_option() -> None
     assert "function chatNodeNavigatorInferLinkQuality(" in js
     assert 'showLinkQuality = Array.isArray(visibleMetaFieldIds)' in js
     assert 'visibleMetaFieldIds.includes("link_quality")' in js
+    assert 'showHops = Array.isArray(visibleMetaFieldIds)' in js
+    assert 'visibleMetaFieldIds.includes("hops")' in js
+    assert 'const hopsInlineHtml = showHops && hopsValue != null' in js
+    assert 'showSnr = Array.isArray(visibleMetaFieldIds)' in js
+    assert 'visibleMetaFieldIds.includes("snr")' in js
+    assert 'class="chat-member-snr-inline"' in js
+    assert 'if (linkQualityInlineHtml) memberMetaRowParts.push(linkQualityInlineHtml);' in js
+    assert 'if (snrInlineHtml) memberMetaRowParts.push(snrInlineHtml);' in js
+    assert js.index('if (linkQualityInlineHtml) memberMetaRowParts.push(linkQualityInlineHtml);') < js.index(
+        'if (snrInlineHtml) memberMetaRowParts.push(snrInlineHtml);'
+    )
+    assert 'fieldId === "snr"' in js
+    assert 'showLastHeardMeta = Array.isArray(visibleMetaFieldIds)' in js
+    assert 'visibleMetaFieldIds.includes("last_heard")' in js
     assert 'class="chat-member-link-quality' in js
 
 
@@ -55,7 +94,9 @@ def test_dashboard_css_styles_chat_member_link_quality_bars() -> None:
     css = build_dashboard_css(theme_css="")
 
     assert ".chat-member-link-quality {" in css
+    assert ".chat-member-snr-inline {" in css
     assert ".chat-member-link-quality-bar.level-4" in css
+    assert "[data-theme=\"dark\"] .chat-member-snr-inline" in css
     assert "[data-theme=\"dark\"] .chat-member-link-quality-bar {" in css
 
 
@@ -285,10 +326,21 @@ def test_dashboard_js_supports_idle_toggle_in_node_navigator() -> None:
     assert 'const nextShowIdle = normalizeChatNodeNavigatorShowIdlePref(' in js
     assert 'chatNodeNavigatorShowIdle = nextShowIdle;' in js
     assert '<input type="checkbox" data-nav-toggle-id="idle"' in js
-    assert '<span>Idle</span>' in js
+    assert '<span>Idle / Last Heard</span>' in js
     assert 'if (toggleId === "idle") {' in js
     assert 'showIdle: !!target.checked,' in js
-    assert 'const idleRowHtml = showIdle' in js
+    assert "function chatNodeNavigatorMetaFieldIdsIncludeLegacyLastHeard(rawIds) {" in js
+    assert 'normalizeNodeExplorerFieldId(value) === "last_heard"' in js
+    assert "const legacyLastHeardMetaAsFreshness = (" in js
+    assert "(legacyLastHeardMetaAsFreshness ? true : chatNodeNavigatorShowIdle)" in js
+    assert "function nodeFreshnessInlineLabel(lastSeenUnix, status" in js
+    assert 'text: showLastHeard ? "Last Heard: n/a" : "Idle: n/a"' in js
+    assert 'text: `Last Heard: ${lastSeenText}`' in js
+    assert 'text: `Idle: ${formatIdleAge(ts, nowUnix)}`' in js
+    assert 'const freshnessInline = (showIdle || showLastHeardMeta)' in js
+    assert 'data-freshness-inline-mode="${escAttr(freshnessInline.mode || "")}"' in js
+    assert 'fieldId === "last_heard") continue;' in js
+    assert "nodeFreshnessInlineLabel(lastSeenUnix, key, nowUnix)" in js
     assert 'const memberMetaRowParts = [];' in js
     assert 'const memberMetaRowHtml = memberMetaRowParts.length > 0' in js
 
@@ -359,6 +411,11 @@ def test_dashboard_js_sorts_status_using_visible_freshness_snapshot() -> None:
     assert "function chatNodeNavigatorStatusSortValue(item, projection) {" in js
     assert 'const statusKey = normalizeFreshnessKey(item && item.status);' in js
     assert 'return (typeof statusRank === "function") ? statusRank(statusKey) : 99;' in js
+    assert "const freshnessUnixRaw = Number(opts.freshnessUnix ?? opts.lastSeenUnix);" in js
+    assert 'freshnessUnix > 0 && freshnessUnix !== lastHeardUnix && typeof formatLocalChatTime === "function"' in js
+    assert "last_heard: { sort: displayLastHeardUnix, text: lastHeardText, title: lastHeardTitle }" in js
+    assert "freshnessUnix: entry && entry.lastSeenUnix," in js
+    assert "freshnessUnix: snapshot && snapshot.lastSeenUnix," in js
     assert "return chatNodeNavigatorStatusSortValue(safeItem, safeProjection);" in js
     assert "chatNodeNavigatorStatusSortValue(a, aProjection)" in js
     assert "chatNodeNavigatorStatusSortValue(b, bProjection)" in js

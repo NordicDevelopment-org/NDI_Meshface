@@ -621,13 +621,22 @@
           const idleDurationEl = item.querySelector(".chat-member-idle-time");
           if (idleDurationEl instanceof HTMLElement) {{
             idleDurationEl.hidden = false;
-            if (!Number.isFinite(lastSeenUnix) || lastSeenUnix <= 0) {{
-              idleDurationEl.textContent = "Idle: n/a";
+            const inlineFreshness = typeof nodeFreshnessInlineLabel === "function"
+              ? nodeFreshnessInlineLabel(lastSeenUnix, key, nowUnix)
+              : null;
+            if (inlineFreshness && typeof inlineFreshness === "object") {{
+              idleDurationEl.textContent = String(inlineFreshness.text || "");
+              idleDurationEl.title = String(inlineFreshness.title || "");
+              idleDurationEl.dataset.freshnessInlineMode = String(inlineFreshness.mode || "");
+            }} else if (!Number.isFinite(lastSeenUnix) || lastSeenUnix <= 0) {{
+              idleDurationEl.textContent = "Last Heard: n/a";
               idleDurationEl.title = "Last seen n/a";
+              idleDurationEl.dataset.freshnessInlineMode = "last_heard";
             }} else {{
               const idleText = formatIdleAge(lastSeenUnix, nowUnix);
               idleDurationEl.textContent = `Idle: ${{idleText}}`;
               idleDurationEl.title = `Last seen ${{formatLocalChatTime(lastSeenUnix, "n/a", nowUnix)}}`;
+              idleDurationEl.dataset.freshnessInlineMode = "idle";
             }}
           }}
         }}
