@@ -753,6 +753,54 @@ def _slim_recent_packets_for_network_graph(
     return slimmed
 
 
+def _slim_recent_chat_for_map_activity(
+    recent_chat: list[dict[str, object]],
+    *,
+    max_messages: int = 80,
+) -> list[dict[str, object]]:
+    """Keep only local send echoes needed for map self-send activity."""
+    try:
+        max_messages = max(0, int(max_messages))
+    except Exception:
+        max_messages = 80
+    if max_messages <= 0:
+        return []
+    slimmed: list[dict[str, object]] = []
+    for entry in recent_chat[-max_messages:]:
+        if not isinstance(entry, Mapping):
+            continue
+        if entry.get("local_echo") is not True:
+            continue
+        slim_entry: dict[str, object] = {"local_echo": True}
+        for key in (
+            "from",
+            "from_id",
+            "fromId",
+            "to",
+            "to_id",
+            "toId",
+            "destination",
+            "dest",
+            "dest_id",
+            "destId",
+            "message_id",
+            "messageId",
+            "portnum",
+            "channel",
+            "rx_time",
+            "captured_at",
+            "delivery_updated_at",
+            "delivery_updated_unix",
+            "retry_of",
+            "bot_command",
+        ):
+            value = entry.get(key)
+            if value is not None:
+                slim_entry[key] = value
+        slimmed.append(slim_entry)
+    return slimmed
+
+
 def _slim_recent_chat_for_chat_profile(
     recent_chat: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -1279,7 +1327,7 @@ def build_dashboard_state_lite(
     elif profile_name in {"network-map", "network_map"}:
         slim_nodes = _slim_nodes_for_chat(state_payload.nodes)
         slim_edges = _slim_edges_for_network(state_payload.traffic.edges)
-        slim_recent_chat = []
+        slim_recent_chat = _slim_recent_chat_for_map_activity(slim_recent_chat)
         slim_port_counts = []
         slim_node_packet_trends = {}
     elif profile_name in {"status", "console"}:

@@ -4,6 +4,7 @@ from meshdash.state_service import (
     _slim_edges_for_network,
     _slim_history_caps,
     _slim_nodes_for_chat,
+    _slim_recent_chat_for_map_activity,
     _slim_recent_chat_for_chat_profile,
     _slim_recent_packets,
     _slim_recent_packets_for_activity,
@@ -301,6 +302,41 @@ def test_slim_recent_packets_for_network_graph_promotes_routing_fields() -> None
     ]
 
 
+def test_slim_recent_chat_for_map_activity_keeps_only_local_echo_fields() -> None:
+    slimmed = _slim_recent_chat_for_map_activity(
+        [
+            {
+                "from": "!remote",
+                "to": "!local",
+                "text": "incoming",
+                "message_id": 11,
+                "local_echo": False,
+            },
+            {
+                "from": "!local",
+                "to": "!remote",
+                "text": "server reply",
+                "message_id": 12,
+                "portnum": "TEXT_MESSAGE_APP",
+                "local_echo": True,
+                "delivery_updated_unix": 1780444812,
+                "delivery_state": "pending",
+            },
+        ]
+    )
+
+    assert slimmed == [
+        {
+            "local_echo": True,
+            "from": "!local",
+            "to": "!remote",
+            "message_id": 12,
+            "portnum": "TEXT_MESSAGE_APP",
+            "delivery_updated_unix": 1780444812,
+        }
+    ]
+
+
 def test_slim_recent_chat_for_chat_profile_drops_duplicate_timestamps() -> None:
     slimmed = _slim_recent_chat_for_chat_profile(
         [
@@ -433,7 +469,17 @@ def test_lite_network_profile_omits_recent_chat_rows(monkeypatch) -> None:
             edges=[{"from": "!node-a", "to": "!node-b", "count": 1}],
             port_counts=[],
             recent_packets=[],
-            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            recent_chat=[
+                {"from": "!node-a", "to": "^all", "text": "chat row"},
+                {
+                    "from": "!local",
+                    "to": "!node-a",
+                    "text": "server reply",
+                    "message_id": 22,
+                    "local_echo": True,
+                    "delivery_updated_unix": 1780444822,
+                },
+            ],
             node_packet_trends={},
         ),
         local_node_id="!local",
@@ -496,7 +542,17 @@ def test_lite_network_map_profile_keeps_activity_packets_only(monkeypatch) -> No
                     "packet": {"id": 1, "raw": {"drop": True}},
                 }
             ],
-            recent_chat=[{"from": "!node-a", "to": "^all", "text": "chat row"}],
+            recent_chat=[
+                {"from": "!node-a", "to": "^all", "text": "chat row"},
+                {
+                    "from": "!local",
+                    "to": "!node-a",
+                    "text": "server reply",
+                    "message_id": 22,
+                    "local_echo": True,
+                    "delivery_updated_unix": 1780444822,
+                },
+            ],
             node_packet_trends={"!node-a": {"recent": 2}},
         ),
         local_node_id="!local",
@@ -522,7 +578,15 @@ def test_lite_network_map_profile_keeps_activity_packets_only(monkeypatch) -> No
 
     traffic = state["traffic"]
     assert isinstance(traffic, dict)
-    assert traffic["recent_chat"] == []
+    assert traffic["recent_chat"] == [
+        {
+            "local_echo": True,
+            "from": "!local",
+            "to": "!node-a",
+            "message_id": 22,
+            "delivery_updated_unix": 1780444822,
+        }
+    ]
     assert traffic["edges"]
     assert traffic["port_counts"] == []
     assert traffic["node_packet_trends"] == {}

@@ -328,6 +328,11 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function isNetworkMapActivityFlashVisible()" in js
     assert "function mapPacketActivityToken(packetEntry)" in js
     assert "function mapPacketActivityEndpointIds(packetEntry)" in js
+    assert "function mapPacketActivityPortnum(packetEntry)" in js
+    assert "function mapPacketActivityShouldAnimateDirection(packetEntry)" in js
+    assert "function mapLocalEchoActivityEndpointIds(chatEntry, localNodeId = \"\")" in js
+    assert "function mapLocalEchoActivityToken(chatEntry, localNodeId = \"\")" in js
+    assert "function isMapLocalEchoActivityEntry(chatEntry, localNodeId = \"\")" in js
     assert "function mapPacketActivityNodeIds(packetEntry)" in js
     assert "function mapPacketActivityTransmitNodeId(packetEntry)" in js
     assert "function mapPacketActivitySignalLevel(packetEntry)" in js
@@ -356,6 +361,7 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
     assert "function scheduleMapNodeActivityFlashUpdate()" in js
     assert "function syncNetworkMapPacketActivity(state = latestState)" in js
+    assert "const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];" in js
     assert "!!mapLiveActivityEnabled" in js
     assert "const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();" in js
     assert "const activeDirectionCount = pruneExpiredMapNodeActivityDirections();" in js
@@ -366,6 +372,15 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "nodesToRipple.set(" in js
     assert "Math.max(Number(prevSignalLevel), signalLevel)" in js
     assert "directionsToAnimate.push({ fromId: endpoints.fromId, toId: endpoints.toId, signalLevel });" in js
+    assert "&& mapPacketActivityShouldAnimateDirection(packetEntry)" in js
+    assert "if (!isMapLocalEchoActivityEntry(chatEntry, localNodeId)) continue;" in js
+    assert "tokens.add(mapLocalEchoActivityToken(chatEntry, localNodeId));" in js
+    assert "const token = mapLocalEchoActivityToken(chatEntry, localNodeId);" in js
+    assert "const endpoints = mapLocalEchoActivityEndpointIds(chatEntry, localNodeId);" in js
+    assert "nodesToFlash.add(endpoints.fromId);" in js
+    assert "nodesToFlash.add(endpoints.toId);" in js
+    assert "fromId: endpoints.fromId," in js
+    assert "toId: endpoints.toId," in js
     assert "cacheMapEstimatedCorridorActivityPaths(estimateLinesToRender);" in js
     assert "const corridorPath = mapPacketActivityCorridorPath(fromId, toId);" in js
     assert "path: animationPath," in js

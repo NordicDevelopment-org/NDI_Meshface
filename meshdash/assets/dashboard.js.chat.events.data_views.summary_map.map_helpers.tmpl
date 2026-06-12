@@ -441,6 +441,88 @@
       }};
     }}
 
+    function mapPacketActivityPortnum(packetEntry) {{
+      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : {{}};
+      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const decoded = (packet && packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : {{}};
+      return String(
+        summary.portnum
+        ?? decoded.portnum
+        ?? packet.portnum
+        ?? ""
+      ).trim().toUpperCase();
+    }}
+
+    function mapPacketActivityShouldAnimateDirection(packetEntry) {{
+      const portnum = mapPacketActivityPortnum(packetEntry);
+      if (portnum === "ROUTING_APP" || portnum === "ADMIN_APP") return false;
+      return true;
+    }}
+
+    function mapLocalEchoActivityEndpointIds(chatEntry, localNodeId = "") {{
+      const entry = (chatEntry && typeof chatEntry === "object") ? chatEntry : {{}};
+      let fromId = normalizeNodeId(
+        entry.from_id
+        ?? entry.fromId
+        ?? entry.from
+        ?? entry.source_id
+        ?? entry.sourceId
+        ?? entry.source
+      );
+      const fallbackLocalId = normalizeNodeId(localNodeId || "");
+      if (!isSelectableNodeId(fromId) && isSelectableNodeId(fallbackLocalId)) {{
+        fromId = fallbackLocalId;
+      }}
+      const toId = normalizeNodeId(
+        entry.to_id
+        ?? entry.toId
+        ?? entry.to
+        ?? entry.destination
+        ?? entry.dest_id
+        ?? entry.destId
+        ?? entry.dest
+      );
+      return {{
+        fromId: isSelectableNodeId(fromId) ? fromId : "",
+        toId: isSelectableNodeId(toId) ? toId : "",
+      }};
+    }}
+
+    function mapLocalEchoActivityToken(chatEntry, localNodeId = "") {{
+      const entry = (chatEntry && typeof chatEntry === "object") ? chatEntry : {{}};
+      const endpoints = mapLocalEchoActivityEndpointIds(entry, localNodeId);
+      const portnum = String(entry.portnum || "TEXT_MESSAGE_APP").trim().toUpperCase();
+      const messageId = parsePositiveMessageId(entry.message_id ?? entry.messageId);
+      const eventMs = latestTimestampMs(
+        entry.delivery_updated_unix,
+        entry.rx_time,
+        entry.captured_at,
+        entry.delivery_updated_at
+      );
+      if (messageId) {{
+        return `local:${{endpoints.fromId}}|${{endpoints.toId}}|${{portnum}}|${{messageId}}`;
+      }}
+      if (Number.isFinite(eventMs) && eventMs > 0) {{
+        return `local-ts:${{endpoints.fromId}}|${{endpoints.toId}}|${{portnum}}|${{Math.trunc(eventMs)}}`;
+      }}
+      return `local-raw:${{endpoints.fromId}}|${{endpoints.toId}}|${{portnum}}|${{JSON.stringify(entry)}}`;
+    }}
+
+    function isMapLocalEchoActivityEntry(chatEntry, localNodeId = "") {{
+      const entry = (chatEntry && typeof chatEntry === "object") ? chatEntry : null;
+      if (!entry || entry.local_echo !== true) return false;
+      const portnum = String(entry.portnum || "TEXT_MESSAGE_APP").trim().toUpperCase();
+      if (portnum === "ROUTING_APP" || portnum === "ADMIN_APP") return false;
+      const endpoints = mapLocalEchoActivityEndpointIds(entry, localNodeId);
+      return !!(endpoints.fromId && endpoints.toId && endpoints.fromId !== endpoints.toId);
+    }}
+
     function mapPacketActivityNodeIds(packetEntry) {{
       const endpoints = mapPacketActivityEndpointIds(packetEntry);
       const nodeIds = new Set();
@@ -512,11 +594,16 @@
         ? safeState.traffic
         : {{}};
       const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const localNodeId = resolveLocalNodeId(safeState);
       const tokens = new Set();
       for (const packetEntry of recentPackets) {{
         if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
         tokens.add(mapPacketActivityToken(packetEntry));
+      }}
+      for (const chatEntry of recentChat) {{
+        if (!isMapLocalEchoActivityEntry(chatEntry, localNodeId)) continue;
+        tokens.add(mapLocalEchoActivityToken(chatEntry, localNodeId));
       }}
       return tokens;
     }}
@@ -1641,6 +1728,7 @@
         ? safeState.traffic
         : {{}};
       const recentPackets = Array.isArray(traffic.recent_packets) ? traffic.recent_packets : [];
+      const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];
       const localNodeId = resolveLocalNodeId(safeState);
       const currentTokens = new Set();
       const nodesToFlash = new Set();
@@ -1667,9 +1755,35 @@
               : signalLevel
           );
         }}
-        if (endpoints.fromId && endpoints.toId && endpoints.fromId !== endpoints.toId) {{
+        if (
+          endpoints.fromId
+          && endpoints.toId
+          && endpoints.fromId !== endpoints.toId
+          && mapPacketActivityShouldAnimateDirection(packetEntry)
+        ) {{
           directionsToAnimate.push({{ fromId: endpoints.fromId, toId: endpoints.toId, signalLevel }});
         }}
+      }}
+      for (const chatEntry of recentChat) {{
+        if (!isMapLocalEchoActivityEntry(chatEntry, localNodeId)) continue;
+        const token = mapLocalEchoActivityToken(chatEntry, localNodeId);
+        currentTokens.add(token);
+        if (!networkMapVisible || lastNetworkMapPacketTokens.has(token)) {{
+          continue;
+        }}
+        const endpoints = mapLocalEchoActivityEndpointIds(chatEntry, localNodeId);
+        if (!(endpoints.fromId && endpoints.toId && endpoints.fromId !== endpoints.toId)) continue;
+        nodesToFlash.add(endpoints.fromId);
+        nodesToFlash.add(endpoints.toId);
+        nodesToRipple.set(
+          endpoints.fromId,
+          Math.max(Number(nodesToRipple.get(endpoints.fromId)) || 0, 0.72)
+        );
+        directionsToAnimate.push({{
+          fromId: endpoints.fromId,
+          toId: endpoints.toId,
+          signalLevel: 0.72,
+        }});
       }}
       lastNetworkMapPacketTokens = currentTokens;
       if (!networkMapVisible || (nodesToFlash.size <= 0 && nodesToRipple.size <= 0 && directionsToAnimate.length <= 0)) {{
