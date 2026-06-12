@@ -695,6 +695,9 @@ def test_chat_reaction_anchor_reuses_same_button_for_more_and_less_states() -> N
     assert "function animateChatEmojiPanelTransition(previousRect = null, options = null) {{" in emoji_src
     assert "function animateChatEmojiPanelClose(options = null) {{" in emoji_src
     assert "function finalizeChatEmojiPanelClose(panel = null) {{" in emoji_src
+    assert 'grid.replaceChildren();' in emoji_src
+    assert 'grid.dataset.key = "";' in emoji_src
+    assert "if (!loaded || panel.hidden) return;" in emoji_src
     assert '"Less reactions"' in emoji_src
     assert '"More reactions"' in emoji_src
     assert "const reactionExpandedFromAnchor = (" in emoji_src

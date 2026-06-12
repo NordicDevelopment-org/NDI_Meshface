@@ -176,6 +176,11 @@
         targetPanel.style.opacity = "";
         targetPanel.style.transform = "";
       }}
+      const grid = document.getElementById("chat-emoji-grid");
+      if (grid instanceof HTMLElement) {{
+        grid.replaceChildren();
+        grid.dataset.key = "";
+      }}
       const searchInput = document.getElementById("chat-emoji-search");
       if (searchInput instanceof HTMLInputElement) {{
         searchInput.value = "";
@@ -1057,7 +1062,7 @@
         }}
 
         void ensureChatEmojiCatalogLoaded(false).then((loaded) => {{
-          if (!loaded) return;
+          if (!loaded || panel.hidden) return;
           renderChatEmojiPickerPanel();
         }});
       }}
