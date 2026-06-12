@@ -364,6 +364,7 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "const mapNodeActivityDirectionMaxRecords = 48;" in js
     assert "const mapTracePathRecords = new Set();" in js
     assert "const mapTracePathMaxRecords = 8;" in js
+    assert "const mapTraceResultFlashById = new Map();" in js
     assert "const mapEstimatedCorridorActivityPathsByKey = new Map();" in js
     assert "const mapNodeTransmitPulseRings = new Set();" in js
     assert "const mapNodeTransmitPulseMaxRings = 72;" in js
@@ -376,6 +377,9 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function currentNetworkMapTraceProgressState(nowMs = Date.now())" in js
     assert "function mapNodeTraceProgressState(nodeId, nowMs = Date.now())" in js
     assert "function isNetworkMapTraceProgressActive(nowMs = Date.now())" in js
+    assert "function triggerNetworkMapTraceResultFlash(rawNodeId, ok, nowMs = Date.now())" in js
+    assert "function mapNodeTraceResultFlashState(nodeId, nowMs = Date.now())" in js
+    assert "function pruneExpiredMapTraceResultFlashes(nowMs = Date.now())" in js
     assert "function mapPacketActivityToken(packetEntry)" in js
     assert "function mapPacketActivityEndpointIds(packetEntry)" in js
     assert "function mapPacketActivityPortnum(packetEntry)" in js
@@ -414,12 +418,15 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "line.setLatLngs(animatedPath.length >= 2 ? animatedPath : [headPoint, headPoint]);" in js
     assert "head.setLatLng(headPoint);" in js
     assert "function applyMapNodeTraceProgressStyle(baseStyle, traceProgress)" in js
+    assert "function applyMapNodeTraceResultStyle(baseStyle, resultFlash)" in js
     assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
     assert "const traceProgress = mapNodeTraceProgressState(nodeId);" in js
-    assert "return applyMapNodeTraceProgressStyle(activityStyle, traceProgress);" in js
+    assert "const resultFlash = mapNodeTraceResultFlashState(nodeId);" in js
+    assert "return applyMapNodeTraceResultStyle(progressStyle, resultFlash);" in js
     assert "function scheduleMapNodeActivityFlashUpdate()" in js
     assert "const activeTraceProgress = isNetworkMapTraceProgressActive();" in js
+    assert "const activeTraceResultCount = pruneExpiredMapTraceResultFlashes();" in js
     assert "mapTraceProgressTimer = window.setTimeout(scheduleMapNodeActivityFlashUpdate, 260);" in js
     assert "function syncNetworkMapPacketActivity(state = latestState)" in js
     assert "const recentChat = Array.isArray(traffic.recent_chat) ? traffic.recent_chat : [];" in js
@@ -480,15 +487,24 @@ def test_dashboard_map_emoji_marker_ring_uses_node_marker_color() -> None:
         "const markerStyleForRing = resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind, markerConfidence, state);"
         in js
     )
-    assert 'const ringColor = String(markerStyleForRing && markerStyleForRing.color ? markerStyleForRing.color : "#86a9ff");' in js
+    assert "const ringColor = traceResultFlash" in js
+    assert ': String(markerStyleForRing && markerStyleForRing.color ? markerStyleForRing.color : "#86a9ff");' in js
     assert "const traceProgressPct = traceProgress ? Math.max(1, Math.min(99, Number(traceProgress.progressPct) || 1)) : 0;" in js
     assert 'traceProgress ? "is-trace-running" : ""' in js
+    assert 'traceResultFlash ? "is-trace-result" : ""' in js
+    assert 'traceResultFlash && traceResultFlash.ok === true ? "is-trace-success" : ""' in js
+    assert 'traceResultFlash && traceResultFlash.ok !== true ? "is-trace-failed" : ""' in js
     assert "--map-node-ring-color:${escAttr(ringColor)}" in js
     assert "--map-node-ring-width:${ringWidth.toFixed(1)}px" in js
     assert "--map-node-trace-angle:${traceAngleDeg}" in js
+    assert "--map-node-trace-result:${traceResultStrength.toFixed(3)}" in js
+    assert "--map-node-trace-color:${escAttr(traceResultFlash ? traceResultColor : \"#7dd3fc\")}" in js
     assert "border: var(--map-node-ring-width, 2px) solid var(--map-node-ring-color, #86a9ff);" in css
     assert "background: conic-gradient(" in css
     assert ".map-node-emoji-marker.is-trace-running::before {" in css
+    assert ".map-node-emoji-marker.is-trace-result::before {" in css
+    assert ".map-node-emoji-marker.is-trace-success::before {" in css
+    assert ".map-node-emoji-marker.is-trace-failed::before {" in css
     assert "border-color: var(--map-node-ring-color, #adc0ff);" in css
     assert "border-color: var(--map-node-ring-color, #9db5ff);" in css
 

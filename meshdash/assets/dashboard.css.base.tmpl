@@ -3687,6 +3687,22 @@
     .map-node-emoji-marker.is-trace-running::before {{
       opacity: 1;
     }}
+    .map-node-emoji-marker.is-trace-result::before {{
+      opacity: calc(0.2 + (0.8 * var(--map-node-trace-result, 0)));
+      filter: drop-shadow(0 0 calc(5px + (6px * var(--map-node-trace-result, 0))) var(--map-node-trace-color, #7dd3fc));
+    }}
+    .map-node-emoji-marker.is-trace-success::before {{
+      background: conic-gradient(
+        var(--map-node-trace-color, #22c55e) 360deg,
+        rgba(34, 197, 94, 0.16) 0deg
+      );
+    }}
+    .map-node-emoji-marker.is-trace-failed::before {{
+      background: conic-gradient(
+        var(--map-node-trace-color, #ef4444) 360deg,
+        rgba(239, 68, 68, 0.18) 0deg
+      );
+    }}
     .map-node-emoji-marker:hover {{
       transform: scale(1.18);
       border-color: var(--map-node-ring-color, #adc0ff);

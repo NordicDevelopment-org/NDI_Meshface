@@ -1011,6 +1011,18 @@
         ...current,
         ...safePatch,
       }});
+      if (
+        current.running
+        && !networkRoutesLiveTraceState.running
+        && networkRoutesLiveTraceState.ok !== null
+        && isSelectableNodeId(networkRoutesLiveTraceState.targetId)
+        && typeof triggerNetworkMapTraceResultFlash === "function"
+      ) {{
+        triggerNetworkMapTraceResultFlash(
+          networkRoutesLiveTraceState.targetId,
+          networkRoutesLiveTraceState.ok === true
+        );
+      }}
       if (typeof scheduleMapNodeActivityFlashUpdate === "function") {{
         scheduleMapNodeActivityFlashUpdate();
       }} else if (typeof refreshMapMarkerStyles === "function") {{
