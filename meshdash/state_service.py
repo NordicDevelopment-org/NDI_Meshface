@@ -674,7 +674,7 @@ def _slim_recent_packets_for_activity(
     *,
     max_packets: int = 120,
 ) -> list[dict[str, object]]:
-    """Keep only fields needed to detect map node activity flashes."""
+    """Keep only fields needed for map activity flashes and signal-scaled pulses."""
     try:
         max_packets = max(0, int(max_packets))
     except Exception:

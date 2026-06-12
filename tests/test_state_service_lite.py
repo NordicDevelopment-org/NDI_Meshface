@@ -237,6 +237,8 @@ def test_slim_recent_packets_for_activity_drops_packet_body() -> None:
                 "to": "!to",
                 "portnum": "POSITION_APP",
                 "rx_time": "2026-06-03 00:00:01Z",
+                "rx_snr": 7.5,
+                "rx_rssi": -91,
             },
             "packet": {
                 "id": 123,
@@ -259,6 +261,8 @@ def test_slim_recent_packets_for_activity_drops_packet_body() -> None:
                     "to": "!to",
                 "portnum": "POSITION_APP",
                 "rx_time": "2026-06-03 00:00:01Z",
+                "rx_rssi": -91,
+                "rx_snr": 7.5,
             },
             "captured_at": "2026-06-03 00:00:01Z",
         }
@@ -482,7 +486,13 @@ def test_lite_network_map_profile_keeps_activity_packets_only(monkeypatch) -> No
             port_counts=[{"portnum": "TEXT_MESSAGE_APP", "count": 2}],
             recent_packets=[
                 {
-                    "summary": {"packet_id": 1, "from": "!node-a", "to": "^all"},
+                    "summary": {
+                        "packet_id": 1,
+                        "from": "!node-a",
+                        "to": "^all",
+                        "rx_snr": 9.25,
+                        "rx_rssi": -87,
+                    },
                     "packet": {"id": 1, "raw": {"drop": True}},
                 }
             ],
@@ -516,7 +526,17 @@ def test_lite_network_map_profile_keeps_activity_packets_only(monkeypatch) -> No
     assert traffic["edges"]
     assert traffic["port_counts"] == []
     assert traffic["node_packet_trends"] == {}
-    assert traffic["recent_packets"] == [{"summary": {"packet_id": 1, "from": "!node-a", "to": "^all"}}]
+    assert traffic["recent_packets"] == [
+        {
+            "summary": {
+                "packet_id": 1,
+                "from": "!node-a",
+                "to": "^all",
+                "rx_snr": 9.25,
+                "rx_rssi": -87,
+            }
+        }
+    ]
 
 
 def test_lite_network_graph_profile_keeps_edges_and_graph_packets(monkeypatch) -> None:

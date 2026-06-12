@@ -447,6 +447,54 @@
       return isSelectableNodeId(fromId) ? fromId : "";
     }}
 
+    function mapPacketActivitySignalLevel(packetEntry) {{
+      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : {{}};
+      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const decoded = (packet && packet.decoded && typeof packet.decoded === "object")
+        ? packet.decoded
+        : {{}};
+      const snr = Number(
+        summary.rx_snr
+        ?? summary.rxSnr
+        ?? packet.rx_snr
+        ?? packet.rxSnr
+        ?? decoded.rx_snr
+        ?? decoded.rxSnr
+      );
+      const rssi = Number(
+        summary.rx_rssi
+        ?? summary.rxRssi
+        ?? packet.rx_rssi
+        ?? packet.rxRssi
+        ?? decoded.rx_rssi
+        ?? decoded.rxRssi
+      );
+      const values = [];
+      if (Number.isFinite(snr)) {{
+        values.push({{ value: clampMapLinkValue((snr + 15) / 27, 0, 1), weight: 0.68 }});
+      }}
+      if (Number.isFinite(rssi)) {{
+        values.push({{ value: clampMapLinkValue((rssi + 125) / 55, 0, 1), weight: 0.32 }});
+      }}
+      if (!values.length) return 0.55;
+      let total = 0;
+      let weight = 0;
+      for (const item of values) {{
+        total += item.value * item.weight;
+        weight += item.weight;
+      }}
+      return clampMapLinkValue(weight > 0 ? (total / weight) : 0.55, 0, 1);
+    }}
+
+    function mapTransmitPulseRadiusScale(signalLevel = 0.55) {{
+      const level = clampMapLinkValue(Number(signalLevel), 0, 1);
+      return 0.65 + (level * 0.9);
+    }}
+
     function snapshotNetworkMapPacketActivityTokens(state = latestState) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object")
@@ -573,7 +621,7 @@
       return activeCount;
     }}
 
-    function startMapNodeTransmitRipple(nodeId, state = latestState) {{
+    function startMapNodeTransmitRipple(nodeId, state = latestState, signalLevel = 0.55) {{
       const normalizedId = normalizeNodeId(nodeId || "");
       if (!isSelectableNodeId(normalizedId) || !isNetworkMapActivityFlashVisible()) return false;
       const position = mapNodeTransmitPulsePosition(normalizedId, state);
@@ -581,8 +629,9 @@
       if (!ensureMapTransmitPulsePane()) return false;
       const color = mapNodeTransmitPulseColor(normalizedId, state);
       const nowMs = Date.now();
+      const radiusScale = mapTransmitPulseRadiusScale(signalLevel);
       for (let idx = 0; idx < 3; idx += 1) {{
-        const endRadius = 22 + (idx * 7);
+        const endRadius = (22 + (idx * 7)) * radiusScale;
         const layer = L.circleMarker(position, {{
           pane: mapTransmitPulsePaneName,
           radius: 5,
@@ -1232,7 +1281,7 @@
       const localNodeId = resolveLocalNodeId(safeState);
       const currentTokens = new Set();
       const nodesToFlash = new Set();
-      const nodesToRipple = new Set();
+      const nodesToRipple = new Map();
       const networkMapVisible = isNetworkMapActivityFlashVisible();
       for (const packetEntry of recentPackets) {{
         if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
@@ -1247,7 +1296,14 @@
         }}
         const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);
         if (transmitNodeId) {{
-          nodesToRipple.add(transmitNodeId);
+          const signalLevel = mapPacketActivitySignalLevel(packetEntry);
+          const prevSignalLevel = nodesToRipple.get(transmitNodeId);
+          nodesToRipple.set(
+            transmitNodeId,
+            Number.isFinite(Number(prevSignalLevel))
+              ? Math.max(Number(prevSignalLevel), signalLevel)
+              : signalLevel
+          );
         }}
       }}
       lastNetworkMapPacketTokens = currentTokens;
@@ -1267,8 +1323,8 @@
           untilMs: nowMs + 1100,
         }});
       }}
-      for (const nodeId of nodesToRipple) {{
-        startMapNodeTransmitRipple(nodeId, safeState);
+      for (const [nodeId, signalLevel] of nodesToRipple.entries()) {{
+        startMapNodeTransmitRipple(nodeId, safeState, signalLevel);
       }}
       scheduleMapNodeActivityFlashUpdate();
     }}

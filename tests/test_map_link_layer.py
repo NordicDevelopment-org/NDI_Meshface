@@ -298,10 +298,15 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function mapPacketActivityToken(packetEntry)" in js
     assert "function mapPacketActivityNodeIds(packetEntry)" in js
     assert "function mapPacketActivityTransmitNodeId(packetEntry)" in js
+    assert "function mapPacketActivitySignalLevel(packetEntry)" in js
+    assert "function mapTransmitPulseRadiusScale(signalLevel = 0.55)" in js
+    assert "summary.rx_snr" in js
+    assert "summary.rx_rssi" in js
+    assert "return 0.65 + (level * 0.9);" in js
     assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function ensureMapTransmitPulsePane()" in js
-    assert "function startMapNodeTransmitRipple(nodeId, state = latestState)" in js
+    assert "function startMapNodeTransmitRipple(nodeId, state = latestState, signalLevel = 0.55)" in js
     assert "function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now())" in js
     assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
@@ -312,9 +317,13 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "activeFlashCount > 0 || activePulseCount > 0" in js
     assert "mapNodeActivityFlashById.set(nodeId, {" in js
     assert "const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);" in js
-    assert "nodesToRipple.add(transmitNodeId);" in js
-    assert "startMapNodeTransmitRipple(nodeId, safeState);" in js
+    assert "const signalLevel = mapPacketActivitySignalLevel(packetEntry);" in js
+    assert "nodesToRipple.set(" in js
+    assert "Math.max(Number(prevSignalLevel), signalLevel)" in js
+    assert "startMapNodeTransmitRipple(nodeId, safeState, signalLevel);" in js
     assert "pane: mapTransmitPulsePaneName," in js
+    assert "const radiusScale = mapTransmitPulseRadiusScale(signalLevel);" in js
+    assert "const endRadius = (22 + (idx * 7)) * radiusScale;" in js
     assert "layer.setRadius(easedRadius);" in js
     assert "scheduleMapNodeActivityFlashUpdate();" in js
     assert "if (mapLiveActivityEnabled)" in js
