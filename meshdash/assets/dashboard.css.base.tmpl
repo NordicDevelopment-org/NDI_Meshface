@@ -3708,6 +3708,22 @@
       background: transparent;
       box-shadow: none;
     }}
+    .map-node-popup,
+    .map-node-popup .leaflet-popup-content-wrapper,
+    .map-node-popup .leaflet-popup-content,
+    .map-node-popup .map-node-info-card,
+    .map-node-popup .map-node-info-action-btn {{
+      pointer-events: auto;
+    }}
+    .map-node-popup .leaflet-popup-content-wrapper,
+    .map-node-popup .leaflet-popup-tip {{
+      opacity: 1;
+      transition: opacity 180ms ease;
+    }}
+    .map-node-popup.is-closing .leaflet-popup-content-wrapper,
+    .map-node-popup.is-closing .leaflet-popup-tip {{
+      opacity: 0;
+    }}
     .map-node-tooltip .leaflet-tooltip-content,
     .map-node-popup .leaflet-popup-content {{
       margin: 0;

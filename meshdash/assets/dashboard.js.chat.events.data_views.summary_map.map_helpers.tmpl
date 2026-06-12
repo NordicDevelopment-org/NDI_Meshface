@@ -1489,17 +1489,6 @@
         if (typeof setActiveNetworkSubview === "function") {{
           setActiveNetworkSubview("map", {{ persist: true }});
         }}
-        selectNode(nodeId, true, false);
-        if (typeof setChatNodeDetailsDrawerTab === "function") {{
-          setChatNodeDetailsDrawerTab("telemetry", {{ fetchHistory: false }});
-        }}
-        if (typeof setChatNodeDetailsDrawerExpanded === "function") {{
-          setChatNodeDetailsDrawerExpanded(true, {{
-            tab: "telemetry",
-            fetchHistory: false,
-            rerender: false,
-          }});
-        }}
         if (typeof runChatNodeTelemetryTool === "function") {{
           void runChatNodeTelemetryTool("traceroute", nodeId);
         }}
@@ -1548,6 +1537,42 @@
       return true;
     }}
 
+    function prepareMapNodePopupElement(popupEl, fallbackNodeId = "", closePopupFn = null, hoverHandlers = null) {{
+      if (!(popupEl instanceof HTMLElement)) return false;
+      popupEl.style.pointerEvents = "auto";
+      popupEl.classList.remove("is-closing");
+      try {{
+        if (typeof L !== "undefined" && L.DomEvent) {{
+          if (typeof L.DomEvent.disableClickPropagation === "function") {{
+            L.DomEvent.disableClickPropagation(popupEl);
+          }}
+          if (typeof L.DomEvent.disableScrollPropagation === "function") {{
+            L.DomEvent.disableScrollPropagation(popupEl);
+          }}
+        }}
+      }} catch (_err) {{
+      }}
+      const hover = (hoverHandlers && typeof hoverHandlers === "object") ? hoverHandlers : null;
+      if (hover && popupEl.dataset.hoverBound !== "1") {{
+        popupEl.dataset.hoverBound = "1";
+        popupEl.addEventListener("mouseenter", () => {{
+          if (typeof hover.onEnter === "function") hover.onEnter();
+        }});
+        popupEl.addEventListener("mouseleave", () => {{
+          if (typeof hover.onLeave === "function") hover.onLeave();
+        }});
+      }}
+      const infoCard = popupEl.querySelector(".map-node-info-card");
+      if (infoCard instanceof HTMLElement && infoCard.dataset.actionsBound !== "1") {{
+        infoCard.dataset.actionsBound = "1";
+        infoCard.style.pointerEvents = "auto";
+        infoCard.addEventListener("click", (clickEv) => {{
+          handleMapNodePopupActionClick(clickEv, fallbackNodeId, closePopupFn);
+        }});
+      }}
+      return true;
+    }}
+
     function bindMapNodePopupActionDelegates() {{
       if (typeof document === "undefined" || !document.body) return;
       if (document.body.dataset.mapNodePopupActionsBound === "1") return;
@@ -1555,12 +1580,28 @@
       document.addEventListener("click", (clickEv) => {{
         handleMapNodePopupActionClick(clickEv);
       }});
+      if (
+        typeof map !== "undefined"
+        && map
+        && typeof map.on === "function"
+        && document.body.dataset.mapNodePopupPropagationBound !== "1"
+      ) {{
+        document.body.dataset.mapNodePopupPropagationBound = "1";
+        map.on("popupopen", (ev) => {{
+          const popup = ev && ev.popup;
+          const popupEl = popup && typeof popup.getElement === "function"
+            ? popup.getElement()
+            : null;
+          prepareMapNodePopupElement(popupEl);
+        }});
+      }}
     }}
 
     function buildMapNodeInfoHtml(node, options = null) {{
       const opts = (options && typeof options === "object") ? options : {{}};
       const safeNode = (node && typeof node === "object") ? node : {{}};
       const state = (opts.state && typeof opts.state === "object") ? opts.state : latestState;
+      const includeActions = opts.includeActions !== false;
       const nowUnix = Number.isFinite(Number(opts.nowUnix))
         ? Math.floor(Number(opts.nowUnix))
         : Math.floor(Date.now() / 1000);
@@ -1651,7 +1692,7 @@
       }}
 
       const actionNodeId = normalizeNodeId(displayId || normalizedId || fallbackId || "");
-      const quickActions = isSelectableNodeId(actionNodeId)
+      const quickActions = includeActions && isSelectableNodeId(actionNodeId)
         ? [
             mapNodePopupActionButtonHtml("Message", "message", actionNodeId),
             mapNodePopupActionButtonHtml("Trace", "trace", actionNodeId),
@@ -1680,23 +1721,66 @@
       if (!(marker && typeof marker.bindPopup === "function")) return;
       const opts = (options && typeof options === "object") ? options : {{}};
       const overlayNodeId = normalizeNodeId(opts.nodeId || (node && node.id) || "");
-      const contentHtml = buildMapNodeInfoHtml(node, opts);
-      marker.bindPopup(contentHtml, {{
+      const popupHtml = buildMapNodeInfoHtml(node, Object.assign({{}}, opts, {{ includeActions: true }}));
+      marker.bindPopup(popupHtml, {{
         closeButton: true,
         autoPan: true,
+        closeOnClick: false,
         className: "map-node-popup",
-        maxWidth: 320,
+        maxWidth: 340,
       }});
-      const closeHoverTooltip = () => {{
-        if (typeof marker.closeTooltip === "function") {{
-          marker.closeTooltip();
+      const popupFadeMs = 180;
+      const popupLeaveDelayMs = 180;
+      let markerHovering = false;
+      let popupHovering = false;
+      let popupCloseTimer = null;
+      let popupFadeTimer = null;
+      const currentPopupElement = () => {{
+        const popup = (typeof marker.getPopup === "function") ? marker.getPopup() : null;
+        return popup && typeof popup.getElement === "function"
+          ? popup.getElement()
+          : null;
+      }};
+      const clearHoverPopupTimers = () => {{
+        if (popupCloseTimer != null) {{
+          window.clearTimeout(popupCloseTimer);
+          popupCloseTimer = null;
+        }}
+        if (popupFadeTimer != null) {{
+          window.clearTimeout(popupFadeTimer);
+          popupFadeTimer = null;
         }}
       }};
-      const removeHoverTooltip = () => {{
-        closeHoverTooltip();
-        if (typeof marker.unbindTooltip === "function") {{
-          marker.unbindTooltip();
+      const cancelHoverPopupClose = () => {{
+        clearHoverPopupTimers();
+        const popupEl = currentPopupElement();
+        if (popupEl instanceof HTMLElement) {{
+          popupEl.classList.remove("is-closing");
         }}
+      }};
+      const finishHoverPopupClose = () => {{
+        popupFadeTimer = null;
+        if (markerHovering || popupHovering) {{
+          cancelHoverPopupClose();
+          return;
+        }}
+        if (typeof marker.closePopup === "function") {{
+          marker.closePopup();
+        }}
+      }};
+      const startHoverPopupFade = () => {{
+        popupCloseTimer = null;
+        if (markerHovering || popupHovering) return;
+        const popupEl = currentPopupElement();
+        if (popupEl instanceof HTMLElement) {{
+          popupEl.classList.add("is-closing");
+        }}
+        popupFadeTimer = window.setTimeout(finishHoverPopupClose, popupFadeMs);
+      }};
+      const scheduleHoverPopupClose = () => {{
+        if (markerHovering || popupHovering) return;
+        clearHoverPopupTimers();
+        popupCloseTimer = window.setTimeout(startHoverPopupFade, popupLeaveDelayMs);
       }};
       const popupIsOpen = () => {{
         try {{
@@ -1705,156 +1789,47 @@
           return false;
         }}
       }};
-      const hoverTooltipSuppressed = () => {{
+      const hoverPopupSuppressed = () => {{
         const selectedId = (typeof selectedNodeId !== "undefined")
           ? normalizeNodeId(selectedNodeId || "")
           : "";
         return !!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId);
       }};
-      marker.on("popupopen", removeHoverTooltip);
       marker.on("popupopen", (ev) => {{
         const popup = ev && ev.popup;
         const popupEl = popup && typeof popup.getElement === "function"
           ? popup.getElement()
           : null;
-        if (!(popupEl instanceof HTMLElement)) return;
-        const infoCard = popupEl.querySelector(".map-node-info-card");
-        if (!(infoCard instanceof HTMLElement) || infoCard.dataset.actionsBound === "1") return;
-        infoCard.dataset.actionsBound = "1";
-        infoCard.addEventListener("click", (clickEv) => {{
-          handleMapNodePopupActionClick(clickEv, overlayNodeId, () => {{
-            marker.closePopup();
-          }});
+        prepareMapNodePopupElement(popupEl, overlayNodeId, () => {{
+          marker.closePopup();
+        }}, {{
+          onEnter: () => {{
+            popupHovering = true;
+            cancelHoverPopupClose();
+          }},
+          onLeave: () => {{
+            popupHovering = false;
+            scheduleHoverPopupClose();
+          }},
         }});
       }});
-      marker.on("click", removeHoverTooltip);
-      if (typeof marker.bindTooltip === "function" && !hoverTooltipSuppressed()) {{
-        const measureTooltipSize = () => {{
-          if (typeof document === "undefined" || !document.body) {{
-            return {{ width: 280, height: 220 }};
-          }}
-          const probe = document.createElement("div");
-          probe.className = "map-node-tooltip map-node-tooltip-measure";
-          probe.style.position = "fixed";
-          probe.style.left = "-10000px";
-          probe.style.top = "-10000px";
-          probe.style.visibility = "hidden";
-          probe.style.pointerEvents = "none";
-          probe.innerHTML = `<div class="leaflet-tooltip-content">${{contentHtml}}</div>`;
-          document.body.appendChild(probe);
-          const rect = probe.getBoundingClientRect();
-          probe.remove();
-          return {{
-            width: Math.max(220, Math.ceil(rect.width) || 280),
-            height: Math.max(120, Math.ceil(rect.height) || 220),
-          }};
-        }};
-        const resolveTooltipOptions = () => {{
-          const baseOptions = {{
-            direction: "top",
-            offset: [0, -16],
-            opacity: 1,
-            sticky: false,
-            className: "map-node-tooltip is-top",
-          }};
-          if (
-            typeof map === "undefined"
-            || !map
-            || typeof map.getSize !== "function"
-            || typeof map.latLngToContainerPoint !== "function"
-            || typeof marker.getLatLng !== "function"
-          ) {{
-            return baseOptions;
-          }}
-          const size = map.getSize();
-          const point = map.latLngToContainerPoint(marker.getLatLng());
-          const tip = measureTooltipSize();
-          const padTop = 14;
-          const padRight = 14;
-          const padBottom = 14;
-          const padLeft = 14;
-          const gap = 18;
-          const layouts = [
-            {{
-              direction: "top",
-              offset: [0, -16],
-              className: "map-node-tooltip is-top",
-              left: point.x - (tip.width / 2),
-              top: point.y - tip.height - gap,
-            }},
-            {{
-              direction: "bottom",
-              offset: [0, 16],
-              className: "map-node-tooltip is-bottom",
-              left: point.x - (tip.width / 2),
-              top: point.y + gap,
-            }},
-            {{
-              direction: "right",
-              offset: [16, 0],
-              className: "map-node-tooltip is-right",
-              left: point.x + gap,
-              top: point.y - (tip.height / 2),
-            }},
-            {{
-              direction: "left",
-              offset: [-16, 0],
-              className: "map-node-tooltip is-left",
-              left: point.x - tip.width - gap,
-              top: point.y - (tip.height / 2),
-            }},
-          ];
-          const overflowScore = (layout) => {{
-            const right = layout.left + tip.width;
-            const bottom = layout.top + tip.height;
-            const overLeft = Math.max(0, padLeft - layout.left);
-            const overTop = Math.max(0, padTop - layout.top);
-            const overRight = Math.max(0, right - (size.x - padRight));
-            const overBottom = Math.max(0, bottom - (size.y - padBottom));
-            return overLeft + overTop + overRight + overBottom;
-          }};
-          let best = layouts[0];
-          let bestScore = Number.POSITIVE_INFINITY;
-          for (const layout of layouts) {{
-            const score = overflowScore(layout);
-            if (score < bestScore) {{
-              best = layout;
-              bestScore = score;
-            }}
-            if (score <= 0) {{
-              best = layout;
-              bestScore = score;
-              break;
-            }}
-          }}
-          return Object.assign({{}}, baseOptions, {{
-            direction: best.direction,
-            offset: best.offset,
-            className: best.className,
-          }});
-        }};
-        const rebindTooltip = (openNow = false) => {{
-          const tooltipOptions = resolveTooltipOptions();
-          if (typeof marker.closeTooltip === "function") {{
-            marker.closeTooltip();
-          }}
-          if (typeof marker.unbindTooltip === "function") {{
-            marker.unbindTooltip();
-          }}
-          marker.bindTooltip(contentHtml, tooltipOptions);
-          if (openNow && typeof marker.openTooltip === "function") {{
-            marker.openTooltip();
-          }}
-        }};
-        rebindTooltip(false);
-        marker.on("mouseover", () => {{
-          if (hoverTooltipSuppressed()) {{
-            removeHoverTooltip();
-            return;
-          }}
-          rebindTooltip(true);
-        }});
-      }}
+      marker.on("mouseover", () => {{
+        markerHovering = true;
+        cancelHoverPopupClose();
+        if (hoverPopupSuppressed()) return;
+        if (typeof marker.openPopup === "function") {{
+          marker.openPopup();
+        }}
+      }});
+      marker.on("mouseout", () => {{
+        markerHovering = false;
+        scheduleHoverPopupClose();
+      }});
+      marker.on("popupclose", () => {{
+        markerHovering = false;
+        popupHovering = false;
+        clearHoverPopupTimers();
+      }});
     }}
 
     function buildMapEmojiMarkerIcon(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{

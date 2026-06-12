@@ -173,24 +173,37 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "Links view is already centered on the local node" in js
 
 
-def test_dashboard_js_suppresses_map_hover_tooltip_while_popup_is_open() -> None:
+def test_dashboard_js_uses_single_popup_for_map_node_hover_and_click() -> None:
     js = build_dashboard_js(
         refresh_ms=1000,
         node_history_hours=24,
         node_history_max_points=240,
     )
+    overlay_start = js.index("function bindMapNodeInfoOverlays(")
+    overlay_end = js.index("function buildMapEmojiMarkerIcon(", overlay_start)
+    overlay_block = js[overlay_start:overlay_end]
 
-    assert "const closeHoverTooltip = () => {" in js
-    assert "const removeHoverTooltip = () => {" in js
     assert 'return !!(typeof marker.isPopupOpen === "function" && marker.isPopupOpen());' in js
     assert "const overlayNodeId = normalizeNodeId(opts.nodeId || (node && node.id) || \"\");" in js
-    assert "const hoverTooltipSuppressed = () => {" in js
+    assert "const hoverPopupSuppressed = () => {" in js
     assert "!!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId)" in js
-    assert 'marker.on("popupopen", removeHoverTooltip);' in js
-    assert 'marker.on("click", removeHoverTooltip);' in js
-    assert 'if (typeof marker.bindTooltip === "function" && !hoverTooltipSuppressed()) {' in js
-    assert "if (hoverTooltipSuppressed()) {" in js
-    assert "removeHoverTooltip();\n            return;" in js
+    assert "const popupFadeMs = 180;" in js
+    assert "const popupLeaveDelayMs = 180;" in js
+    assert "let markerHovering = false;" in js
+    assert "let popupHovering = false;" in js
+    assert "const scheduleHoverPopupClose = () => {" in js
+    assert 'popupEl.classList.add("is-closing");' in js
+    assert 'popupEl.classList.remove("is-closing");' in js
+    assert 'marker.on("mouseover", () => {' in js
+    assert 'marker.on("mouseout", () => {' in js
+    assert 'marker.on("popupclose", () => {' in js
+    assert "if (hoverPopupSuppressed()) return;" in js
+    assert "marker.openPopup();" in js
+    assert "onEnter: () => {" in js
+    assert "onLeave: () => {" in js
+    assert "marker.bindTooltip(" not in overlay_block
+    assert "tooltipHtml" not in overlay_block
+    assert "map-node-tooltip-measure" not in overlay_block
     assert "if (isSelected) {" in js
     assert "marker.unbindTooltip();" in js
     assert "suppressHoverTooltip: true," in js
@@ -205,16 +218,39 @@ def test_dashboard_js_binds_programmatic_map_popup_actions() -> None:
     )
 
     assert "function handleMapNodePopupActionClick(clickEv, fallbackNodeId = \"\", closePopupFn = null)" in js
+    assert (
+        "function prepareMapNodePopupElement(popupEl, fallbackNodeId = \"\", "
+        "closePopupFn = null, hoverHandlers = null)"
+    ) in js
+    assert 'popupEl.style.pointerEvents = "auto";' in js
+    assert "L.DomEvent.disableClickPropagation(popupEl);" in js
+    assert "L.DomEvent.disableScrollPropagation(popupEl);" in js
+    assert 'popupEl.dataset.hoverBound = "1";' in js
     assert "function bindMapNodePopupActionDelegates()" in js
+    assert "const includeActions = opts.includeActions !== false;" in js
+    assert "const quickActions = includeActions && isSelectableNodeId(actionNodeId)" in js
+    assert "const popupHtml = buildMapNodeInfoHtml(node, Object.assign({}, opts, { includeActions: true }));" in js
+    assert "marker.bindPopup(popupHtml, {" in js
     assert 'document.body.dataset.mapNodePopupActionsBound = "1";' in js
+    assert 'document.body.dataset.mapNodePopupPropagationBound = "1";' in js
     assert 'document.addEventListener("click", (clickEv) => {' in js
     assert "handleMapNodePopupActionClick(clickEv);" in js
     assert 'runBootStep("bindMapNodePopupActionDelegates", () => bindMapNodePopupActionDelegates());' in js
-    assert "handleMapNodePopupActionClick(clickEv, overlayNodeId, () => {" in js
+    assert "prepareMapNodePopupElement(popupEl, overlayNodeId, () => {" in js
+    assert "closeOnClick: false," in js
+    assert "maxWidth: 340," in js
     assert 'data-map-node-action="${escAttr(cleanAction)}"' in js
     assert 'mapNodePopupActionButtonHtml("Message", "message", actionNodeId)' in js
     assert 'mapNodePopupActionButtonHtml("Trace", "trace", actionNodeId)' in js
     assert 'mapNodePopupActionButtonHtml("Open details", "details", actionNodeId)' in js
+
+    css = build_dashboard_css(theme_css="")
+    assert ".map-node-popup .map-node-info-action-btn {" in css
+    popup_pointer_section = css.split(".map-node-popup,", 1)[1].split("}", 1)[0]
+    assert "pointer-events: auto;" in popup_pointer_section
+    assert ".map-node-popup.is-closing .leaflet-popup-content-wrapper," in css
+    assert "transition: opacity 180ms ease;" in css
+    assert "opacity: 0;" in css
 
 
 def test_dashboard_js_map_popup_actions_use_node_drawer_without_leaving_map() -> None:
@@ -245,9 +281,10 @@ def test_dashboard_js_map_popup_actions_use_node_drawer_without_leaving_map() ->
 
     assert 'applyLayoutView("network", true);' in trace_block
     assert 'setActiveNetworkSubview("map", { persist: true });' in trace_block
-    assert 'selectNode(nodeId, true, false);' in trace_block
-    assert 'setChatNodeDetailsDrawerTab("telemetry", { fetchHistory: false });' in trace_block
-    assert 'tab: "telemetry",' in trace_block
+    assert 'selectNode(nodeId, true, false);' not in trace_block
+    assert 'setChatNodeDetailsDrawerTab("telemetry", { fetchHistory: false });' not in trace_block
+    assert 'tab: "telemetry",' not in trace_block
+    assert "setChatNodeDetailsDrawerExpanded" not in trace_block
     assert 'void runChatNodeTelemetryTool("traceroute", nodeId);' in trace_block
     assert "openNetworkRoutesLiveTrace(nodeId" not in trace_block
     assert 'setActiveNetworkSubview("routes", { persist: true });' not in trace_block
