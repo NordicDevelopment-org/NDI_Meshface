@@ -452,7 +452,11 @@
         }}
         syncSelectedNodeWithVisibilityFilters();
         syncNodeTagsWithMeshtasticFavorites(rawState);
-        if (mapLiveActivityEnabled) {{
+        if (
+          mapLiveActivityEnabled
+          && typeof isNetworkMapActivityFlashVisible === "function"
+          && !isNetworkMapActivityFlashVisible()
+        ) {{
           syncNetworkMapPacketActivity(state);
         }}
         lastPollSuccessUnix = Math.floor(Date.now() / 1000);
@@ -557,6 +561,13 @@
 
         if (mapVisible) {{
           renderMap(state.nodes || [], (state.traffic || {{}}).edges || [], cachedHistory);
+        }}
+        if (
+          mapLiveActivityEnabled
+          && typeof isNetworkMapActivityFlashVisible === "function"
+          && isNetworkMapActivityFlashVisible()
+        ) {{
+          syncNetworkMapPacketActivity(state);
         }}
         markPollPerfPhase(pollPerfRun, "render-map", {{ mapVisible }});
 

@@ -411,25 +411,7 @@
       return `raw:${{fromId}}|${{toId}}|${{portnum}}|${{JSON.stringify(summary)}}`;
     }}
 
-    function mapPacketActivityNodeIds(packetEntry) {{
-      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
-        ? packetEntry.summary
-        : {{}};
-      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
-        ? packetEntry.packet
-        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
-      const nodeIds = new Set();
-      const pushNodeId = (rawValue) => {{
-        const normalized = normalizeNodeId(rawValue);
-        if (!isSelectableNodeId(normalized)) return;
-        nodeIds.add(normalized);
-      }};
-      pushNodeId(summary.from_id ?? summary.fromId ?? summary.from ?? packet.from_id ?? packet.fromId ?? packet.from);
-      pushNodeId(summary.to_id ?? summary.toId ?? summary.to ?? packet.to_id ?? packet.toId ?? packet.to ?? packet.destination);
-      return Array.from(nodeIds);
-    }}
-
-    function mapPacketActivityTransmitNodeId(packetEntry) {{
+    function mapPacketActivityEndpointIds(packetEntry) {{
       const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
         ? packetEntry.summary
         : {{}};
@@ -444,7 +426,36 @@
         ?? packet.fromId
         ?? packet.from
       );
-      return isSelectableNodeId(fromId) ? fromId : "";
+      const toId = normalizeNodeId(
+        summary.to_id
+        ?? summary.toId
+        ?? summary.to
+        ?? packet.to_id
+        ?? packet.toId
+        ?? packet.to
+        ?? packet.destination
+      );
+      return {{
+        fromId: isSelectableNodeId(fromId) ? fromId : "",
+        toId: isSelectableNodeId(toId) ? toId : "",
+      }};
+    }}
+
+    function mapPacketActivityNodeIds(packetEntry) {{
+      const endpoints = mapPacketActivityEndpointIds(packetEntry);
+      const nodeIds = new Set();
+      const pushNodeId = (rawValue) => {{
+        const normalized = normalizeNodeId(rawValue);
+        if (!isSelectableNodeId(normalized)) return;
+        nodeIds.add(normalized);
+      }};
+      pushNodeId(endpoints.fromId);
+      pushNodeId(endpoints.toId);
+      return Array.from(nodeIds);
+    }}
+
+    function mapPacketActivityTransmitNodeId(packetEntry) {{
+      return mapPacketActivityEndpointIds(packetEntry).fromId;
     }}
 
     function mapPacketActivitySignalLevel(packetEntry) {{
@@ -527,7 +538,44 @@
       return pane || null;
     }}
 
-    function mapNodeTransmitPulsePosition(nodeId, state = latestState) {{
+    function cacheNetworkMapActivityPositions(nodes = [], estimatedPositions = new Map()) {{
+      const nextPositions = new Map();
+      for (const node of (nodes || [])) {{
+        const nodeId = normalizeNodeId(node && node.id);
+        if (!isSelectableNodeId(nodeId)) continue;
+        const lat = Number(node && node.lat);
+        const lon = Number(node && node.lon);
+        if (!isValidMapCoord(lat, lon)) continue;
+        nextPositions.set(nodeId, {{
+          lat,
+          lon,
+          kind: "actual",
+          confidence: 1,
+        }});
+      }}
+      if (estimatedPositions instanceof Map) {{
+        for (const [rawNodeId, estimate] of estimatedPositions.entries()) {{
+          const nodeId = normalizeNodeId(rawNodeId);
+          if (!isSelectableNodeId(nodeId) || nextPositions.has(nodeId)) continue;
+          const lat = Number(estimate && estimate.lat);
+          const lon = Number(estimate && estimate.lon);
+          if (!isValidMapCoord(lat, lon)) continue;
+          nextPositions.set(nodeId, {{
+            lat,
+            lon,
+            kind: "estimated",
+            confidence: clampMapLinkValue(Number(estimate && estimate.confidence), 0.08, 1),
+          }});
+        }}
+      }}
+      mapNodeActivityPositionById.clear();
+      for (const [nodeId, position] of nextPositions.entries()) {{
+        mapNodeActivityPositionById.set(nodeId, position);
+      }}
+      return mapNodeActivityPositionById.size;
+    }}
+
+    function mapNodeActivityPosition(nodeId, state = latestState) {{
       const normalizedId = normalizeNodeId(nodeId || "");
       if (!isSelectableNodeId(normalizedId)) return null;
       const marker = nodeMarkers.get(normalizedId);
@@ -535,15 +583,33 @@
         const latLng = marker.getLatLng();
         const lat = Number(latLng && latLng.lat);
         const lon = Number(latLng && (latLng.lng ?? latLng.lon));
-        if (isValidMapCoord(lat, lon)) return [lat, lon];
+        if (isValidMapCoord(lat, lon)) return {{ lat, lon, kind: nodeMarkerKinds.get(normalizedId) || "actual" }};
+      }}
+      const cached = mapNodeActivityPositionById.get(normalizedId);
+      if (cached && typeof cached === "object") {{
+        const lat = Number(cached.lat);
+        const lon = Number(cached.lon);
+        if (isValidMapCoord(lat, lon)) {{
+          return {{
+            lat,
+            lon,
+            kind: cached.kind === "estimated" ? "estimated" : "actual",
+            confidence: cached.confidence,
+          }};
+        }}
       }}
       const safeState = (state && typeof state === "object") ? state : latestState;
       const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
       const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === normalizedId) || null;
       const lat = Number(node && node.lat);
       const lon = Number(node && node.lon);
-      if (isValidMapCoord(lat, lon)) return [lat, lon];
+      if (isValidMapCoord(lat, lon)) return {{ lat, lon, kind: "actual", confidence: 1 }};
       return null;
+    }}
+
+    function mapNodeTransmitPulsePosition(nodeId, state = latestState) {{
+      const position = mapNodeActivityPosition(nodeId, state);
+      return position ? [position.lat, position.lon] : null;
     }}
 
     function mapNodeTransmitPulseColor(nodeId, state = latestState) {{
@@ -577,6 +643,135 @@
       for (const record of Array.from(mapNodeTransmitPulseRings)) {{
         removeMapTransmitPulseRing(record);
       }}
+    }}
+
+    function mapActivityInterpolateLatLng(fromPosition, toPosition, progress) {{
+      const t = clampMapLinkValue(Number(progress), 0, 1);
+      const fromLat = Number(fromPosition && fromPosition.lat);
+      const fromLon = Number(fromPosition && fromPosition.lon);
+      const toLat = Number(toPosition && toPosition.lat);
+      const toLon = Number(toPosition && toPosition.lon);
+      return [
+        fromLat + ((toLat - fromLat) * t),
+        fromLon + ((toLon - fromLon) * t),
+      ];
+    }}
+
+    function removeMapNodeActivityDirection(record) {{
+      if (!(record && typeof record === "object")) return;
+      for (const layer of [record.line, record.head]) {{
+        if (layer && map && typeof map.removeLayer === "function") {{
+          try {{
+            map.removeLayer(layer);
+          }} catch (_err) {{
+          }}
+        }}
+      }}
+      mapNodeActivityDirectionRecords.delete(record);
+    }}
+
+    function clearMapNodeActivityDirections() {{
+      for (const record of Array.from(mapNodeActivityDirectionRecords)) {{
+        removeMapNodeActivityDirection(record);
+      }}
+    }}
+
+    function pruneExpiredMapNodeActivityDirections(nowMs = Date.now()) {{
+      if (!isNetworkMapActivityFlashVisible()) {{
+        clearMapNodeActivityDirections();
+        return 0;
+      }}
+      let activeCount = 0;
+      for (const record of Array.from(mapNodeActivityDirectionRecords)) {{
+        const line = record && record.line;
+        const head = record && record.head;
+        if (!(line && typeof line.setLatLngs === "function" && head && typeof head.setLatLng === "function")) {{
+          removeMapNodeActivityDirection(record);
+          continue;
+        }}
+        const startedAtMs = Number(record.startedAtMs);
+        const durationMs = Math.max(1, Number(record.durationMs) || 900);
+        const ageMs = nowMs - (Number.isFinite(startedAtMs) ? startedAtMs : nowMs);
+        if (ageMs >= durationMs) {{
+          removeMapNodeActivityDirection(record);
+          continue;
+        }}
+        const progress = clampMapLinkValue(ageMs / durationMs, 0, 1);
+        const tailProgress = clampMapLinkValue(progress - 0.22, 0, 1);
+        const tailPoint = mapActivityInterpolateLatLng(record.fromPosition, record.toPosition, tailProgress);
+        const headPoint = mapActivityInterpolateLatLng(record.fromPosition, record.toPosition, progress);
+        const signalLevel = clampMapLinkValue(Number(record.signalLevel), 0, 1);
+        const fadeIn = clampMapLinkValue(progress / 0.18, 0, 1);
+        const fadeOut = clampMapLinkValue((1 - progress) / 0.22, 0, 1);
+        const opacity = clampMapLinkValue((0.28 + (signalLevel * 0.5)) * Math.min(fadeIn, fadeOut), 0, 0.86);
+        const weight = 2.2 + (signalLevel * 2.2);
+        line.setLatLngs([tailPoint, headPoint]);
+        line.setStyle({{
+          opacity,
+          weight,
+        }});
+        head.setLatLng(headPoint);
+        head.setStyle({{
+          opacity: clampMapLinkValue(opacity + 0.12, 0, 0.92),
+          fillOpacity: clampMapLinkValue(opacity + 0.18, 0, 0.96),
+        }});
+        activeCount += 1;
+      }}
+      return activeCount;
+    }}
+
+    function startMapPacketDirectionAnimation(fromNodeId, toNodeId, state = latestState, signalLevel = 0.55) {{
+      const fromId = normalizeNodeId(fromNodeId || "");
+      const toId = normalizeNodeId(toNodeId || "");
+      if (!isSelectableNodeId(fromId) || !isSelectableNodeId(toId) || fromId === toId) return false;
+      if (!isNetworkMapActivityFlashVisible()) return false;
+      if (!ensureMapTransmitPulsePane()) return false;
+      const fromPosition = mapNodeActivityPosition(fromId, state);
+      const toPosition = mapNodeActivityPosition(toId, state);
+      if (!fromPosition || !toPosition) return false;
+      if (!isValidMapCoord(fromPosition.lat, fromPosition.lon) || !isValidMapCoord(toPosition.lat, toPosition.lon)) return false;
+      const color = mapNodeTransmitPulseColor(fromId, state);
+      const signal = clampMapLinkValue(Number(signalLevel), 0, 1);
+      const fromPoint = [fromPosition.lat, fromPosition.lon];
+      const line = L.polyline([fromPoint, fromPoint], {{
+        pane: mapTransmitPulsePaneName,
+        color,
+        opacity: 0,
+        weight: 2.2 + (signal * 2.2),
+        lineCap: "round",
+        lineJoin: "round",
+        interactive: false,
+        bubblingMouseEvents: false,
+      }});
+      const head = L.circleMarker(fromPoint, {{
+        pane: mapTransmitPulsePaneName,
+        radius: 3.2 + (signal * 2.4),
+        color,
+        fillColor: color,
+        opacity: 0,
+        fillOpacity: 0,
+        weight: 1.2,
+        interactive: false,
+        bubblingMouseEvents: false,
+      }});
+      line.addTo(map);
+      head.addTo(map);
+      mapNodeActivityDirectionRecords.add({{
+        line,
+        head,
+        fromId,
+        toId,
+        fromPosition,
+        toPosition,
+        signalLevel: signal,
+        startedAtMs: Date.now(),
+        durationMs: 920,
+      }});
+      while (mapNodeActivityDirectionRecords.size > mapNodeActivityDirectionMaxRecords) {{
+        const oldest = mapNodeActivityDirectionRecords.values().next().value;
+        removeMapNodeActivityDirection(oldest);
+      }}
+      return true;
     }}
 
     function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now()) {{
@@ -1260,13 +1455,15 @@
         mapNodeActivityFlashRaf = null;
         const activeFlashCount = pruneExpiredMapNodeActivityFlashes();
         const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();
+        const activeDirectionCount = pruneExpiredMapNodeActivityDirections();
         refreshMapMarkerStyles();
         if (!isNetworkMapActivityFlashVisible()) {{
           clearMapNodeTransmitPulseRings();
+          clearMapNodeActivityDirections();
           stopMapNodeActivityFlashLoop();
           return;
         }}
-        if (activeFlashCount > 0 || activePulseCount > 0) {{
+        if (activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0) {{
           scheduleMapNodeActivityFlashUpdate();
         }}
       }});
@@ -1282,6 +1479,7 @@
       const currentTokens = new Set();
       const nodesToFlash = new Set();
       const nodesToRipple = new Map();
+      const directionsToAnimate = [];
       const networkMapVisible = isNetworkMapActivityFlashVisible();
       for (const packetEntry of recentPackets) {{
         if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
@@ -1290,28 +1488,30 @@
         if (!networkMapVisible || lastNetworkMapPacketTokens.has(token)) {{
           continue;
         }}
+        const endpoints = mapPacketActivityEndpointIds(packetEntry);
+        const signalLevel = mapPacketActivitySignalLevel(packetEntry);
         const nodeIds = mapPacketActivityNodeIds(packetEntry);
         for (const nodeId of nodeIds) {{
           nodesToFlash.add(nodeId);
-        }}
-        const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);
-        if (transmitNodeId) {{
-          const signalLevel = mapPacketActivitySignalLevel(packetEntry);
-          const prevSignalLevel = nodesToRipple.get(transmitNodeId);
+          const prevSignalLevel = nodesToRipple.get(nodeId);
           nodesToRipple.set(
-            transmitNodeId,
+            nodeId,
             Number.isFinite(Number(prevSignalLevel))
               ? Math.max(Number(prevSignalLevel), signalLevel)
               : signalLevel
           );
         }}
+        if (endpoints.fromId && endpoints.toId && endpoints.fromId !== endpoints.toId) {{
+          directionsToAnimate.push({{ fromId: endpoints.fromId, toId: endpoints.toId, signalLevel }});
+        }}
       }}
       lastNetworkMapPacketTokens = currentTokens;
-      if (!networkMapVisible || (nodesToFlash.size <= 0 && nodesToRipple.size <= 0)) {{
+      if (!networkMapVisible || (nodesToFlash.size <= 0 && nodesToRipple.size <= 0 && directionsToAnimate.length <= 0)) {{
         if (!networkMapVisible) {{
           lastNetworkMapPacketTokens = currentTokens;
           mapNodeActivityFlashById.clear();
           clearMapNodeTransmitPulseRings();
+          clearMapNodeActivityDirections();
           stopMapNodeActivityFlashLoop();
         }}
         return;
@@ -1325,6 +1525,9 @@
       }}
       for (const [nodeId, signalLevel] of nodesToRipple.entries()) {{
         startMapNodeTransmitRipple(nodeId, safeState, signalLevel);
+      }}
+      for (const direction of directionsToAnimate) {{
+        startMapPacketDirectionAnimation(direction.fromId, direction.toId, safeState, direction.signalLevel);
       }}
       scheduleMapNodeActivityFlashUpdate();
     }}

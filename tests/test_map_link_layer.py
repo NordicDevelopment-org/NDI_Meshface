@@ -289,6 +289,9 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     )
 
     assert "const mapNodeActivityFlashById = new Map();" in js
+    assert "const mapNodeActivityPositionById = new Map();" in js
+    assert "const mapNodeActivityDirectionRecords = new Set();" in js
+    assert "const mapNodeActivityDirectionMaxRecords = 48;" in js
     assert "const mapNodeTransmitPulseRings = new Set();" in js
     assert "const mapNodeTransmitPulseMaxRings = 72;" in js
     assert 'const mapTransmitPulsePaneName = "mapTransmitPulsePane";' in js
@@ -296,6 +299,7 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "let lastNetworkMapPacketTokens = new Set();" in js
     assert "function isNetworkMapActivityFlashVisible()" in js
     assert "function mapPacketActivityToken(packetEntry)" in js
+    assert "function mapPacketActivityEndpointIds(packetEntry)" in js
     assert "function mapPacketActivityNodeIds(packetEntry)" in js
     assert "function mapPacketActivityTransmitNodeId(packetEntry)" in js
     assert "function mapPacketActivitySignalLevel(packetEntry)" in js
@@ -306,27 +310,43 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function ensureMapTransmitPulsePane()" in js
+    assert "function cacheNetworkMapActivityPositions(nodes = [], estimatedPositions = new Map())" in js
+    assert 'kind: "estimated",' in js
+    assert "cacheNetworkMapActivityPositions(nodes, estimatedPositions);" in js
+    assert "function mapNodeActivityPosition(nodeId, state = latestState)" in js
     assert "function startMapNodeTransmitRipple(nodeId, state = latestState, signalLevel = 0.55)" in js
     assert "function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now())" in js
+    assert "function startMapPacketDirectionAnimation(fromNodeId, toNodeId, state = latestState, signalLevel = 0.55)" in js
+    assert "function pruneExpiredMapNodeActivityDirections(nowMs = Date.now())" in js
+    assert "line.setLatLngs([tailPoint, headPoint]);" in js
+    assert "head.setLatLng(headPoint);" in js
     assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
     assert "function scheduleMapNodeActivityFlashUpdate()" in js
     assert "function syncNetworkMapPacketActivity(state = latestState)" in js
     assert "!!mapLiveActivityEnabled" in js
     assert "const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();" in js
-    assert "activeFlashCount > 0 || activePulseCount > 0" in js
+    assert "const activeDirectionCount = pruneExpiredMapNodeActivityDirections();" in js
+    assert "activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0" in js
     assert "mapNodeActivityFlashById.set(nodeId, {" in js
-    assert "const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);" in js
+    assert "const endpoints = mapPacketActivityEndpointIds(packetEntry);" in js
     assert "const signalLevel = mapPacketActivitySignalLevel(packetEntry);" in js
     assert "nodesToRipple.set(" in js
     assert "Math.max(Number(prevSignalLevel), signalLevel)" in js
+    assert "directionsToAnimate.push({ fromId: endpoints.fromId, toId: endpoints.toId, signalLevel });" in js
     assert "startMapNodeTransmitRipple(nodeId, safeState, signalLevel);" in js
+    assert "startMapPacketDirectionAnimation(direction.fromId, direction.toId, safeState, direction.signalLevel);" in js
     assert "pane: mapTransmitPulsePaneName," in js
     assert "const radiusScale = mapTransmitPulseRadiusScale(signalLevel);" in js
     assert "const endRadius = (22 + (idx * 7)) * radiusScale;" in js
     assert "layer.setRadius(easedRadius);" in js
     assert "scheduleMapNodeActivityFlashUpdate();" in js
-    assert "if (mapLiveActivityEnabled)" in js
+    assert "mapLiveActivityEnabled\n          && typeof isNetworkMapActivityFlashVisible === \"function\"" in js
+    assert "&& !isNetworkMapActivityFlashVisible()" in js
+    assert "&& isNetworkMapActivityFlashVisible()" in js
+    assert js.index("renderMap(state.nodes || [], (state.traffic || {}).edges || [], cachedHistory);") < js.index(
+        "&& isNetworkMapActivityFlashVisible()"
+    )
     assert "syncNetworkMapPacketActivity(state);" in js
 
 

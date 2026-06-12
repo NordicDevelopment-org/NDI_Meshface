@@ -648,6 +648,7 @@
             .map(([rawNodeId, caps]) => [normalizeNodeId(rawNodeId), caps])
             .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
         );
+        cacheNetworkMapActivityPositions(nodes, estimatedPositions);
         const nowUnix = Math.floor(Date.now() / 1000);
         const seenNodeIds = new Set();
 
