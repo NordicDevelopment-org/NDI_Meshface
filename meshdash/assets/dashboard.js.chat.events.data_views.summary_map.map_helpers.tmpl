@@ -354,6 +354,62 @@
       );
     }}
 
+    function isNetworkMapTraceProgressVisible() {{
+      try {{
+        return (
+          activeLayoutView === "network"
+          && (
+            typeof networkSubviewUsesMap === "function"
+              ? networkSubviewUsesMap(activeNetworkSubview)
+              : activeNetworkSubview === "map"
+          )
+          && !(typeof document !== "undefined" && document.hidden)
+        );
+      }} catch (_err) {{
+        return false;
+      }}
+    }}
+
+    function currentNetworkMapTraceProgressState(nowMs = Date.now()) {{
+      if (!isNetworkMapTraceProgressVisible()) return null;
+      if (
+        typeof normalizedNetworkRoutesLiveTraceState !== "function"
+        || typeof networkRoutesLiveTraceProgressPct !== "function"
+      ) {{
+        return null;
+      }}
+      try {{
+        const rawState = (typeof networkRoutesLiveTraceState !== "undefined")
+          ? networkRoutesLiveTraceState
+          : null;
+        const traceState = normalizedNetworkRoutesLiveTraceState(rawState);
+        const targetId = normalizeNodeId(traceState && traceState.targetId || "");
+        if (!(traceState && traceState.running && isSelectableNodeId(targetId))) return null;
+        const progressPct = Math.max(
+          1,
+          Math.min(99, Math.round(Number(networkRoutesLiveTraceProgressPct(traceState, nowMs)) || 1))
+        );
+        return Object.assign({{}}, traceState, {{
+          progressPct,
+          progressRatio: clampMapLinkValue(progressPct / 100, 0.01, 0.99),
+        }});
+      }} catch (_err) {{
+        return null;
+      }}
+    }}
+
+    function mapNodeTraceProgressState(nodeId, nowMs = Date.now()) {{
+      const normalizedId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(normalizedId)) return null;
+      const traceState = currentNetworkMapTraceProgressState(nowMs);
+      if (!(traceState && normalizeNodeId(traceState.targetId || "") === normalizedId)) return null;
+      return traceState;
+    }}
+
+    function isNetworkMapTraceProgressActive(nowMs = Date.now()) {{
+      return !!currentNetworkMapTraceProgressState(nowMs);
+    }}
+
     function mapPacketActivityToken(packetEntry) {{
       const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
         ? packetEntry.summary
@@ -1363,6 +1419,10 @@
         window.cancelAnimationFrame(mapNodeActivityFlashRaf);
         mapNodeActivityFlashRaf = null;
       }}
+      if (mapTraceProgressTimer != null) {{
+        window.clearTimeout(mapTraceProgressTimer);
+        mapTraceProgressTimer = null;
+      }}
     }}
 
     function mapNodeActivityFlashStrength(nodeId, nowMs = Date.now()) {{
@@ -1400,6 +1460,22 @@
       return style;
     }}
 
+    function applyMapNodeTraceProgressStyle(baseStyle, traceProgress) {{
+      if (!(traceProgress && typeof traceProgress === "object")) return baseStyle;
+      const progressRatio = clampMapLinkValue(Number(traceProgress.progressRatio), 0.01, 0.99);
+      const style = Object.assign({{}}, baseStyle);
+      const radius = Math.max(4, Number(style.radius) || 6);
+      const circumference = Math.max(8, 2 * Math.PI * radius);
+      const dashLength = Math.max(1.6, circumference * progressRatio);
+      const baseWeight = Number(style.weight);
+      style.color = "#7dd3fc";
+      style.opacity = 1;
+      style.weight = Math.max(Number.isFinite(baseWeight) ? baseWeight : 1.8, 2.4 + (2.2 * progressRatio));
+      style.dashArray = `${{dashLength.toFixed(1)}} ${{circumference.toFixed(1)}}`;
+      style.lineCap = "round";
+      return style;
+    }}
+
     function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState) {{
       const kind = markerKind === "estimated" ? "estimated" : "actual";
       const safeState = (state && typeof state === "object") ? state : latestState;
@@ -1416,7 +1492,9 @@
         baseStyle.weight = Math.max(Number(baseStyle.weight) || 0, isSelected ? 2.8 : 2.1);
       }}
       const flashStrength = mapNodeActivityFlashStrength(nodeId);
-      return applyMapNodeActivityFlashStyle(baseStyle, flashStrength, kind);
+      const activityStyle = applyMapNodeActivityFlashStyle(baseStyle, flashStrength, kind);
+      const traceProgress = mapNodeTraceProgressState(nodeId);
+      return applyMapNodeTraceProgressStyle(activityStyle, traceProgress);
     }}
 
     function resolveMapNodeEmoji(nodeId, state = latestState) {{
@@ -1730,9 +1808,11 @@
         maxWidth: 340,
       }});
       const popupFadeMs = 180;
+      const popupEnterDelayMs = 220;
       const popupLeaveDelayMs = 180;
       let markerHovering = false;
       let popupHovering = false;
+      let popupOpenTimer = null;
       let popupCloseTimer = null;
       let popupFadeTimer = null;
       const currentPopupElement = () => {{
@@ -1742,6 +1822,10 @@
           : null;
       }};
       const clearHoverPopupTimers = () => {{
+        if (popupOpenTimer != null) {{
+          window.clearTimeout(popupOpenTimer);
+          popupOpenTimer = null;
+        }}
         if (popupCloseTimer != null) {{
           window.clearTimeout(popupCloseTimer);
           popupCloseTimer = null;
@@ -1782,6 +1866,20 @@
         clearHoverPopupTimers();
         popupCloseTimer = window.setTimeout(startHoverPopupFade, popupLeaveDelayMs);
       }};
+      const finishHoverPopupOpen = () => {{
+        popupOpenTimer = null;
+        if (!markerHovering || hoverPopupSuppressed()) return;
+        if (typeof marker.openPopup === "function") {{
+          marker.openPopup();
+        }}
+      }};
+      const scheduleHoverPopupOpen = () => {{
+        if (hoverPopupSuppressed()) return;
+        if (popupOpenTimer != null) {{
+          window.clearTimeout(popupOpenTimer);
+        }}
+        popupOpenTimer = window.setTimeout(finishHoverPopupOpen, popupEnterDelayMs);
+      }};
       const popupIsOpen = () => {{
         try {{
           return !!(typeof marker.isPopupOpen === "function" && marker.isPopupOpen());
@@ -1796,6 +1894,7 @@
         return !!opts.suppressHoverTooltip || popupIsOpen() || !!(overlayNodeId && selectedId === overlayNodeId);
       }};
       marker.on("popupopen", (ev) => {{
+        cancelHoverPopupClose();
         const popup = ev && ev.popup;
         const popupEl = popup && typeof popup.getElement === "function"
           ? popup.getElement()
@@ -1816,10 +1915,7 @@
       marker.on("mouseover", () => {{
         markerHovering = true;
         cancelHoverPopupClose();
-        if (hoverPopupSuppressed()) return;
-        if (typeof marker.openPopup === "function") {{
-          marker.openPopup();
-        }}
+        scheduleHoverPopupOpen();
       }});
       marker.on("mouseout", () => {{
         markerHovering = false;
@@ -1837,6 +1933,9 @@
       const emoji = resolveMapNodeEmoji(nodeId, state);
       if (!emoji) return null;
       const flashStrength = mapNodeActivityFlashStrength(nodeId);
+      const traceProgress = mapNodeTraceProgressState(nodeId);
+      const traceProgressPct = traceProgress ? Math.max(1, Math.min(99, Number(traceProgress.progressPct) || 1)) : 0;
+      const traceAngleDeg = `${{(traceProgressPct * 3.6).toFixed(1)}}deg`;
       const markerStyleForRing = resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind, markerConfidence, state);
       const ringColor = String(markerStyleForRing && markerStyleForRing.color ? markerStyleForRing.color : "#86a9ff");
       const ringWidthRaw = Number(markerStyleForRing && markerStyleForRing.weight);
@@ -1845,7 +1944,11 @@
         "map-node-emoji-marker",
         isSelected ? "is-selected" : "",
         flashStrength > 0.04 ? "is-active" : "",
+        traceProgress ? "is-trace-running" : "",
       ].filter(Boolean).join(" ");
+      const traceTitleAttr = traceProgress
+        ? ` title="${{escAttr(`Traceroute in progress (${{traceProgressPct}}%)`)}}"`
+        : "";
       const iconSize = isSelected ? 30 : 24;
       const iconAnchor = Math.round(iconSize / 2);
       const popupAnchorY = isSelected ? -16 : -13;
@@ -1854,7 +1957,8 @@
         html: `
           <div
             class="${{markerClasses}}"
-            style="--map-node-flash:${{Number(flashStrength.toFixed(3))}}; --map-node-ring-color:${{escAttr(ringColor)}}; --map-node-ring-width:${{ringWidth.toFixed(1)}}px;"
+            style="--map-node-flash:${{Number(flashStrength.toFixed(3))}}; --map-node-ring-color:${{escAttr(ringColor)}}; --map-node-ring-width:${{ringWidth.toFixed(1)}}px; --map-node-trace-progress:${{traceProgressPct.toFixed(0)}}; --map-node-trace-angle:${{traceAngleDeg}};"
+            ${{traceTitleAttr}}
           >
             <span class="map-node-emoji-glyph" aria-hidden="true">${{escAttr(emoji)}}</span>
           </div>
@@ -1912,6 +2016,10 @@
     }}
 
     function scheduleMapNodeActivityFlashUpdate() {{
+      if (mapTraceProgressTimer != null) {{
+        window.clearTimeout(mapTraceProgressTimer);
+        mapTraceProgressTimer = null;
+      }}
       if (mapNodeActivityFlashRaf != null) return;
       mapNodeActivityFlashRaf = window.requestAnimationFrame(() => {{
         mapNodeActivityFlashRaf = null;
@@ -1919,16 +2027,21 @@
         const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();
         const activeDirectionCount = pruneExpiredMapNodeActivityDirections();
         const activeTraceCount = pruneExpiredMapTracePaths();
+        const activeTraceProgress = isNetworkMapTraceProgressActive();
         refreshMapMarkerStyles();
         if (!isNetworkMapActivityFlashVisible()) {{
           clearMapNodeTransmitPulseRings();
           clearMapNodeActivityDirections();
           clearMapTracePaths();
-          stopMapNodeActivityFlashLoop();
-          return;
+          if (!activeTraceProgress) {{
+            stopMapNodeActivityFlashLoop();
+            return;
+          }}
         }}
         if (activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0 || activeTraceCount > 0) {{
           scheduleMapNodeActivityFlashUpdate();
+        }} else if (activeTraceProgress) {{
+          mapTraceProgressTimer = window.setTimeout(scheduleMapNodeActivityFlashUpdate, 260);
         }}
       }});
     }}

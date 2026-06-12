@@ -1011,6 +1011,11 @@
         ...current,
         ...safePatch,
       }});
+      if (typeof scheduleMapNodeActivityFlashUpdate === "function") {{
+        scheduleMapNodeActivityFlashUpdate();
+      }} else if (typeof refreshMapMarkerStyles === "function") {{
+        refreshMapMarkerStyles();
+      }}
       return networkRoutesLiveTraceState;
     }}
 

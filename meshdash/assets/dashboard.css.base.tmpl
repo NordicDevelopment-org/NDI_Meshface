@@ -3654,15 +3654,38 @@
       width: 24px;
       height: 24px;
       display: flex;
+      position: relative;
       align-items: center;
       justify-content: center;
       border-radius: 999px;
+      overflow: visible;
+      isolation: isolate;
       border: var(--map-node-ring-width, 2px) solid var(--map-node-ring-color, #86a9ff);
       background: radial-gradient(circle at 50% 44%, #2a3a70 0%, #21315d 58%, #1a2749 100%);
       transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
       box-shadow:
         0 0 0 calc(1px + (2px * var(--map-node-flash, 0))) rgba(203, 137, 255, calc(0.22 + (0.24 * var(--map-node-flash, 0)))),
         0 3px 8px rgba(10, 18, 36, 0.28);
+    }}
+    .map-node-emoji-marker::before {{
+      content: "";
+      position: absolute;
+      inset: calc(-3px - var(--map-node-ring-width, 2px));
+      border-radius: 999px;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 0;
+      background: conic-gradient(
+        var(--map-node-trace-color, #7dd3fc) var(--map-node-trace-angle, 0deg),
+        rgba(125, 211, 252, 0.2) 0deg
+      );
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px));
+      filter: drop-shadow(0 0 5px rgba(125, 211, 252, 0.52));
+      transition: opacity 140ms ease;
+    }}
+    .map-node-emoji-marker.is-trace-running::before {{
+      opacity: 1;
     }}
     .map-node-emoji-marker:hover {{
       transform: scale(1.18);
@@ -3683,6 +3706,8 @@
     }}
     .map-node-emoji-glyph {{
       display: block;
+      position: relative;
+      z-index: 1;
       font-size: 16px;
       line-height: 1;
       transform: translateY(-0.5px);

@@ -366,6 +366,8 @@ def test_dashboard_js_supports_network_graph_subview() -> None:
     assert 'syncNetworkRoutesFromSelectedNode(latestState, { preferSelectedTarget: true });\n        renderNetworkRoutes(latestState);' in js
     assert 'const liveTraceRunningForNode = !!(liveTraceState && liveTraceState.running' in js
     assert 'function networkRoutesLiveTraceProgressPct(rawState = networkRoutesLiveTraceState, nowMs = Date.now())' in js
+    assert 'if (typeof scheduleMapNodeActivityFlashUpdate === "function") {' in js
+    assert 'scheduleMapNodeActivityFlashUpdate();' in js
     assert 'runBtn.classList.toggle("is-running-trace", !!liveState.running);' in js
     assert 'runBtn.style.setProperty("--network-routes-run-progress", `${progressPct}%`);' in js
     assert 'class="network-routes-run-progress-fill"' in js
