@@ -536,7 +536,8 @@
         : normalizeMapLinkLayerMode(mapLinkLayerMode);
       let estimatedPositions = new Map();
       const graphChanged = lastMapRenderMode !== "graph" || graphSignature !== lastMapGraphSignature;
-      if (!graphChanged && signature === lastMapSignature) {{
+      const shouldRenderGraph = graphChanged || !!mapEstimatedPositionSmoothingActive;
+      if (!shouldRenderGraph && signature === lastMapSignature) {{
         ensureMapSizeSync();
         if (activeLayoutView === "network" && !fitDone) {{
           // View-switch fast path: still run initial network auto-fit even when map data is unchanged.
@@ -551,7 +552,7 @@
         return;
       }}
 
-      if (graphChanged) {{
+      if (shouldRenderGraph) {{
         const byId = Object.create(null);
         for (const node of (nodes || [])) {{
           byId[normalizeNodeId(node && node.id)] = node;
@@ -564,14 +565,20 @@
             || estimatedCloudsEnabled
           )
         );
-        const rawLinkOverlay = needsMapLinkEstimateOverlay
+        const rawLinkOverlayUnsmoothed = needsMapLinkEstimateOverlay
           ? buildMapLinkLayerOverlay(nodes, mapRenderEdges, {{
               mode: effectiveMapLinkMode !== "none" ? effectiveMapLinkMode : "both",
             }})
           : {{ estimates: new Map(), lines: [] }};
-        const densitySourceOverlay = needsMapLinkEstimateOverlay
+        const densitySourceOverlayUnsmoothed = needsMapLinkEstimateOverlay
           ? buildMapLinkLayerOverlay(nodes, mapRenderEdges, {{ mode: "both" }})
           : {{ estimates: new Map(), lines: [] }};
+        const densitySourceOverlay = smoothMapLinkLayerOverlay(densitySourceOverlayUnsmoothed, {{
+          updateCache: true,
+        }});
+        const rawLinkOverlay = smoothMapLinkLayerOverlay(rawLinkOverlayUnsmoothed, {{
+          updateCache: false,
+        }});
         const linkDensity = (
           needsMapLinkEstimateOverlay
           && typeof buildMapLinkEstimateDensityOverlay === "function"

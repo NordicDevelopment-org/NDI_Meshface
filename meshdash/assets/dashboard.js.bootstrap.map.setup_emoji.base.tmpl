@@ -282,11 +282,14 @@
     const mapNodeActivityDirectionMaxRecords = 48;
     const mapNodeTransmitPulseRings = new Set();
     const mapNodeTransmitPulseMaxRings = 72;
+    const mapEstimatedPositionSmoothingById = new Map();
+    const mapEstimatedPositionSmoothingMaxAgeMs = 180000;
     const edgeLines = new Map();
     const edgeLineMeta = new Map();
     const linkEstimateLines = new Map();
     const linkEstimateLineMeta = new Map();
     let mapNodeActivityFlashRaf = null;
+    let mapEstimatedPositionSmoothingActive = false;
     let lastNetworkMapPacketTokens = new Set();
     const selectionStorageKey = "meshDashboardSelectedNodeId";
     const favoritesStorageKey = "meshDashboardFavoriteNodeIdsV1";

@@ -104,6 +104,21 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function estimatedMarkerStyle(isSelected, confidence = 0.5, isLocal = false)" in js
     assert "function buildMapLinkLayerOverlay(nodes, rawEdges, options = null)" in js
     assert "function buildMapLinkEstimateDensityOverlay(linkOverlay, options = null)" in js
+    assert "const mapEstimatedPositionSmoothingById = new Map();" in js
+    assert "let mapEstimatedPositionSmoothingActive = false;" in js
+    assert "function smoothMapEstimatedPosition(nodeId, target, options = null)" in js
+    assert "function smoothMapEstimatedPositions(estimates, options = null)" in js
+    assert "function smoothMapLinkLineEndpoints(lines, smoothedEstimates)" in js
+    assert "function smoothMapLinkLayerOverlay(linkOverlay, options = null)" in js
+    assert "const shouldRenderGraph = graphChanged || !!mapEstimatedPositionSmoothingActive;" in js
+    assert "if (!shouldRenderGraph && signature === lastMapSignature)" in js
+    assert "const densitySourceOverlay = smoothMapLinkLayerOverlay(densitySourceOverlayUnsmoothed, {" in js
+    assert "const rawLinkOverlay = smoothMapLinkLayerOverlay(rawLinkOverlayUnsmoothed, {" in js
+    assert "mapEstimatedPositionSmoothingActive = anyActive;" in js
+    assert "rawLat: targetLat," in js
+    assert "rawLon: targetLon," in js
+    assert "copy.fromLat = Number(fromEstimate.lat);" in js
+    assert "copy.toLat = Number(toEstimate.lat);" in js
     assert "const signalHeatmapGradientCoverage = {" in js
     assert "const signalHeatmapGradientLiveContrast = {" in js
     assert "function resolveSignalHeatGradient(mode = signalHeatmapMode) {" in js

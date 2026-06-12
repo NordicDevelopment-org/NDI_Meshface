@@ -1640,6 +1640,176 @@
       return prepared[prepared.length - 1].value;
     }}
 
+    function mapEstimatedPositionDistanceMeters(fromPosition, toPosition) {{
+      const fromLat = Number(fromPosition && fromPosition.lat);
+      const fromLon = Number(fromPosition && fromPosition.lon);
+      const toLat = Number(toPosition && toPosition.lat);
+      const toLon = Number(toPosition && toPosition.lon);
+      if (!isValidMapCoord(fromLat, fromLon) || !isValidMapCoord(toLat, toLon)) return Number.POSITIVE_INFINITY;
+      const vec = projectMapLinkPoint(toLat, toLon, fromLat, fromLon);
+      return Math.hypot(Number(vec.x) || 0, Number(vec.y) || 0);
+    }}
+
+    function pruneMapEstimatedPositionSmoothingCache(activeIds, nowMs = Date.now()) {{
+      const keepIds = activeIds instanceof Set ? activeIds : new Set();
+      for (const [nodeId, cached] of Array.from(mapEstimatedPositionSmoothingById.entries())) {{
+        if (keepIds.has(nodeId)) continue;
+        const lastSeenMs = Number(cached && cached.lastSeenMs);
+        if (!Number.isFinite(lastSeenMs) || (nowMs - lastSeenMs) > mapEstimatedPositionSmoothingMaxAgeMs) {{
+          mapEstimatedPositionSmoothingById.delete(nodeId);
+        }}
+      }}
+    }}
+
+    function smoothMapEstimatedPosition(nodeId, target, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const updateCache = opts.updateCache !== false;
+      const nowMs = Number.isFinite(Number(opts.nowMs)) ? Number(opts.nowMs) : Date.now();
+      const normalizedId = normalizeNodeId(nodeId || "");
+      const targetLat = Number(target && target.lat);
+      const targetLon = Number(target && target.lon);
+      if (!isSelectableNodeId(normalizedId) || !isValidMapCoord(targetLat, targetLon)) return null;
+      const confidence = clampMapLinkValue(Number(target && target.confidence), 0.08, 1);
+      const supportLinks = Math.max(0, Math.trunc(Number(target && target.supportLinks) || 0));
+      const previous = mapEstimatedPositionSmoothingById.get(normalizedId);
+
+      if (!updateCache && previous && typeof previous === "object") {{
+        const prevLat = Number(previous.lat);
+        const prevLon = Number(previous.lon);
+        if (isValidMapCoord(prevLat, prevLon)) {{
+          return Object.assign({{}}, target, {{
+            lat: prevLat,
+            lon: prevLon,
+            rawLat: targetLat,
+            rawLon: targetLon,
+          }});
+        }}
+      }}
+
+      let nextLat = targetLat;
+      let nextLon = targetLon;
+      let active = false;
+      const previousLat = Number(previous && previous.lat);
+      const previousLon = Number(previous && previous.lon);
+      const previousSeenMs = Number(previous && previous.lastSeenMs);
+      const previousFresh = Number.isFinite(previousSeenMs)
+        && (nowMs - previousSeenMs) <= mapEstimatedPositionSmoothingMaxAgeMs;
+      if (updateCache && previousFresh && isValidMapCoord(previousLat, previousLon)) {{
+        const targetPosition = {{ lat: targetLat, lon: targetLon }};
+        const previousPosition = {{ lat: previousLat, lon: previousLon }};
+        const distanceMeters = mapEstimatedPositionDistanceMeters(previousPosition, targetPosition);
+        if (Number.isFinite(distanceMeters) && distanceMeters > 90) {{
+          const alpha = clampMapLinkValue(
+            0.075 + (confidence * 0.09) + Math.min(0.045, supportLinks * 0.008),
+            0.075,
+            0.22
+          );
+          const maxStepMeters = 1400 + (confidence * 2200) + Math.min(1100, supportLinks * 160);
+          const requestedStepMeters = Math.min(distanceMeters, distanceMeters * alpha, maxStepMeters);
+          const vec = projectMapLinkPoint(targetLat, targetLon, previousLat, previousLon);
+          if (
+            Number.isFinite(vec.x)
+            && Number.isFinite(vec.y)
+            && distanceMeters > 0
+            && requestedStepMeters > 0
+          ) {{
+            const ratio = requestedStepMeters / distanceMeters;
+            const projected = unprojectMapLinkPoint(vec.x * ratio, vec.y * ratio, previousLat, previousLon);
+            if (isValidMapCoord(Number(projected.lat), Number(projected.lon))) {{
+              nextLat = Number(projected.lat);
+              nextLon = Number(projected.lon);
+            }} else {{
+              nextLat = previousLat + ((targetLat - previousLat) * alpha);
+              nextLon = previousLon + ((targetLon - previousLon) * alpha);
+            }}
+          }} else {{
+            nextLat = previousLat + ((targetLat - previousLat) * alpha);
+            nextLon = previousLon + ((targetLon - previousLon) * alpha);
+          }}
+          const remainingMeters = mapEstimatedPositionDistanceMeters(
+            {{ lat: nextLat, lon: nextLon }},
+            targetPosition
+          );
+          active = Number.isFinite(remainingMeters) && remainingMeters > 120;
+        }}
+      }}
+
+      const smoothed = Object.assign({{}}, target, {{
+        lat: nextLat,
+        lon: nextLon,
+        rawLat: targetLat,
+        rawLon: targetLon,
+      }});
+      if (updateCache) {{
+        mapEstimatedPositionSmoothingById.set(normalizedId, {{
+          lat: nextLat,
+          lon: nextLon,
+          targetLat,
+          targetLon,
+          confidence,
+          supportLinks,
+          lastSeenMs: nowMs,
+        }});
+      }}
+      return {{ estimate: smoothed, active }};
+    }}
+
+    function smoothMapEstimatedPositions(estimates, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const updateCache = opts.updateCache !== false;
+      const nowMs = Date.now();
+      const rawEstimates = estimates instanceof Map ? estimates : new Map();
+      const smoothed = new Map();
+      const activeIds = new Set();
+      let anyActive = false;
+      for (const [rawNodeId, estimate] of rawEstimates.entries()) {{
+        const nodeId = normalizeNodeId(rawNodeId);
+        const result = smoothMapEstimatedPosition(nodeId, estimate, {{ updateCache, nowMs }});
+        const nextEstimate = result && result.estimate ? result.estimate : result;
+        if (!(nextEstimate && typeof nextEstimate === "object")) continue;
+        smoothed.set(nodeId, nextEstimate);
+        activeIds.add(nodeId);
+        if (result && result.active) {{
+          anyActive = true;
+        }}
+      }}
+      if (updateCache) {{
+        pruneMapEstimatedPositionSmoothingCache(activeIds, nowMs);
+        mapEstimatedPositionSmoothingActive = anyActive;
+      }}
+      return smoothed;
+    }}
+
+    function smoothMapLinkLineEndpoints(lines, smoothedEstimates) {{
+      if (!Array.isArray(lines) || !(smoothedEstimates instanceof Map)) return [];
+      return lines.map((line) => {{
+        const copy = Object.assign({{}}, line);
+        const fromEstimate = smoothedEstimates.get(normalizeNodeId(copy.fromId));
+        const toEstimate = smoothedEstimates.get(normalizeNodeId(copy.toId));
+        if (fromEstimate && isValidMapCoord(Number(fromEstimate.lat), Number(fromEstimate.lon))) {{
+          copy.fromLat = Number(fromEstimate.lat);
+          copy.fromLon = Number(fromEstimate.lon);
+        }}
+        if (toEstimate && isValidMapCoord(Number(toEstimate.lat), Number(toEstimate.lon))) {{
+          copy.toLat = Number(toEstimate.lat);
+          copy.toLon = Number(toEstimate.lon);
+        }}
+        return copy;
+      }});
+    }}
+
+    function smoothMapLinkLayerOverlay(linkOverlay, options = null) {{
+      const overlay = (linkOverlay && typeof linkOverlay === "object") ? linkOverlay : {{}};
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const smoothedEstimates = smoothMapEstimatedPositions(overlay.estimates, {{
+        updateCache: opts.updateCache !== false,
+      }});
+      return Object.assign({{}}, overlay, {{
+        estimates: smoothedEstimates,
+        lines: smoothMapLinkLineEndpoints(overlay.lines, smoothedEstimates),
+      }});
+    }}
+
     function buildMapLinkEstimateDensityOverlay(linkOverlay, options = null) {{
       const overlay = (linkOverlay && typeof linkOverlay === "object") ? linkOverlay : {{}};
       const lines = Array.isArray(overlay.lines) ? overlay.lines : [];
