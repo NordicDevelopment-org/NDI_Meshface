@@ -1069,6 +1069,11 @@
           : null,
       }});
       setNetworkRoutesPinnedTargetId(targetId);
+      if (ok && typeof startMapLiveTracerouteOverlay === "function") {{
+        startMapLiveTracerouteOverlay(targetId, safePayload, {{
+          sourceId,
+        }});
+      }}
       if (typeof renderChatNodeNavigatorList === "function" && latestState) {{
         renderChatNodeNavigatorList(latestState);
       }}

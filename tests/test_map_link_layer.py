@@ -319,6 +319,8 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "const mapNodeActivityPositionById = new Map();" in js
     assert "const mapNodeActivityDirectionRecords = new Set();" in js
     assert "const mapNodeActivityDirectionMaxRecords = 48;" in js
+    assert "const mapTracePathRecords = new Set();" in js
+    assert "const mapTracePathMaxRecords = 8;" in js
     assert "const mapEstimatedCorridorActivityPathsByKey = new Map();" in js
     assert "const mapNodeTransmitPulseRings = new Set();" in js
     assert "const mapNodeTransmitPulseMaxRings = 72;" in js
@@ -343,6 +345,12 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function ensureMapTransmitPulsePane()" in js
+    assert "function startMapLiveTracerouteOverlay(rawTargetNodeId, payload, options = null)" in js
+    assert "function startMapTracePathAnimation(nodeIds, state = latestState, options = null)" in js
+    assert "function pruneExpiredMapTracePaths(nowMs = Date.now())" in js
+    assert "function clearMapTracePaths()" in js
+    assert "function mapTracePathNodeIds(startNodeId, hops, options = null)" in js
+    assert "function mapTracePathSegmentsForNodeIds(nodeIds, state = latestState)" in js
     assert "function cacheNetworkMapActivityPositions(nodes = [], estimatedPositions = new Map())" in js
     assert 'kind: "estimated",' in js
     assert "cacheNetworkMapActivityPositions(nodes, estimatedPositions);" in js
@@ -365,8 +373,15 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "!!mapLiveActivityEnabled" in js
     assert "const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();" in js
     assert "const activeDirectionCount = pruneExpiredMapNodeActivityDirections();" in js
-    assert "activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0" in js
+    assert "const activeTraceCount = pruneExpiredMapTracePaths();" in js
+    assert "activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0 || activeTraceCount > 0" in js
     assert "mapNodeActivityFlashById.set(nodeId, {" in js
+    assert "mapTracePathRecords.add({" in js
+    assert "while (mapTracePathRecords.size > mapTracePathMaxRecords)" in js
+    assert "dashArray = kind === \"return\" ? \"4 7\" : \"9 6\";" in js
+    assert "startMapTracePathAnimation(towardsPath, safeState, {" in js
+    assert "startMapTracePathAnimation(backPath, safeState, {" in js
+    assert "startMapLiveTracerouteOverlay(targetId, safePayload, {" in js
     assert "const endpoints = mapPacketActivityEndpointIds(packetEntry);" in js
     assert "const signalLevel = mapPacketActivitySignalLevel(packetEntry);" in js
     assert "nodesToRipple.set(" in js

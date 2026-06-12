@@ -732,6 +732,199 @@
       }}
     }}
 
+    function removeMapTracePathRecord(record) {{
+      if (!(record && typeof record === "object")) return;
+      const layers = Array.isArray(record.layers) ? record.layers : [];
+      for (const layer of layers) {{
+        if (layer && map && typeof map.removeLayer === "function") {{
+          try {{
+            map.removeLayer(layer);
+          }} catch (_err) {{
+          }}
+        }}
+      }}
+      mapTracePathRecords.delete(record);
+    }}
+
+    function clearMapTracePaths() {{
+      for (const record of Array.from(mapTracePathRecords)) {{
+        removeMapTracePathRecord(record);
+      }}
+    }}
+
+    function mapTracePathNodeIds(startNodeId, hops, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const localAliasNodeId = normalizeNodeId(opts.localAliasNodeId || "");
+      const fallbackEndNodeId = normalizeNodeId(opts.fallbackEndNodeId || "");
+      const path = [];
+      const appendNode = (rawNodeId) => {{
+        let clean = normalizeNodeId(rawNodeId || "");
+        if (
+          (!clean || clean === "local" || clean === "!local")
+          && isSelectableNodeId(localAliasNodeId)
+        ) {{
+          clean = localAliasNodeId;
+        }}
+        if (!isSelectableNodeId(clean)) return false;
+        if (!path.length || path[path.length - 1] !== clean) {{
+          path.push(clean);
+        }}
+        return true;
+      }};
+      appendNode(startNodeId);
+      for (const hop of (Array.isArray(hops) ? hops : [])) {{
+        const hopNodeId = (hop && typeof hop === "object") ? hop.node : hop;
+        appendNode(hopNodeId);
+      }}
+      if (
+        isSelectableNodeId(fallbackEndNodeId)
+        && fallbackEndNodeId !== (path[path.length - 1] || "")
+      ) {{
+        appendNode(fallbackEndNodeId);
+      }}
+      return path;
+    }}
+
+    function mapTracePathSegmentsForNodeIds(nodeIds, state = latestState) {{
+      const segments = [];
+      let currentSegment = [];
+      for (const rawNodeId of (Array.isArray(nodeIds) ? nodeIds : [])) {{
+        const nodeId = normalizeNodeId(rawNodeId || "");
+        if (!isSelectableNodeId(nodeId)) continue;
+        const position = mapNodeActivityPosition(nodeId, state);
+        const lat = Number(position && position.lat);
+        const lon = Number(position && position.lon);
+        if (!isValidMapCoord(lat, lon)) {{
+          if (currentSegment.length >= 2) {{
+            segments.push(currentSegment);
+          }}
+          currentSegment = [];
+          continue;
+        }}
+        currentSegment.push([lat, lon]);
+      }}
+      if (currentSegment.length >= 2) {{
+        segments.push(currentSegment);
+      }}
+      return segments;
+    }}
+
+    function startMapTracePathAnimation(nodeIds, state = latestState, options = null) {{
+      if (!isNetworkMapActivityFlashVisible()) return false;
+      if (!ensureMapTransmitPulsePane()) return false;
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const segments = mapTracePathSegmentsForNodeIds(nodeIds, safeState);
+      if (!segments.length) return false;
+      const kind = String(opts.kind || "towards").trim().toLowerCase();
+      const color = String(
+        opts.color
+        || (kind === "return" ? "#38bdf8" : "#f59e0b")
+      );
+      const layers = [];
+      const weight = Math.max(1.2, Number(opts.weight) || (kind === "return" ? 3.1 : 3.6));
+      const dashArray = kind === "return" ? "4 7" : "9 6";
+      for (const segment of segments) {{
+        const path = mapActivityNormalizePathPoints(segment);
+        if (path.length < 2) continue;
+        const layer = L.polyline(path, {{
+          pane: mapTransmitPulsePaneName,
+          color,
+          opacity: 0,
+          weight,
+          dashArray,
+          lineCap: "round",
+          lineJoin: "round",
+          interactive: false,
+          bubblingMouseEvents: false,
+        }});
+        layer.addTo(map);
+        layers.push(layer);
+      }}
+      if (!layers.length) return false;
+      const nowMs = Date.now();
+      mapTracePathRecords.add({{
+        layers,
+        kind,
+        color,
+        startedAtMs: nowMs,
+        durationMs: Math.max(1200, Number(opts.durationMs) || 6200),
+        baseOpacity: clampMapLinkValue(Number(opts.opacity) || (kind === "return" ? 0.7 : 0.78), 0.08, 0.9),
+        baseWeight: weight,
+      }});
+      while (mapTracePathRecords.size > mapTracePathMaxRecords) {{
+        const oldest = mapTracePathRecords.values().next().value;
+        removeMapTracePathRecord(oldest);
+      }}
+      for (const rawNodeId of (Array.isArray(nodeIds) ? nodeIds : [])) {{
+        const nodeId = normalizeNodeId(rawNodeId || "");
+        if (!isSelectableNodeId(nodeId)) continue;
+        mapNodeActivityFlashById.set(nodeId, {{
+          startedAtMs: nowMs,
+          untilMs: nowMs + 1800,
+        }});
+      }}
+      scheduleMapNodeActivityFlashUpdate();
+      return true;
+    }}
+
+    function startMapLiveTracerouteOverlay(rawTargetNodeId, payload, options = null) {{
+      if (!isNetworkMapActivityFlashVisible()) return false;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const safePayload = (payload && typeof payload === "object") ? payload : {{}};
+      const result = (safePayload.result && typeof safePayload.result === "object")
+        ? safePayload.result
+        : {{}};
+      const safeState = (latestState && typeof latestState === "object") ? latestState : {{}};
+      const targetId = normalizeNodeId(
+        rawTargetNodeId
+        || safePayload.destination
+        || safePayload.dest
+        || ""
+      );
+      const preferredSourceId = normalizeNodeId(opts.sourceId || "");
+      const resolvedSourceId = normalizeNodeId(
+        preferredSourceId
+        || (typeof resolveNetworkRoutesSourceNodeId === "function" ? resolveNetworkRoutesSourceNodeId(safeState) : "")
+        || resolveLocalNodeId(safeState)
+        || ""
+      );
+      if (!isSelectableNodeId(resolvedSourceId) || !isSelectableNodeId(targetId) || resolvedSourceId === targetId) {{
+        return false;
+      }}
+      const towardsPath = mapTracePathNodeIds(resolvedSourceId, result.towards, {{
+        localAliasNodeId: resolvedSourceId,
+        fallbackEndNodeId: targetId,
+      }});
+      const backStartId = towardsPath.length > 1 ? towardsPath[towardsPath.length - 1] : targetId;
+      const backHops = Array.isArray(result.back) ? result.back : [];
+      const backPath = backHops.length > 0
+        ? mapTracePathNodeIds(backStartId, backHops, {{
+            localAliasNodeId: resolvedSourceId,
+            fallbackEndNodeId: resolvedSourceId,
+          }})
+        : [];
+      let started = false;
+      if (towardsPath.length >= 2) {{
+        started = startMapTracePathAnimation(towardsPath, safeState, {{
+          kind: "towards",
+          color: "#f59e0b",
+          durationMs: 6600,
+          opacity: 0.82,
+        }}) || started;
+      }}
+      if (backPath.length >= 2) {{
+        started = startMapTracePathAnimation(backPath, safeState, {{
+          kind: "return",
+          color: "#38bdf8",
+          durationMs: 5600,
+          opacity: 0.68,
+          weight: 2.9,
+        }}) || started;
+      }}
+      return started;
+    }}
+
     function mapActivityInterpolateLatLng(fromPosition, toPosition, progress) {{
       const t = clampMapLinkValue(Number(progress), 0, 1);
       const fromLat = Number(fromPosition && fromPosition.lat);
@@ -964,6 +1157,47 @@
           fillOpacity: clampMapLinkValue(opacity + 0.18, 0, 0.96),
         }});
         activeCount += 1;
+      }}
+      return activeCount;
+    }}
+
+    function pruneExpiredMapTracePaths(nowMs = Date.now()) {{
+      if (!isNetworkMapActivityFlashVisible()) {{
+        clearMapTracePaths();
+        return 0;
+      }}
+      let activeCount = 0;
+      for (const record of Array.from(mapTracePathRecords)) {{
+        const layers = Array.isArray(record && record.layers) ? record.layers : [];
+        if (!layers.length) {{
+          removeMapTracePathRecord(record);
+          continue;
+        }}
+        const startedAtMs = Number(record.startedAtMs);
+        const durationMs = Math.max(1, Number(record.durationMs) || 6200);
+        const ageMs = nowMs - (Number.isFinite(startedAtMs) ? startedAtMs : nowMs);
+        if (ageMs >= durationMs) {{
+          removeMapTracePathRecord(record);
+          continue;
+        }}
+        const progress = clampMapLinkValue(ageMs / durationMs, 0, 1);
+        const fadeIn = clampMapLinkValue(progress / 0.14, 0, 1);
+        const fadeOut = clampMapLinkValue((1 - progress) / 0.42, 0, 1);
+        const opacity = clampMapLinkValue((Number(record.baseOpacity) || 0.7) * Math.min(fadeIn, fadeOut), 0, 0.9);
+        const weight = Math.max(1, (Number(record.baseWeight) || 3) * (1 - (progress * 0.18)));
+        for (const layer of layers) {{
+          if (!(layer && typeof layer.setStyle === "function")) {{
+            removeMapTracePathRecord(record);
+            break;
+          }}
+          layer.setStyle({{
+            opacity,
+            weight,
+          }});
+        }}
+        if (mapTracePathRecords.has(record)) {{
+          activeCount += 1;
+        }}
       }}
       return activeCount;
     }}
@@ -1709,14 +1943,16 @@
         const activeFlashCount = pruneExpiredMapNodeActivityFlashes();
         const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();
         const activeDirectionCount = pruneExpiredMapNodeActivityDirections();
+        const activeTraceCount = pruneExpiredMapTracePaths();
         refreshMapMarkerStyles();
         if (!isNetworkMapActivityFlashVisible()) {{
           clearMapNodeTransmitPulseRings();
           clearMapNodeActivityDirections();
+          clearMapTracePaths();
           stopMapNodeActivityFlashLoop();
           return;
         }}
-        if (activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0) {{
+        if (activeFlashCount > 0 || activePulseCount > 0 || activeDirectionCount > 0 || activeTraceCount > 0) {{
           scheduleMapNodeActivityFlashUpdate();
         }}
       }});
@@ -1792,6 +2028,7 @@
           mapNodeActivityFlashById.clear();
           clearMapNodeTransmitPulseRings();
           clearMapNodeActivityDirections();
+          clearMapTracePaths();
           stopMapNodeActivityFlashLoop();
         }}
         return;
