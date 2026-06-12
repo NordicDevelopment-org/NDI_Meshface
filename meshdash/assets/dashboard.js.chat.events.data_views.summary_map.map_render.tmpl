@@ -126,6 +126,126 @@
       }};
     }}
 
+    function mapEstimatedLineTrafficValue(line) {{
+      const weight = Math.max(0, Number(line && line.weight) || 0);
+      const sessionWeight = Math.max(0, Number(line && line.sessionWeight) || 0);
+      const sampleCount = Math.max(0, Number(line && line.sampleCount) || 0);
+      return weight + (sessionWeight * 0.65) + (sampleCount * 1.25);
+    }}
+
+    function mapEstimatedLineTrafficPct(line, maxTrafficValue) {{
+      const trafficValue = mapEstimatedLineTrafficValue(line);
+      const maxValue = Math.max(1, Number(maxTrafficValue) || 0, trafficValue);
+      return clampMapLinkValue(Math.log1p(trafficValue) / Math.log1p(maxValue), 0.08, 1);
+    }}
+
+    function mapEstimatedLineCorridorKey(line) {{
+      const fromId = String(line && line.fromId || "").trim().toLowerCase();
+      const toId = String(line && line.toId || "").trim().toLowerCase();
+      if (!fromId || !toId) return "";
+      return fromId < toId ? `${{fromId}}::${{toId}}` : `${{toId}}::${{fromId}}`;
+    }}
+
+    function mergeMapEstimatedLineCorridors(lines) {{
+      if (!Array.isArray(lines) || lines.length <= 0) return [];
+      const corridors = new Map();
+      for (const line of lines) {{
+        const key = mapEstimatedLineCorridorKey(line);
+        if (!key) continue;
+        const trafficValue = mapEstimatedLineTrafficValue(line);
+        const qualityScore = clampMapLinkValue(Number(line && line.qualityScore), 0.08, 0.98);
+        const lastSeenUnix = Number(line && line.lastSeenUnix) || 0;
+        const existing = corridors.get(key);
+        if (!existing) {{
+          corridors.set(key, Object.assign({{}}, line, {{
+            key: `corridor::${{key}}`,
+            renderCorridorKey: key,
+            renderTrafficValue: trafficValue,
+            renderQualityWeight: Math.max(0.1, trafficValue),
+            renderQualityTotal: qualityScore * Math.max(0.1, trafficValue),
+          }}));
+          continue;
+        }}
+
+        const existingTraffic = Number(existing.renderTrafficValue) || 0;
+        const nextTraffic = existingTraffic + trafficValue;
+        const qualityWeight = Math.max(0.1, trafficValue);
+        existing.renderTrafficValue = nextTraffic;
+        existing.renderQualityWeight = (Number(existing.renderQualityWeight) || 0) + qualityWeight;
+        existing.renderQualityTotal = (Number(existing.renderQualityTotal) || 0) + (qualityScore * qualityWeight);
+        existing.qualityScore = clampMapLinkValue(
+          (Number(existing.renderQualityTotal) || 0) / Math.max(0.1, Number(existing.renderQualityWeight) || 0),
+          0.08,
+          0.98
+        );
+        existing.weight = Math.max(Number(existing.weight) || 0, Number(line && line.weight) || 0);
+        existing.sessionWeight = Math.max(Number(existing.sessionWeight) || 0, Number(line && line.sessionWeight) || 0);
+        existing.sampleCount = Math.max(Number(existing.sampleCount) || 0, Number(line && line.sampleCount) || 0);
+        existing.lastSeenUnix = Math.max(Number(existing.lastSeenUnix) || 0, lastSeenUnix);
+        if (String(line && line.mode || "history").trim().toLowerCase() === "live") {{
+          existing.mode = "live";
+        }}
+      }}
+      return Array.from(corridors.values());
+    }}
+
+    function mapEstimatedLinkRenderScore(line, nowUnix) {{
+      const mode = String((line && line.mode) || "history").trim().toLowerCase() === "live"
+        ? "live"
+        : "history";
+      const qualityScore = clampMapLinkValue(Number(line && line.qualityScore), 0.08, 0.98);
+      const trafficValue = Math.max(
+        Number(line && line.renderTrafficValue) || 0,
+        mapEstimatedLineTrafficValue(line)
+      );
+      const lastSeenUnix = Number(line && line.lastSeenUnix);
+      const ageSeconds = Number.isFinite(lastSeenUnix) && lastSeenUnix > 0
+        ? Math.max(0, nowUnix - lastSeenUnix)
+        : Number.POSITIVE_INFINITY;
+      const recencyScore = Number.isFinite(ageSeconds)
+        ? clampMapLinkValue(1 - (ageSeconds / (60 * 60 * 6)), 0, 1)
+        : 0;
+      return (
+        (Math.log1p(trafficValue) * 2.2)
+        + (qualityScore * 0.38)
+        + (recencyScore * 0.2)
+        + (mode === "live" ? 0.08 : 0)
+      );
+    }}
+
+    function selectMapEstimatedLinesForRender(lines, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const maxLines = Math.max(0, Math.trunc(Number(opts.maxLines) || 18));
+      if (maxLines <= 0 || !Array.isArray(lines) || lines.length <= 0) return [];
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const validLines = lines.filter((line) => (
+        line
+        && isValidMapCoord(Number(line.fromLat), Number(line.fromLon))
+        && isValidMapCoord(Number(line.toLat), Number(line.toLon))
+      ));
+      const corridorLines = mergeMapEstimatedLineCorridors(validLines);
+      const maxTrafficValue = corridorLines.reduce((maxValue, line) => (
+        Math.max(maxValue, Number(line && line.renderTrafficValue) || mapEstimatedLineTrafficValue(line))
+      ), 0);
+      const rankedLines = corridorLines
+        .map((line, index) => ({{
+          line: Object.assign({{}}, line, {{
+            renderTrafficPct: mapEstimatedLineTrafficPct(line, maxTrafficValue),
+          }}),
+          index,
+          score: mapEstimatedLinkRenderScore(line, nowUnix),
+        }}))
+        .sort((a, b) => (
+          (b.score - a.score)
+          || ((Number(b.line && b.line.renderTrafficValue) || 0) - (Number(a.line && a.line.renderTrafficValue) || 0))
+          || (a.index - b.index)
+        ));
+      if (rankedLines.length <= maxLines) return rankedLines.map((entry) => entry.line);
+      return rankedLines
+        .slice(0, maxLines)
+        .map((entry) => entry.line);
+    }}
+
     function refreshNetworkMapAfterLegendControlChange() {{
       updateMapPacketLinesControl();
       updateMapLinkLayerControl();
@@ -293,7 +413,13 @@
       const cloudLinks = (linkDensity && Array.isArray(linkDensity.cloudLinks))
         ? linkDensity.cloudLinks
         : [];
-      const estimatedCount = cloudLinks.length > 0 ? cloudLinks.length : lines.length;
+      const rawRenderedEstimatedLineCount = Number(linkOverlay && linkOverlay.renderedEstimatedLineCount);
+      const renderedEstimatedLineCount = Number.isFinite(rawRenderedEstimatedLineCount)
+        ? Math.max(0, Math.trunc(rawRenderedEstimatedLineCount))
+        : -1;
+      const estimatedCount = renderedEstimatedLineCount >= 0
+        ? renderedEstimatedLineCount
+        : (cloudLinks.length > 0 ? cloudLinks.length : lines.length);
       const modeParts = mapLinkLayerModeParts(mapLinkLayerMode);
       const estimatedLinksEnabled = !!modeParts.estimatedLinks;
       const signalHeatModeConfig = resolveSignalHeatModeConfig();
@@ -353,16 +479,16 @@
             <span class="map-link-legend-name">Estimated nodes${{hideLinkedDots ? " (hidden)" : ""}}</span>
             <span class="map-link-legend-count">${{linkedCount}}</span>
           </label>
-          <label class="map-link-legend-item is-toggle" style="--map-link-legend-color:#bf1f43;" title="Show packet lines between positioned nodes">
+          <label class="map-link-legend-item is-toggle" style="--map-link-legend-color:#bf1f43;" title="Show confirmed packet lines between positioned nodes">
             <input class="map-link-legend-input" type="checkbox" data-map-link-legend-toggle="packet"${{mapPacketLinesEnabled ? " checked" : ""}} aria-label="Show real links" />
             <span class="map-link-legend-swatch is-packet-line" aria-hidden="true"></span>
             <span class="map-link-legend-name">Real links</span>
             <span class="map-link-legend-count">${{packetCount}}</span>
           </label>
-          <label class="map-link-legend-item is-toggle" style="--map-link-legend-color:#5fa4ff;" title="Show estimated links built from history and/or live evidence.">
+          <label class="map-link-legend-item is-toggle" style="--map-link-legend-color:#5fa4ff;" title="Show the most-used estimated paths built from history and live evidence.">
             <input class="map-link-legend-input" type="checkbox" data-map-link-legend-toggle="estimated"${{estimatedLinksEnabled ? " checked" : ""}} aria-label="Show estimated links" />
             <span class="map-link-legend-swatch is-link-heat" aria-hidden="true"></span>
-            <span class="map-link-legend-name">Estimated links</span>
+            <span class="map-link-legend-name">Common paths</span>
             <span class="map-link-legend-count">${{estimatedCount}}</span>
           </label>
         </div>
@@ -598,7 +724,7 @@
           && linkDensity.enabled
           && estimatedCloudsEnabled
         );
-        const estimateLinesToRender = showEstimatedLinks
+        const estimateLinesAvailable = showEstimatedLinks
           ? (
             useCloudConsolidation
               ? (
@@ -617,6 +743,11 @@
               )
           )
           : [];
+        const estimateLinesToRender = selectMapEstimatedLinesForRender(estimateLinesAvailable, {{
+          maxLines: 18,
+        }});
+        linkOverlay.renderedEstimatedLineCount = estimateLinesToRender.length;
+        linkOverlay.availableEstimatedLineCount = estimateLinesAvailable.length;
         const hideEstimatedLinkDots = !!(
           linkDensity
           && linkDensity.hideEstimatedMarkers
@@ -656,6 +787,7 @@
             .filter(([nodeId, caps]) => isSelectableNodeId(nodeId) && caps && typeof caps === "object")
         );
         cacheNetworkMapActivityPositions(nodes, estimatedPositions);
+        cacheMapEstimatedCorridorActivityPaths(estimateLinesToRender);
         const nowUnix = Math.floor(Date.now() / 1000);
         const seenNodeIds = new Set();
 
@@ -927,6 +1059,9 @@
               ? "live"
               : "history";
             const qualityScore = clampMapLinkValue(Number(estimateLine && estimateLine.qualityScore), 0.08, 0.98);
+            const trafficPct = clampMapLinkValue(Number(estimateLine && estimateLine.renderTrafficPct), 0.08, 1);
+            const trafficValue = Math.max(0, Number(estimateLine && estimateLine.renderTrafficValue) || mapEstimatedLineTrafficValue(estimateLine));
+            const trafficLabel = Math.max(0, Math.round(trafficValue));
             const estimatedEndpoints = Math.max(1, Math.trunc(Number(estimateLine && estimateLine.estimatedEndpoints) || 1));
             const lastSeenUnix = Number(estimateLine && estimateLine.lastSeenUnix);
             const ageLabel = Number.isFinite(lastSeenUnix) && lastSeenUnix > 0
@@ -948,6 +1083,8 @@
             lineHash = hashMixInt(lineHash, Math.round(Number(estimateLine && estimateLine.desiredDistanceKm) * 10));
             lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.weight) || 0);
             lineHash = hashMixInt(lineHash, Number(estimateLine && estimateLine.sessionWeight) || 0);
+            lineHash = hashMixInt(lineHash, Math.round(trafficPct * 1000));
+            lineHash = hashMixInt(lineHash, Math.round(trafficValue));
             lineHash = hashMixStr(lineHash, lineMode);
             lineHash = hashMixStr(
               lineHash,
@@ -1005,18 +1142,18 @@
                       : (estimatedEndpoints >= 2 ? "4 7" : "8 6")
                   ),
                 opacity: isCloudLink
-                  ? (0.34 + (qualityScore * 0.4))
+                  ? (0.14 + (qualityScore * 0.13) + (trafficPct * 0.34))
                   : (
                     lineMode === "live"
-                      ? (0.22 + (qualityScore * 0.28))
-                      : (0.18 + (qualityScore * 0.26))
+                      ? (0.12 + (qualityScore * 0.1) + (trafficPct * 0.34))
+                      : (0.1 + (qualityScore * 0.08) + (trafficPct * 0.3))
                   ),
                 weight: isCloudLink
-                  ? (2.2 + (qualityScore * 2.6) + Math.min(1.8, (Number(estimateLine && estimateLine.sampleCount) || 0) * 0.12))
+                  ? (0.9 + (qualityScore * 0.9) + (trafficPct * 2.6))
                   : (
                     lineMode === "live"
-                      ? (2.2 + (qualityScore * 2.4))
-                      : (1.2 + (qualityScore * 1.4))
+                      ? (0.8 + (qualityScore * 0.6) + (trafficPct * 2.8))
+                      : (0.75 + (qualityScore * 0.45) + (trafficPct * 2.3))
                   ),
                 lineCap: "round",
                 lineJoin: "round",
@@ -1031,6 +1168,7 @@
                 <b>Cloud link (${{lineMode === "live" ? "live" : "history"}})</b><br/>
                 Cloud: ${{cloudId}} (${{cloudNodeCount}} unknown node${{cloudNodeCount === 1 ? "" : "s"}})<br/>
                 Known node: ${{estimateLine.toId}}<br/>
+                Traffic: ${{trafficLabel}} weighted packet${{trafficLabel === 1 ? "" : "s"}}<br/>
                 Samples: ${{sampleCount}}<br/>
                 Quality: ${{Math.round(qualityScore * 100)}}%
               `, {{ sticky: true, opacity: 0.9 }});
@@ -1038,6 +1176,7 @@
                 <b>Cloud link (${{lineMode === "live" ? "live" : "history"}})</b><br/>
                 Cloud: ${{cloudId}} (${{cloudNodeCount}} unknown node${{cloudNodeCount === 1 ? "" : "s"}})<br/>
                 Known node: ${{estimateLine.toId}}<br/>
+                Traffic: ${{trafficLabel}} weighted packet${{trafficLabel === 1 ? "" : "s"}}<br/>
                 Samples: ${{sampleCount}}<br/>
                 Quality: ${{Math.round(qualityScore * 100)}}%<br/>
                 Cloud->node span: ${{estimateLine.desiredDistanceKm}} km<br/>
@@ -1050,12 +1189,14 @@
               line.bindTooltip(`
                 <b>Link layer (${{lineMode === "live" ? "live" : "history"}})</b><br/>
                 ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
+                Traffic: ${{trafficLabel}} weighted packet${{trafficLabel === 1 ? "" : "s"}}<br/>
                 Quality: ${{Math.round(qualityScore * 100)}}%<br/>
                 Target span: ${{estimateLine.desiredDistanceKm}} km
               `, {{ sticky: true, opacity: 0.9 }});
               line.bindPopup(`
                 <b>Link layer (${{lineMode === "live" ? "live" : "history"}})</b><br/>
                 Nodes: ${{estimateLine.fromId}} <-> ${{estimateLine.toId}}<br/>
+                Traffic: ${{trafficLabel}} weighted packet${{trafficLabel === 1 ? "" : "s"}}<br/>
                 Estimated endpoints: ${{estimatedEndpoints}}<br/>
                 Quality: ${{Math.round(qualityScore * 100)}}%<br/>
                 Target span: ${{estimateLine.desiredDistanceKm}} km<br/>

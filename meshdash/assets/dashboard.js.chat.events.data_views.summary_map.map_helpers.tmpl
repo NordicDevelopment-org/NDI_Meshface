@@ -657,6 +657,166 @@
       ];
     }}
 
+    function mapActivityCorridorKey(fromNodeId, toNodeId) {{
+      const fromKey = String(fromNodeId || "").trim().toLowerCase();
+      const toKey = String(toNodeId || "").trim().toLowerCase();
+      if (!fromKey || !toKey || fromKey === toKey) return "";
+      return fromKey < toKey ? `${{fromKey}}::${{toKey}}` : `${{toKey}}::${{fromKey}}`;
+    }}
+
+    function mapActivityNormalizePathPoints(path) {{
+      const points = [];
+      for (const point of (Array.isArray(path) ? path : [])) {{
+        const lat = Array.isArray(point) ? Number(point[0]) : Number(point && point.lat);
+        const lon = Array.isArray(point) ? Number(point[1]) : Number(point && (point.lng ?? point.lon));
+        if (isValidMapCoord(lat, lon)) {{
+          points.push([lat, lon]);
+        }}
+      }}
+      return points;
+    }}
+
+    function mapActivityPathMetrics(path) {{
+      const points = mapActivityNormalizePathPoints(path);
+      const distances = [0];
+      let total = 0;
+      for (let index = 1; index < points.length; index += 1) {{
+        const previous = points[index - 1];
+        const current = points[index];
+        const distance = mapEstimatedPositionDistanceMeters(
+          {{ lat: previous[0], lon: previous[1] }},
+          {{ lat: current[0], lon: current[1] }}
+        );
+        total += Number.isFinite(distance) ? Math.max(0, distance) : 0;
+        distances.push(total);
+      }}
+      return {{ points, distances, total }};
+    }}
+
+    function mapActivityPathPointAtDistance(metrics, targetDistance) {{
+      const points = Array.isArray(metrics && metrics.points) ? metrics.points : [];
+      const distances = Array.isArray(metrics && metrics.distances) ? metrics.distances : [];
+      if (points.length <= 0) return null;
+      if (points.length === 1 || !(Number(metrics && metrics.total) > 0)) {{
+        return points[0];
+      }}
+      const target = clampMapLinkValue(Number(targetDistance), 0, Number(metrics.total));
+      for (let index = 1; index < points.length; index += 1) {{
+        const startDistance = Number(distances[index - 1]) || 0;
+        const endDistance = Number(distances[index]) || startDistance;
+        if (target > endDistance && index < points.length - 1) continue;
+        const segmentDistance = Math.max(0, endDistance - startDistance);
+        const localProgress = segmentDistance > 0 ? ((target - startDistance) / segmentDistance) : 1;
+        return mapActivityInterpolateLatLng(
+          {{ lat: points[index - 1][0], lon: points[index - 1][1] }},
+          {{ lat: points[index][0], lon: points[index][1] }},
+          localProgress
+        );
+      }}
+      return points[points.length - 1];
+    }}
+
+    function mapActivityPathSlice(path, startProgress, endProgress) {{
+      const metrics = mapActivityPathMetrics(path);
+      const points = metrics.points;
+      if (points.length <= 0) return [];
+      if (points.length === 1 || !(metrics.total > 0)) return [points[0]];
+      const startDistance = clampMapLinkValue(Number(startProgress), 0, 1) * metrics.total;
+      const endDistance = clampMapLinkValue(Number(endProgress), 0, 1) * metrics.total;
+      const fromDistance = Math.min(startDistance, endDistance);
+      const toDistance = Math.max(startDistance, endDistance);
+      const slice = [];
+      const appendPoint = (point) => {{
+        if (!Array.isArray(point) || point.length < 2) return;
+        const last = slice[slice.length - 1];
+        if (
+          last
+          && Math.abs(Number(last[0]) - Number(point[0])) < 1e-9
+          && Math.abs(Number(last[1]) - Number(point[1])) < 1e-9
+        ) {{
+          return;
+        }}
+        slice.push([Number(point[0]), Number(point[1])]);
+      }};
+      appendPoint(mapActivityPathPointAtDistance(metrics, fromDistance));
+      for (let index = 1; index < points.length - 1; index += 1) {{
+        const distance = Number(metrics.distances[index]) || 0;
+        if (distance > fromDistance && distance < toDistance) {{
+          appendPoint(points[index]);
+        }}
+      }}
+      appendPoint(mapActivityPathPointAtDistance(metrics, toDistance));
+      return slice.length > 0 ? slice : [points[0]];
+    }}
+
+    function cacheMapEstimatedCorridorActivityPaths(estimateLines = []) {{
+      mapEstimatedCorridorActivityPathsByKey.clear();
+      const addPath = (fromNodeId, toNodeId, path, line = null) => {{
+        const fromId = normalizeNodeId(fromNodeId || "");
+        const toId = normalizeNodeId(toNodeId || "");
+        if (!isSelectableNodeId(fromId) || !isSelectableNodeId(toId) || fromId === toId) return;
+        const normalizedPath = mapActivityNormalizePathPoints(path);
+        if (normalizedPath.length < 2) return;
+        const key = mapActivityCorridorKey(fromId, toId);
+        if (!key) return;
+        mapEstimatedCorridorActivityPathsByKey.set(key, {{
+          fromId,
+          toId,
+          path: normalizedPath,
+          trafficPct: clampMapLinkValue(Number(line && line.renderTrafficPct), 0.08, 1),
+        }});
+      }};
+
+      for (const estimateLine of (Array.isArray(estimateLines) ? estimateLines : [])) {{
+        const fromId = normalizeNodeId(estimateLine && estimateLine.fromId);
+        const toId = normalizeNodeId(estimateLine && estimateLine.toId);
+        const fromLat = Number(estimateLine && estimateLine.fromLat);
+        const fromLon = Number(estimateLine && estimateLine.fromLon);
+        const toLat = Number(estimateLine && estimateLine.toLat);
+        const toLon = Number(estimateLine && estimateLine.toLon);
+        if (!isValidMapCoord(fromLat, fromLon) || !isValidMapCoord(toLat, toLon)) continue;
+        const basePath = [[fromLat, fromLon], [toLat, toLon]];
+        addPath(fromId, toId, basePath, estimateLine);
+
+        if (!(estimateLine && estimateLine.cloudLink)) continue;
+        const knownNodeId = normalizeNodeId(estimateLine.toId || "");
+        if (!isSelectableNodeId(knownNodeId)) continue;
+        const cloudPoint = [fromLat, fromLon];
+        const knownPoint = [toLat, toLon];
+        for (const rawMemberNodeId of (Array.isArray(estimateLine.cloudNodeIds) ? estimateLine.cloudNodeIds : [])) {{
+          const memberNodeId = normalizeNodeId(rawMemberNodeId || "");
+          if (!isSelectableNodeId(memberNodeId) || memberNodeId === knownNodeId) continue;
+          const memberPosition = mapNodeActivityPosition(memberNodeId);
+          const memberPoint = (
+            memberPosition
+            && isValidMapCoord(Number(memberPosition.lat), Number(memberPosition.lon))
+          )
+            ? [Number(memberPosition.lat), Number(memberPosition.lon)]
+            : cloudPoint;
+          addPath(memberNodeId, knownNodeId, [memberPoint, cloudPoint, knownPoint], estimateLine);
+        }}
+      }}
+      return mapEstimatedCorridorActivityPathsByKey.size;
+    }}
+
+    function mapPacketActivityCorridorPath(fromNodeId, toNodeId) {{
+      const fromId = normalizeNodeId(fromNodeId || "");
+      const toId = normalizeNodeId(toNodeId || "");
+      const key = mapActivityCorridorKey(fromId, toId);
+      if (!key) return null;
+      const corridor = mapEstimatedCorridorActivityPathsByKey.get(key);
+      if (!(corridor && Array.isArray(corridor.path) && corridor.path.length >= 2)) return null;
+      const path = mapActivityNormalizePathPoints(corridor.path);
+      if (path.length < 2) return null;
+      if (normalizeNodeId(corridor.fromId) === fromId && normalizeNodeId(corridor.toId) === toId) {{
+        return path;
+      }}
+      if (normalizeNodeId(corridor.fromId) === toId && normalizeNodeId(corridor.toId) === fromId) {{
+        return path.slice().reverse();
+      }}
+      return path;
+    }}
+
     function removeMapNodeActivityDirection(record) {{
       if (!(record && typeof record === "object")) return;
       for (const layer of [record.line, record.head]) {{
@@ -698,14 +858,15 @@
         }}
         const progress = clampMapLinkValue(ageMs / durationMs, 0, 1);
         const tailProgress = clampMapLinkValue(progress - 0.22, 0, 1);
-        const tailPoint = mapActivityInterpolateLatLng(record.fromPosition, record.toPosition, tailProgress);
-        const headPoint = mapActivityInterpolateLatLng(record.fromPosition, record.toPosition, progress);
+        const animatedPath = mapActivityPathSlice(record.path, tailProgress, progress);
+        const headPoint = animatedPath[animatedPath.length - 1]
+          || mapActivityInterpolateLatLng(record.fromPosition, record.toPosition, progress);
         const signalLevel = clampMapLinkValue(Number(record.signalLevel), 0, 1);
         const fadeIn = clampMapLinkValue(progress / 0.18, 0, 1);
         const fadeOut = clampMapLinkValue((1 - progress) / 0.22, 0, 1);
         const opacity = clampMapLinkValue((0.28 + (signalLevel * 0.5)) * Math.min(fadeIn, fadeOut), 0, 0.86);
         const weight = 2.2 + (signalLevel * 2.2);
-        line.setLatLngs([tailPoint, headPoint]);
+        line.setLatLngs(animatedPath.length >= 2 ? animatedPath : [headPoint, headPoint]);
         line.setStyle({{
           opacity,
           weight,
@@ -730,9 +891,13 @@
       const toPosition = mapNodeActivityPosition(toId, state);
       if (!fromPosition || !toPosition) return false;
       if (!isValidMapCoord(fromPosition.lat, fromPosition.lon) || !isValidMapCoord(toPosition.lat, toPosition.lon)) return false;
+      const corridorPath = mapPacketActivityCorridorPath(fromId, toId);
+      const animationPath = Array.isArray(corridorPath) && corridorPath.length >= 2
+        ? corridorPath
+        : [[fromPosition.lat, fromPosition.lon], [toPosition.lat, toPosition.lon]];
       const color = mapNodeTransmitPulseColor(fromId, state);
       const signal = clampMapLinkValue(Number(signalLevel), 0, 1);
-      const fromPoint = [fromPosition.lat, fromPosition.lon];
+      const fromPoint = animationPath[0];
       const line = L.polyline([fromPoint, fromPoint], {{
         pane: mapTransmitPulsePaneName,
         color,
@@ -763,6 +928,7 @@
         toId,
         fromPosition,
         toPosition,
+        path: animationPath,
         signalLevel: signal,
         startedAtMs: Date.now(),
         durationMs: 920,
@@ -1964,6 +2130,7 @@
           id: cloudId,
           lat: centerLL.lat,
           lon: centerLL.lon,
+          nodeIds: members.map((member) => member.nodeId),
           nodeCount: members.length,
           avgConfidence: clampMapLinkValue(confidenceTotal / Math.max(1, members.length), 0, 1),
           radiusMeters: cloudRadiusMeters,
@@ -2117,6 +2284,7 @@
           avgRssi: agg.rssiWeight > 0 ? Math.round((agg.rssiWeighted / agg.rssiWeight) * 100) / 100 : null,
           cloudLink: true,
           cloudId: agg.cloudId,
+          cloudNodeIds: Array.isArray(cloud.nodeIds) ? cloud.nodeIds.slice() : [],
           clusterNodeCount: cloud.nodeCount,
           sampleCount: agg.sampleCount,
         }});

@@ -59,7 +59,8 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert 'other: true,' in js
     assert 'let nodePacketSeriesEnabled = { ...nodePacketSeriesDefaults };' in js
     assert "function normalizeNodePacketSeries(raw) {" in js
-    assert 'const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV1";' in js
+    assert 'const mapPacketLinesStorageKey = "meshDashboardMapPacketLinesEnabledV2";' in js
+    assert "let mapPacketLinesEnabled = false;" in js
     assert 'const mapLinkModeStorageKey = "meshDashboardMapLinkModeV1";' in js
     assert 'const mapLiveActivityStorageKey = "meshDashboardMapLiveActivityEnabledV1";' in js
     assert "function updateMapPacketLinesControl()" in js
@@ -74,6 +75,12 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function bindMapLiveActivityControl()" in js
     assert "let mapLinkLegendOffsetRaf = null;" in js
     assert "function mapLinkLayerModeParts(modeName = mapLinkLayerMode)" in js
+    assert "function mapEstimatedLineTrafficValue(line)" in js
+    assert "function mapEstimatedLineTrafficPct(line, maxTrafficValue)" in js
+    assert "function mapEstimatedLineCorridorKey(line)" in js
+    assert "function mergeMapEstimatedLineCorridors(lines)" in js
+    assert "function selectMapEstimatedLinesForRender(lines, options = null)" in js
+    assert "function mapEstimatedLinkRenderScore(line, nowUnix)" in js
     assert 'estimated: mode !== "none",' in js
     assert "function renderMapLinkLegend(nodes = [], rawEdges = [], estimatedPositions = new Map(), linkOverlay = null)" in js
     assert "function bindMapLinkLegendControls(legend)" in js
@@ -84,7 +91,7 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "Estimate heatmap" in js
     assert "const signalHeatLegendHtml = signalHeatPointCount > 0" in js
     assert "const estimatedCloudHeatLegendHtml = showEstimatedCloudHeat" in js
-    assert "Estimated links" in js
+    assert "Common paths" in js
     assert 'renderMapLinkLegend(nodes, mapRenderEdges, estimatedPositions, linkOverlay);' in js
     assert 'mapElement.style.setProperty("--map-link-legend-space"' in js
     assert "networkSubviewUsesMap(activeNetworkSubview)" in js
@@ -119,6 +126,11 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "rawLon: targetLon," in js
     assert "copy.fromLat = Number(fromEstimate.lat);" in js
     assert "copy.toLat = Number(toEstimate.lat);" in js
+    assert "const estimateLinesToRender = selectMapEstimatedLinesForRender(estimateLinesAvailable, {" in js
+    assert "linkOverlay.renderedEstimatedLineCount = estimateLinesToRender.length;" in js
+    assert "renderTrafficPct: mapEstimatedLineTrafficPct(line, maxTrafficValue)," in js
+    assert "key: `corridor::${key}`," in js
+    assert "Traffic: ${trafficLabel} weighted packet" in js
     assert "const signalHeatmapGradientCoverage = {" in js
     assert "const signalHeatmapGradientLiveContrast = {" in js
     assert "function resolveSignalHeatGradient(mode = signalHeatmapMode) {" in js
@@ -307,6 +319,7 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "const mapNodeActivityPositionById = new Map();" in js
     assert "const mapNodeActivityDirectionRecords = new Set();" in js
     assert "const mapNodeActivityDirectionMaxRecords = 48;" in js
+    assert "const mapEstimatedCorridorActivityPathsByKey = new Map();" in js
     assert "const mapNodeTransmitPulseRings = new Set();" in js
     assert "const mapNodeTransmitPulseMaxRings = 72;" in js
     assert 'const mapTransmitPulsePaneName = "mapTransmitPulsePane";' in js
@@ -329,11 +342,15 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert 'kind: "estimated",' in js
     assert "cacheNetworkMapActivityPositions(nodes, estimatedPositions);" in js
     assert "function mapNodeActivityPosition(nodeId, state = latestState)" in js
+    assert "function cacheMapEstimatedCorridorActivityPaths(estimateLines = [])" in js
+    assert "function mapPacketActivityCorridorPath(fromNodeId, toNodeId)" in js
+    assert "function mapActivityPathSlice(path, startProgress, endProgress)" in js
     assert "function startMapNodeTransmitRipple(nodeId, state = latestState, signalLevel = 0.55)" in js
     assert "function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now())" in js
     assert "function startMapPacketDirectionAnimation(fromNodeId, toNodeId, state = latestState, signalLevel = 0.55)" in js
     assert "function pruneExpiredMapNodeActivityDirections(nowMs = Date.now())" in js
-    assert "line.setLatLngs([tailPoint, headPoint]);" in js
+    assert "const animatedPath = mapActivityPathSlice(record.path, tailProgress, progress);" in js
+    assert "line.setLatLngs(animatedPath.length >= 2 ? animatedPath : [headPoint, headPoint]);" in js
     assert "head.setLatLng(headPoint);" in js
     assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
@@ -349,6 +366,9 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     assert "nodesToRipple.set(" in js
     assert "Math.max(Number(prevSignalLevel), signalLevel)" in js
     assert "directionsToAnimate.push({ fromId: endpoints.fromId, toId: endpoints.toId, signalLevel });" in js
+    assert "cacheMapEstimatedCorridorActivityPaths(estimateLinesToRender);" in js
+    assert "const corridorPath = mapPacketActivityCorridorPath(fromId, toId);" in js
+    assert "path: animationPath," in js
     assert "startMapNodeTransmitRipple(nodeId, safeState, signalLevel);" in js
     assert "startMapPacketDirectionAnimation(direction.fromId, direction.toId, safeState, direction.signalLevel);" in js
     assert "pane: mapTransmitPulsePaneName," in js
