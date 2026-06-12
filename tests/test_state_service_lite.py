@@ -10,6 +10,7 @@ from meshdash.state_service import (
     _slim_recent_packets_for_network_graph,
 )
 from meshdash.state_summary import apply_node_historical_names
+from meshdash.state_summary import apply_node_link_counts, apply_node_position_counts
 
 
 def test_slim_recent_packets_drops_raw_packet_blob_but_keeps_ui_fields() -> None:
@@ -173,6 +174,44 @@ def test_apply_node_historical_names_prefers_custom_history_over_generic_live_na
     assert rows[1]["long_name"] == "Current Custom Name"
 
 
+def test_apply_node_link_and_position_counts_populates_sort_fields() -> None:
+    rows = [
+        {"id": "!aa000001"},
+        {"id": "!bb000002"},
+        {"id": "!cc000003"},
+    ]
+
+    apply_node_position_counts(
+        rows,
+        {
+            "!aa000001": {
+                "position_points": 7,
+                "position_last_seen_unix": 1770000000,
+                "position_last_seen": "2026-02-03 09:20:00Z",
+            },
+            "!cc000003": {"position_points": 2},
+        },
+    )
+    apply_node_link_counts(
+        rows,
+        [
+            {"from": "!aa000001", "to": "!bb000002", "lifetime_count": 4},
+            {"from": "!aa000001", "to": "!cc000003", "session_count": 3},
+            {"from": "!bb000002", "to": "!cc000003", "count": 2},
+        ],
+    )
+
+    by_id = {row["id"]: row for row in rows}
+    assert by_id["!aa000001"]["position_points"] == 7
+    assert by_id["!aa000001"]["position_last_seen_unix"] == 1770000000
+    assert by_id["!aa000001"]["link_count"] == 2
+    assert by_id["!aa000001"]["link_packet_count"] == 7
+    assert by_id["!bb000002"]["position_points"] == 0
+    assert by_id["!bb000002"]["link_count"] == 2
+    assert by_id["!bb000002"]["link_packet_count"] == 6
+    assert by_id["!cc000003"]["position_points"] == 2
+
+
 def test_slim_recent_packets_caps_lite_buffer_length() -> None:
     recent_packets = [
         {
@@ -323,6 +362,10 @@ def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
                 "first_seen_unix": 5,
                 "last_heard": "2026-04-15 00:00:10Z",
                 "last_heard_unix": 10,
+                "link_count": 3,
+                "link_packet_count": 42,
+                "position_last_seen_unix": 9,
+                "position_points": 6,
                 "role": "CLIENT",
             }
         ]
@@ -335,6 +378,10 @@ def test_slim_nodes_for_chat_drops_unused_heavy_fields() -> None:
             "long_name": "Alpha",
             "first_seen_unix": 5,
             "last_heard_unix": 10,
+            "link_count": 3,
+            "link_packet_count": 42,
+            "position_last_seen_unix": 9,
+            "position_points": 6,
             "role": "CLIENT",
         }
     ]

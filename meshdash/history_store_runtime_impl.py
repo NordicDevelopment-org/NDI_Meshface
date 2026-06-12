@@ -25,6 +25,7 @@ from .history_store_link_edges import (
 from .history_store_nodes import (
     load_node_capabilities as _load_node_capabilities_helper,
     load_node_history as _load_node_history_helper,
+    load_node_position_counts as _load_node_position_counts_helper,
     load_node_saved_counts as _load_node_saved_counts_helper,
     load_online_activity as _load_online_activity_helper,
 )
@@ -189,6 +190,9 @@ class HistoryStore:
 
     def load_node_saved_counts(self) -> dict[str, dict[str, object]]:
         return _load_node_saved_counts_helper(self)
+
+    def load_node_position_counts(self) -> dict[str, dict[str, object]]:
+        return _load_node_position_counts_helper(self)
 
     def load_node_capabilities(self) -> dict[str, dict[str, object]]:
         return _load_node_capabilities_helper(self)

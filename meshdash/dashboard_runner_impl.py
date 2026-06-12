@@ -47,7 +47,11 @@ from .runtime_types import (
     ToIntFn,
     UtcNowFn,
 )
-from .state_summary import apply_node_historical_names, apply_node_saved_counts
+from .state_summary import (
+    apply_node_historical_names,
+    apply_node_position_counts,
+    apply_node_saved_counts,
+)
 
 
 @dataclass(frozen=True)
@@ -194,8 +198,13 @@ def _cached_history_node_rows(
         return [], {}
 
     load_capabilities_fn = getattr(history_store, "load_node_capabilities", None)
+    load_position_counts_fn = getattr(history_store, "load_node_position_counts", None)
     load_saved_counts_fn = getattr(history_store, "load_node_saved_counts", None)
-    if not callable(load_capabilities_fn) and not callable(load_saved_counts_fn):
+    if (
+        not callable(load_capabilities_fn)
+        and not callable(load_position_counts_fn)
+        and not callable(load_saved_counts_fn)
+    ):
         return [], {}
 
     try:
@@ -206,6 +215,10 @@ def _cached_history_node_rows(
         raw_saved_counts = load_saved_counts_fn() if callable(load_saved_counts_fn) else {}
     except Exception:
         raw_saved_counts = {}
+    try:
+        raw_position_counts = load_position_counts_fn() if callable(load_position_counts_fn) else {}
+    except Exception:
+        raw_position_counts = {}
 
     caps_by_id = {
         str(node_id or "").strip(): dict(caps)
@@ -217,9 +230,14 @@ def _cached_history_node_rows(
         for node_id, stats in (raw_saved_counts.items() if isinstance(raw_saved_counts, Mapping) else [])
         if str(node_id or "").strip() and isinstance(stats, Mapping)
     }
+    position_counts = {
+        str(node_id or "").strip(): dict(stats)
+        for node_id, stats in (raw_position_counts.items() if isinstance(raw_position_counts, Mapping) else [])
+        if str(node_id or "").strip() and isinstance(stats, Mapping)
+    }
 
     rows: list[dict[str, object]] = []
-    for node_id in sorted(set(caps_by_id) | set(saved_counts)):
+    for node_id in sorted(set(caps_by_id) | set(saved_counts) | set(position_counts)):
         caps = caps_by_id.get(node_id, {})
         last_seen_unix = to_int(caps.get("last_seen_unix")) or 0
         num: int | None = None
@@ -253,6 +271,7 @@ def _cached_history_node_rows(
         )
 
     apply_node_saved_counts(rows, saved_counts)
+    apply_node_position_counts(rows, position_counts)
     apply_node_historical_names(rows, caps_by_id)
     rows.sort(key=lambda item: int(to_int(item.get("last_heard_unix")) or 0), reverse=True)
     return rows, caps_by_id

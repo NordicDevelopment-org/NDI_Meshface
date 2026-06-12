@@ -16,6 +16,9 @@ class TrackerHistoryStore(Protocol):
     def load_node_saved_counts(self) -> dict[str, dict[str, object]]:
         ...
 
+    def load_node_position_counts(self) -> dict[str, dict[str, object]]:
+        ...
+
     def load_node_capabilities(self) -> dict[str, dict[str, object]]:
         ...
 

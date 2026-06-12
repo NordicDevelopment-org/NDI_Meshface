@@ -41,6 +41,27 @@ def load_tracker_node_saved_counts_safe(
         return {}, str(exc)
 
 
+def load_tracker_node_position_counts_safe(
+    tracker: StateTracker,
+) -> tuple[dict[str, dict[str, object]], Optional[str]]:
+    load_fn = getattr(tracker, "load_node_position_counts", None)
+    if not callable(load_fn):
+        return {}, None
+    try:
+        raw = load_fn()
+        if not isinstance(raw, Mapping):
+            raise TypeError("Expected node position counts mapping from tracker")
+        out: dict[str, dict[str, object]] = {}
+        for node_id, value in raw.items():
+            if isinstance(value, Mapping):
+                out[str(node_id)] = dict(value)
+            else:
+                out[str(node_id)] = {}
+        return out, None
+    except Exception as exc:
+        return {}, str(exc)
+
+
 def load_tracker_node_capabilities_safe(
     tracker: StateTracker,
 ) -> tuple[dict[str, dict[str, object]], Optional[str]]:

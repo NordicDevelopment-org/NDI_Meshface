@@ -7,6 +7,7 @@ from ..helpers import to_int as _to_int
 from ..history_backfill import (
     backfill_node_capabilities as _backfill_node_capabilities_helper,
     backfill_node_hour_seen as _backfill_node_hour_seen_helper,
+    backfill_node_position_counts as _backfill_node_position_counts_helper,
     backfill_node_saved_counts as _backfill_node_saved_counts_helper,
 )
 from ..history_maintenance import (
@@ -44,6 +45,7 @@ def open_and_initialize_history_connection(
         event_max_rows=event_max_rows,
     )
     _backfill_node_saved_counts_helper(conn)
+    _backfill_node_position_counts_helper(conn)
     _backfill_node_hour_seen_helper(conn)
     _backfill_node_capabilities_helper(conn, to_int_fn=_to_int)
     conn.commit()

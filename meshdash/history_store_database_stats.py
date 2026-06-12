@@ -10,6 +10,7 @@ _COUNTED_TABLES: tuple[str, ...] = (
     "connections",
     "node_capabilities",
     "node_saved_counts",
+    "node_position_counts",
     "node_positions",
     "node_metrics_1m",
     "link_metrics_1m",

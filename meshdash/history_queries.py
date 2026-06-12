@@ -476,6 +476,19 @@ def fetch_node_saved_count_rows(conn: SqlConnection) -> SqlRows:
     ).fetchall()
 
 
+def fetch_node_position_count_rows(conn: SqlConnection) -> SqlRows:
+    return conn.execute(
+        """
+        SELECT node_id,
+               position_points,
+               position_last_seen_unix
+        FROM node_position_counts
+        WHERE trim(COALESCE(node_id, '')) <> ''
+          AND trim(COALESCE(node_id, '')) NOT IN ('Unknown', 'n/a', '^all')
+        """
+    ).fetchall()
+
+
 def fetch_node_capability_rows(conn: SqlConnection) -> SqlRows:
     return conn.execute(
         """

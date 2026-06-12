@@ -4,6 +4,7 @@ from .helpers import format_epoch as _format_epoch, to_int as _to_int
 
 
 SavedCountsRow = tuple[object, object, object, object]
+PositionCountsRow = tuple[object, object, object]
 CapabilityRow = tuple[object, object, object, object, object, object, object, object, object, object, object]
 
 
@@ -17,6 +18,20 @@ def decode_node_saved_counts_rows(rows: Iterable[SavedCountsRow]) -> dict[str, d
             "saved_packets": int(saved_packets or 0),
             "saved_points": int(saved_points or 0),
             "saved_last_seen": _format_epoch(saved_last_seen_unix),
+        }
+    return out
+
+
+def decode_node_position_counts_rows(rows: Iterable[PositionCountsRow]) -> dict[str, dict[str, object]]:
+    out: dict[str, dict[str, object]] = {}
+    for node_id, position_points, position_last_seen_unix in rows:
+        clean_node_id = str(node_id or "").strip()
+        if not clean_node_id:
+            continue
+        out[clean_node_id] = {
+            "position_points": int(position_points or 0),
+            "position_last_seen_unix": _to_int(position_last_seen_unix),
+            "position_last_seen": _format_epoch(position_last_seen_unix),
         }
     return out
 

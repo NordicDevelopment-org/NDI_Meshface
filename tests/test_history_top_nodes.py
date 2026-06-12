@@ -7,6 +7,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from meshdash.history_schema import initialize_history_schema
+from meshdash.history_store_nodes import load_node_position_counts
 from meshdash.history_top_nodes import load_top_nodes
 from meshdash.html_css import build_dashboard_css
 from meshdash.html_js import build_dashboard_js
@@ -168,6 +169,40 @@ def test_top_nodes_links_count_unique_peers_and_link_packets() -> None:
     assert link_packets["items"][0]["node_id"] == "!11111111"
     assert link_packets["items"][0]["value"] == 11
     assert link_packets["items"][0]["secondary_value"] == 2
+
+
+def test_node_position_counts_follow_position_inserts_and_deletes() -> None:
+    conn = sqlite3.connect(":memory:")
+    initialize_history_schema(conn)
+    store = _make_store(conn)
+
+    conn.executemany(
+        """
+        INSERT INTO node_positions(created_unix, node_id, lat, lon)
+        VALUES (?, ?, ?, ?)
+        """,
+        [
+            (100, "!11111111", 44.9, -93.1),
+            (200, "!11111111", 45.0, -93.2),
+            (150, "!22222222", 46.0, -94.0),
+        ],
+    )
+    conn.commit()
+
+    counts = load_node_position_counts(store)
+    assert counts["!11111111"]["position_points"] == 2
+    assert counts["!11111111"]["position_last_seen_unix"] == 200
+    assert counts["!22222222"]["position_points"] == 1
+
+    conn.execute(
+        "DELETE FROM node_positions WHERE node_id = ? AND created_unix = ?",
+        ("!11111111", 200),
+    )
+    conn.commit()
+
+    counts = load_node_position_counts(store)
+    assert counts["!11111111"]["position_points"] == 1
+    assert counts["!11111111"]["position_last_seen_unix"] == 100
 
 
 def test_dashboard_adds_network_top10_subview() -> None:

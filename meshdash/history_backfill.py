@@ -216,6 +216,43 @@ def backfill_node_saved_counts(conn: SqlConnection) -> None:
         )
 
 
+def backfill_node_position_counts(conn: SqlConnection) -> None:
+    """Populate node_position_counts from node_positions if it's empty."""
+    try:
+        existing = conn.execute("SELECT COUNT(*) FROM node_position_counts").fetchone()
+    except Exception:
+        existing = None
+
+    if existing and int(existing[0] or 0) > 0:
+        return
+
+    rows = conn.execute(
+        """
+        SELECT node_id,
+               COUNT(*) AS position_points,
+               MAX(created_unix) AS position_last_seen_unix
+        FROM node_positions
+        GROUP BY node_id
+        """
+    ).fetchall()
+    for node_id, position_points, position_last_seen_unix in rows:
+        clean_node_id = str(node_id or "").strip()
+        if not clean_node_id:
+            continue
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO node_position_counts(
+              node_id, position_points, position_last_seen_unix
+            ) VALUES(?, ?, ?)
+            """,
+            (
+                clean_node_id,
+                int(position_points or 0),
+                int(position_last_seen_unix or 0),
+            ),
+        )
+
+
 def backfill_node_hour_seen(conn: SqlConnection) -> None:
     """Populate node_hour_seen from node_metrics_1m if it's empty.
 

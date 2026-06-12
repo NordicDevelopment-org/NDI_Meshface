@@ -179,6 +179,13 @@ TABLE_SCHEMA_STATEMENTS = [
       saved_last_seen_unix INTEGER NOT NULL DEFAULT 0
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS node_position_counts (
+      node_id TEXT PRIMARY KEY,
+      position_points INTEGER NOT NULL DEFAULT 0,
+      position_last_seen_unix INTEGER NOT NULL DEFAULT 0
+    )
+    """,
 
     # Per-node-per-hour presence table for fast "online activity" charts.
     #

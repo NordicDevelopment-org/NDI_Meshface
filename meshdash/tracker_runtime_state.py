@@ -35,6 +35,17 @@ def load_tracker_node_saved_counts(
     return history_store.load_node_saved_counts()
 
 
+def load_tracker_node_position_counts(
+    history_store: TrackerHistoryStore | None,
+) -> Dict[str, Dict[str, object]]:
+    if history_store is None:
+        return {}
+    load_fn = getattr(history_store, "load_node_position_counts", None)
+    if not callable(load_fn):
+        return {}
+    return load_fn()
+
+
 def load_tracker_node_capabilities(
     history_store: TrackerHistoryStore | None,
 ) -> Dict[str, Dict[str, object]]:
@@ -109,6 +120,12 @@ def load_tracker_node_saved_counts_for_tracker(
     tracker: TrackerSnapshotRuntimeState,
 ) -> Dict[str, Dict[str, object]]:
     return load_tracker_node_saved_counts(tracker._history_store)
+
+
+def load_tracker_node_position_counts_for_tracker(
+    tracker: TrackerSnapshotRuntimeState,
+) -> Dict[str, Dict[str, object]]:
+    return load_tracker_node_position_counts(tracker._history_store)
 
 
 def load_tracker_node_capabilities_for_tracker(

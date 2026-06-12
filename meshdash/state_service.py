@@ -41,11 +41,14 @@ from .state_nodes import (
 )
 from .state_tracker import (
     load_tracker_node_capabilities_safe as _load_tracker_node_capabilities_safe_helper,
+    load_tracker_node_position_counts_safe as _load_tracker_node_position_counts_safe_helper,
     load_tracker_node_saved_counts_safe as _load_tracker_node_saved_counts_safe_helper,
     load_tracker_snapshot_safe as _load_tracker_snapshot_safe_helper,
 )
 from .state_summary import (
+    apply_node_link_counts as _apply_node_link_counts_helper,
     apply_node_historical_names as _apply_node_historical_names_helper,
+    apply_node_position_counts as _apply_node_position_counts_helper,
     apply_node_saved_counts as _apply_node_saved_counts_helper,
     build_summary_payload as _build_summary_payload_helper,
     collect_local_state_safe as _collect_local_state_safe_helper,
@@ -465,9 +468,13 @@ def _slim_nodes_for_chat(nodes: list[dict[str, object]]) -> list[dict[str, objec
         "first_seen_unix",
         "last_heard_unix",
         "lat",
+        "link_count",
+        "link_packet_count",
         "lon",
         "long_name",
         "num",
+        "position_last_seen_unix",
+        "position_points",
         "role",
         "rssi",
         "saved_packets",
@@ -948,16 +955,36 @@ def build_dashboard_state_typed(
         node_capabilities = {}
         if node_capabilities_error is None:
             node_capabilities_error = str(exc)
+    node_position_counts_raw, node_position_counts_error = _load_tracker_node_position_counts_safe_helper(tracker)
+    try:
+        node_position_counts = _coerce_nested_mapping_rows(
+            node_position_counts_raw,
+            label="node position counts",
+        )
+    except Exception as exc:
+        node_position_counts = {}
+        if node_position_counts_error is None:
+            node_position_counts_error = str(exc)
     try:
         apply_node_saved_counts_fn(nodes.rows, node_saved_counts)
     except Exception as exc:
         if node_saved_counts_error is None:
             node_saved_counts_error = str(exc)
     try:
+        _apply_node_position_counts_helper(nodes.rows, node_position_counts)
+    except Exception as exc:
+        if node_position_counts_error is None:
+            node_position_counts_error = str(exc)
+    try:
         _apply_node_historical_names_helper(nodes.rows, node_capabilities)
     except Exception as exc:
         if node_capabilities_error is None:
             node_capabilities_error = str(exc)
+    try:
+        _apply_node_link_counts_helper(nodes.rows, tracker_data.edges)
+    except Exception as exc:
+        if tracker_error is None:
+            tracker_error = str(exc)
 
     if include_debug:
         my_info, my_info_error = _to_jsonable_safe(

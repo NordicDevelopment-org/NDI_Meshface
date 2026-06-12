@@ -22,6 +22,7 @@ from .tracker_runtime_chat import (
 from .tracker_runtime_state import (
     build_tracker_snapshot_for_tracker_typed as _build_tracker_snapshot_for_tracker_typed_helper,
     load_tracker_node_capabilities_for_tracker as _load_tracker_node_capabilities_for_tracker_helper,
+    load_tracker_node_position_counts_for_tracker as _load_tracker_node_position_counts_for_tracker_helper,
     load_tracker_node_saved_counts_for_tracker as _load_tracker_node_saved_counts_for_tracker_helper,
 )
 from .tracker_snapshot_contracts import TrackerSnapshot
@@ -357,6 +358,9 @@ class DashboardTracker:
 
     def load_node_saved_counts(self) -> dict[str, dict[str, object]]:
         return _load_tracker_node_saved_counts_for_tracker_helper(self)
+
+    def load_node_position_counts(self) -> dict[str, dict[str, object]]:
+        return _load_tracker_node_position_counts_for_tracker_helper(self)
 
     def load_node_capabilities(self) -> dict[str, dict[str, object]]:
         return _load_tracker_node_capabilities_for_tracker_helper(self)

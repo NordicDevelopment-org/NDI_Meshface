@@ -48,6 +48,60 @@ TRIGGER_SCHEMA_STATEMENTS = [
     END
     """,
 
+    # Keep node_position_counts in sync with node_positions for cheap /api/state
+    # location-point sorting.
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_node_positions_counts_insert
+    AFTER INSERT ON node_positions
+    BEGIN
+      INSERT INTO node_position_counts(node_id, position_points, position_last_seen_unix)
+      VALUES(NEW.node_id, 1, COALESCE(NEW.created_unix, 0))
+      ON CONFLICT(node_id) DO UPDATE SET
+        position_points = position_points + 1,
+        position_last_seen_unix = MAX(position_last_seen_unix, COALESCE(NEW.created_unix, 0));
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_node_positions_counts_update
+    AFTER UPDATE ON node_positions
+    BEGIN
+      UPDATE node_position_counts
+      SET
+        position_points = position_points - 1,
+        position_last_seen_unix = COALESCE(
+          (SELECT MAX(created_unix) FROM node_positions WHERE node_id = OLD.node_id),
+          0
+        )
+      WHERE node_id = OLD.node_id;
+
+      DELETE FROM node_position_counts
+      WHERE node_id = OLD.node_id AND position_points <= 0;
+
+      INSERT INTO node_position_counts(node_id, position_points, position_last_seen_unix)
+      VALUES(NEW.node_id, 1, COALESCE(NEW.created_unix, 0))
+      ON CONFLICT(node_id) DO UPDATE SET
+        position_points = position_points + 1,
+        position_last_seen_unix = MAX(position_last_seen_unix, COALESCE(NEW.created_unix, 0));
+    END
+    """,
+    """
+    CREATE TRIGGER IF NOT EXISTS trg_node_positions_counts_delete
+    AFTER DELETE ON node_positions
+    BEGIN
+      UPDATE node_position_counts
+      SET
+        position_points = position_points - 1,
+        position_last_seen_unix = COALESCE(
+          (SELECT MAX(created_unix) FROM node_positions WHERE node_id = OLD.node_id),
+          0
+        )
+      WHERE node_id = OLD.node_id;
+
+      DELETE FROM node_position_counts
+      WHERE node_id = OLD.node_id AND position_points <= 0;
+    END
+    """,
+
     # Track per-hour node presence for fast online-activity charts.
     """
     CREATE TRIGGER IF NOT EXISTS trg_node_metrics_hour_seen_insert

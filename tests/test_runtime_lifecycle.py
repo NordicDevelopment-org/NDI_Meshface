@@ -126,6 +126,15 @@ def test_offline_runtime_uses_cached_history_nodes(tmp_path) -> None:
                 }
             }
 
+        def load_node_position_counts(self) -> dict[str, dict[str, object]]:
+            return {
+                "!49b5dff0": {
+                    "position_points": 4,
+                    "position_last_seen_unix": 180,
+                    "position_last_seen": "1970-01-01 00:03:00Z",
+                }
+            }
+
     args = SimpleNamespace(
         history_db=str(tmp_path / "mesh_dashboard_history.sqlite3"),
         no_history=False,
@@ -155,4 +164,6 @@ def test_offline_runtime_uses_cached_history_nodes(tmp_path) -> None:
     assert [node["id"] for node in state["nodes"]] == ["!49b5dff0", "!02edc4f8"]
     assert state["nodes"][0]["long_name"] == "green"
     assert state["nodes"][0]["saved_packets"] == 12
+    assert state["nodes"][0]["position_points"] == 4
+    assert state["nodes"][0]["position_last_seen_unix"] == 180
     assert state["nodes"][0]["hops_away"] == 2

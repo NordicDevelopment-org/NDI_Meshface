@@ -50,6 +50,16 @@ def load_node_saved_counts_data(
     return decode_node_saved_counts_rows_fn(rows)
 
 
+def load_node_position_counts_data(
+    conn: SqlConnection,
+    *,
+    fetch_node_position_count_rows_fn: FetchRowsFn,
+    decode_node_position_counts_rows_fn: DecodeNodeCapabilityMapFn,
+) -> NodeCapabilityMap:
+    rows = fetch_node_position_count_rows_fn(conn)
+    return decode_node_position_counts_rows_fn(rows)
+
+
 def load_node_capabilities_data(
     conn: SqlConnection,
     *,

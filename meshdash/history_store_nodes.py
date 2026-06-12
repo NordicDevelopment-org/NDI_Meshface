@@ -6,12 +6,14 @@ from .history_analytics import (
 )
 from .history_capabilities import (
     decode_node_capabilities_rows as _decode_node_capabilities_rows_helper,
+    decode_node_position_counts_rows as _decode_node_position_counts_rows_helper,
     decode_node_saved_counts_rows as _decode_node_saved_counts_rows_helper,
 )
 from .history_queries import (
     fetch_local_signal_history_rows as _fetch_local_signal_history_rows_helper,
     fetch_node_capability_rows as _fetch_node_capability_rows_helper,
     fetch_node_history_rows as _fetch_node_history_rows_helper,
+    fetch_node_position_count_rows as _fetch_node_position_count_rows_helper,
     fetch_node_saved_count_rows as _fetch_node_saved_count_rows_helper,
     fetch_online_activity_rows as _fetch_online_activity_rows_helper,
 )
@@ -20,6 +22,7 @@ from .history_node_metrics import (
 )
 from .history_read_api import (
     load_node_capabilities_data as _load_node_capabilities_data_helper,
+    load_node_position_counts_data as _load_node_position_counts_data_helper,
     load_node_saved_counts_data as _load_node_saved_counts_data_helper,
 )
 from .history_read_history import (
@@ -100,6 +103,21 @@ def load_node_saved_counts(store: HistoryStoreReadState) -> dict[str, dict[str, 
             read_conn,
             fetch_node_saved_count_rows_fn=_fetch_node_saved_count_rows_helper,
             decode_node_saved_counts_rows_fn=_decode_node_saved_counts_rows_helper,
+        )
+
+
+def load_node_position_counts(store: HistoryStoreReadState) -> dict[str, dict[str, object]]:
+    read_conn = getattr(store, "_read_conn", None)
+    if read_conn is None or read_conn is store._conn:
+        read_conn = store._conn
+        read_lock = store._lock
+    else:
+        read_lock = getattr(store, "_read_lock", None) or store._lock
+    with read_lock:
+        return _load_node_position_counts_data_helper(
+            read_conn,
+            fetch_node_position_count_rows_fn=_fetch_node_position_count_rows_helper,
+            decode_node_position_counts_rows_fn=_decode_node_position_counts_rows_helper,
         )
 
 
