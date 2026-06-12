@@ -289,19 +289,33 @@ def test_dashboard_js_flashes_network_map_nodes_on_new_packet_activity() -> None
     )
 
     assert "const mapNodeActivityFlashById = new Map();" in js
+    assert "const mapNodeTransmitPulseRings = new Set();" in js
+    assert "const mapNodeTransmitPulseMaxRings = 72;" in js
+    assert 'const mapTransmitPulsePaneName = "mapTransmitPulsePane";' in js
     assert "let mapNodeActivityFlashRaf = null;" in js
     assert "let lastNetworkMapPacketTokens = new Set();" in js
     assert "function isNetworkMapActivityFlashVisible()" in js
     assert "function mapPacketActivityToken(packetEntry)" in js
     assert "function mapPacketActivityNodeIds(packetEntry)" in js
+    assert "function mapPacketActivityTransmitNodeId(packetEntry)" in js
     assert "function snapshotNetworkMapPacketActivityTokens(state = latestState)" in js
     assert "function seedNetworkMapPacketActivityTokens(state = latestState)" in js
+    assert "function ensureMapTransmitPulsePane()" in js
+    assert "function startMapNodeTransmitRipple(nodeId, state = latestState)" in js
+    assert "function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now())" in js
     assert 'function resolveMapNodeMarkerStyle(nodeId, isSelected, markerKind = "actual", markerConfidence = 0.45, state = latestState)' in js
     assert 'const isLocal = !!(localNodeId && normalizeNodeId(nodeId || "") === localNodeId);' in js
     assert "function scheduleMapNodeActivityFlashUpdate()" in js
     assert "function syncNetworkMapPacketActivity(state = latestState)" in js
     assert "!!mapLiveActivityEnabled" in js
+    assert "const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();" in js
+    assert "activeFlashCount > 0 || activePulseCount > 0" in js
     assert "mapNodeActivityFlashById.set(nodeId, {" in js
+    assert "const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);" in js
+    assert "nodesToRipple.add(transmitNodeId);" in js
+    assert "startMapNodeTransmitRipple(nodeId, safeState);" in js
+    assert "pane: mapTransmitPulsePaneName," in js
+    assert "layer.setRadius(easedRadius);" in js
     assert "scheduleMapNodeActivityFlashUpdate();" in js
     assert "if (mapLiveActivityEnabled)" in js
     assert "syncNetworkMapPacketActivity(state);" in js

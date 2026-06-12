@@ -429,6 +429,24 @@
       return Array.from(nodeIds);
     }}
 
+    function mapPacketActivityTransmitNodeId(packetEntry) {{
+      const summary = (packetEntry && packetEntry.summary && typeof packetEntry.summary === "object")
+        ? packetEntry.summary
+        : {{}};
+      const packet = (packetEntry && packetEntry.packet && typeof packetEntry.packet === "object")
+        ? packetEntry.packet
+        : ((packetEntry && typeof packetEntry === "object") ? packetEntry : {{}});
+      const fromId = normalizeNodeId(
+        summary.from_id
+        ?? summary.fromId
+        ?? summary.from
+        ?? packet.from_id
+        ?? packet.fromId
+        ?? packet.from
+      );
+      return isSelectableNodeId(fromId) ? fromId : "";
+    }}
+
     function snapshotNetworkMapPacketActivityTokens(state = latestState) {{
       const safeState = (state && typeof state === "object") ? state : {{}};
       const traffic = (safeState.traffic && typeof safeState.traffic === "object")
@@ -446,6 +464,154 @@
 
     function seedNetworkMapPacketActivityTokens(state = latestState) {{
       lastNetworkMapPacketTokens = snapshotNetworkMapPacketActivityTokens(state);
+    }}
+
+    function ensureMapTransmitPulsePane() {{
+      if (!(map && typeof map.getPane === "function")) return null;
+      let pane = map.getPane(mapTransmitPulsePaneName);
+      if (!pane && typeof map.createPane === "function") {{
+        pane = map.createPane(mapTransmitPulsePaneName);
+      }}
+      if (pane) {{
+        pane.style.zIndex = "585";
+        pane.style.pointerEvents = "none";
+      }}
+      return pane || null;
+    }}
+
+    function mapNodeTransmitPulsePosition(nodeId, state = latestState) {{
+      const normalizedId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(normalizedId)) return null;
+      const marker = nodeMarkers.get(normalizedId);
+      if (marker && typeof marker.getLatLng === "function") {{
+        const latLng = marker.getLatLng();
+        const lat = Number(latLng && latLng.lat);
+        const lon = Number(latLng && (latLng.lng ?? latLng.lon));
+        if (isValidMapCoord(lat, lon)) return [lat, lon];
+      }}
+      const safeState = (state && typeof state === "object") ? state : latestState;
+      const nodes = Array.isArray(safeState && safeState.nodes) ? safeState.nodes : [];
+      const node = nodes.find((entry) => normalizeNodeId(entry && entry.id) === normalizedId) || null;
+      const lat = Number(node && node.lat);
+      const lon = Number(node && node.lon);
+      if (isValidMapCoord(lat, lon)) return [lat, lon];
+      return null;
+    }}
+
+    function mapNodeTransmitPulseColor(nodeId, state = latestState) {{
+      const normalizedId = normalizeNodeId(nodeId || "");
+      const markerKind = nodeMarkerKinds.get(normalizedId) || "actual";
+      const markerConfidence = nodeMarkerConfidence.get(normalizedId) || 1;
+      const isSelected = !!selectedNodeId && normalizedId === normalizeNodeId(selectedNodeId);
+      const style = resolveMapNodeMarkerStyle(
+        normalizedId,
+        isSelected,
+        markerKind,
+        markerConfidence,
+        state
+      );
+      return String(style && (style.color || style.fillColor) ? (style.color || style.fillColor) : "#ffd06a");
+    }}
+
+    function removeMapTransmitPulseRing(record) {{
+      if (!(record && typeof record === "object")) return;
+      const layer = record.layer;
+      if (layer && map && typeof map.removeLayer === "function") {{
+        try {{
+          map.removeLayer(layer);
+        }} catch (_err) {{
+        }}
+      }}
+      mapNodeTransmitPulseRings.delete(record);
+    }}
+
+    function clearMapNodeTransmitPulseRings() {{
+      for (const record of Array.from(mapNodeTransmitPulseRings)) {{
+        removeMapTransmitPulseRing(record);
+      }}
+    }}
+
+    function pruneExpiredMapNodeTransmitPulseRings(nowMs = Date.now()) {{
+      if (!isNetworkMapActivityFlashVisible()) {{
+        clearMapNodeTransmitPulseRings();
+        return 0;
+      }}
+      let activeCount = 0;
+      for (const record of Array.from(mapNodeTransmitPulseRings)) {{
+        const layer = record && record.layer;
+        if (!(layer && typeof layer.setStyle === "function" && typeof layer.setRadius === "function")) {{
+          removeMapTransmitPulseRing(record);
+          continue;
+        }}
+        const startedAtMs = Number(record.startedAtMs);
+        const delayMs = Math.max(0, Number(record.delayMs) || 0);
+        const durationMs = Math.max(1, Number(record.durationMs) || 1200);
+        const ageMs = nowMs - (Number.isFinite(startedAtMs) ? startedAtMs : nowMs) - delayMs;
+        if (ageMs >= durationMs) {{
+          removeMapTransmitPulseRing(record);
+          continue;
+        }}
+        activeCount += 1;
+        if (ageMs < 0) {{
+          layer.setStyle({{ opacity: 0, fillOpacity: 0 }});
+          continue;
+        }}
+        const progress = clampMapLinkValue(ageMs / durationMs, 0, 1);
+        const radiusStart = Number(record.startRadius) || 5;
+        const radiusEnd = Number(record.endRadius) || 30;
+        const easedRadius = radiusStart + ((radiusEnd - radiusStart) * (1 - Math.pow(1 - progress, 2)));
+        const fade = Math.pow(1 - progress, 1.35);
+        const opacity = clampMapLinkValue((Number(record.baseOpacity) || 0.62) * fade, 0, 0.72);
+        const weight = Math.max(0.7, (Number(record.baseWeight) || 2) * (1 - (progress * 0.28)));
+        layer.setRadius(easedRadius);
+        layer.setStyle({{
+          opacity,
+          fillOpacity: 0,
+          weight,
+        }});
+      }}
+      return activeCount;
+    }}
+
+    function startMapNodeTransmitRipple(nodeId, state = latestState) {{
+      const normalizedId = normalizeNodeId(nodeId || "");
+      if (!isSelectableNodeId(normalizedId) || !isNetworkMapActivityFlashVisible()) return false;
+      const position = mapNodeTransmitPulsePosition(normalizedId, state);
+      if (!position) return false;
+      if (!ensureMapTransmitPulsePane()) return false;
+      const color = mapNodeTransmitPulseColor(normalizedId, state);
+      const nowMs = Date.now();
+      for (let idx = 0; idx < 3; idx += 1) {{
+        const endRadius = 22 + (idx * 7);
+        const layer = L.circleMarker(position, {{
+          pane: mapTransmitPulsePaneName,
+          radius: 5,
+          color,
+          opacity: 0,
+          weight: idx === 0 ? 2.4 : 1.8,
+          fill: false,
+          fillOpacity: 0,
+          interactive: false,
+          bubblingMouseEvents: false,
+        }});
+        layer.addTo(map);
+        mapNodeTransmitPulseRings.add({{
+          layer,
+          nodeId: normalizedId,
+          startedAtMs: nowMs,
+          delayMs: idx * 170,
+          durationMs: 1250,
+          startRadius: 5,
+          endRadius,
+          baseOpacity: idx === 0 ? 0.72 : 0.58,
+          baseWeight: idx === 0 ? 2.4 : 1.8,
+        }});
+      }}
+      while (mapNodeTransmitPulseRings.size > mapNodeTransmitPulseMaxRings) {{
+        const oldest = mapNodeTransmitPulseRings.values().next().value;
+        removeMapTransmitPulseRing(oldest);
+      }}
+      return true;
     }}
 
     function pruneExpiredMapNodeActivityFlashes(nowMs = Date.now()) {{
@@ -1043,13 +1209,15 @@
       if (mapNodeActivityFlashRaf != null) return;
       mapNodeActivityFlashRaf = window.requestAnimationFrame(() => {{
         mapNodeActivityFlashRaf = null;
-        const activeCount = pruneExpiredMapNodeActivityFlashes();
+        const activeFlashCount = pruneExpiredMapNodeActivityFlashes();
+        const activePulseCount = pruneExpiredMapNodeTransmitPulseRings();
         refreshMapMarkerStyles();
         if (!isNetworkMapActivityFlashVisible()) {{
+          clearMapNodeTransmitPulseRings();
           stopMapNodeActivityFlashLoop();
           return;
         }}
-        if (activeCount > 0) {{
+        if (activeFlashCount > 0 || activePulseCount > 0) {{
           scheduleMapNodeActivityFlashUpdate();
         }}
       }});
@@ -1064,6 +1232,7 @@
       const localNodeId = resolveLocalNodeId(safeState);
       const currentTokens = new Set();
       const nodesToFlash = new Set();
+      const nodesToRipple = new Set();
       const networkMapVisible = isNetworkMapActivityFlashVisible();
       for (const packetEntry of recentPackets) {{
         if (!isMeshRadioActivityPacket(packetEntry, localNodeId)) continue;
@@ -1076,12 +1245,17 @@
         for (const nodeId of nodeIds) {{
           nodesToFlash.add(nodeId);
         }}
+        const transmitNodeId = mapPacketActivityTransmitNodeId(packetEntry);
+        if (transmitNodeId) {{
+          nodesToRipple.add(transmitNodeId);
+        }}
       }}
       lastNetworkMapPacketTokens = currentTokens;
-      if (!networkMapVisible || nodesToFlash.size <= 0) {{
+      if (!networkMapVisible || (nodesToFlash.size <= 0 && nodesToRipple.size <= 0)) {{
         if (!networkMapVisible) {{
           lastNetworkMapPacketTokens = currentTokens;
           mapNodeActivityFlashById.clear();
+          clearMapNodeTransmitPulseRings();
           stopMapNodeActivityFlashLoop();
         }}
         return;
@@ -1092,6 +1266,9 @@
           startedAtMs: nowMs,
           untilMs: nowMs + 1100,
         }});
+      }}
+      for (const nodeId of nodesToRipple) {{
+        startMapNodeTransmitRipple(nodeId, safeState);
       }}
       scheduleMapNodeActivityFlashUpdate();
     }}
