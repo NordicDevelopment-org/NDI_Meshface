@@ -141,6 +141,9 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function animateMapPolylineLatLngs(layer, targetPathRaw, options = null)" in js
     assert "function animateMapHeatLayerLatLngs(layer, targetPointsRaw, options = null)" in js
     assert "function fadeOutMapHeatLayer(layer, options = null)" in js
+    assert "function fadeMapNodeMarker(marker, options = null)" in js
+    assert "function fadeInMapNodeMarker(marker, options = null)" in js
+    assert "function fadeOutMapNodeMarker(marker, options = null)" in js
     assert "function advanceMapDriftAnimationElapsedMs(state, timestampMs)" in js
     assert "Math.min(frameDeltaMs, maxFrameAdvanceMs)" in js
     assert "const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);" in js
@@ -149,6 +152,11 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "const activeState = layer._meshHeatDriftAnimation;" in js
     assert "mapHeatPointsSameEnough(activeState.targetPoints, targetPoints)" in js
     assert "activeState.onComplete = onComplete;" in js
+    assert "markerDriftMeters > mapEstimatedOverlayMaxDriftMeters" in js
+    assert "fadeOutMapNodeMarker(existingMarker, {" in js
+    assert "setMapNodeMarkerOpacityScale(marker, 0, marker._meshMapNodeMarkerFadeBaseStyle);" in js
+    assert "fadeInMapNodeMarker(marker, {" in js
+    assert 'if (nodeMarkerKinds.get(nodeId) === "estimated")' in js
     assert "function mapLatLngPathMaxDistanceMeters(a, b)" in js
     assert "function mapHeatPointDistanceMeters(a, b)" in js
     assert "!Number.isFinite(pathDriftMeters) || pathDriftMeters > maxDriftMeters" in js

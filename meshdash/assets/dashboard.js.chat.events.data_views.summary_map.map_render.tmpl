@@ -867,16 +867,54 @@
           markerHash = hashMixInt(markerHash, isEstimated ? (Math.round(Number(estimate && estimate.residualKm) * 10) || 0) : 0);
           const existingMarker = nodeMarkers.get(normalizedId);
           const prevMarkerHash = nodeMarkerMeta.get(normalizedId);
+          const existingMarkerKind = nodeMarkerKinds.get(normalizedId) || "";
+          let fadeExistingEstimatedMarkerOut = false;
+          if (existingMarker && existingMarkerKind === "estimated") {{
+            if (!isEstimated) {{
+              fadeExistingEstimatedMarkerOut = true;
+            }} else if (typeof existingMarker.getLatLng === "function") {{
+              const prevLatLng = existingMarker.getLatLng();
+              const markerDriftMeters = mapEstimatedPositionDistanceMeters(
+                {{ lat: Number(prevLatLng && prevLatLng.lat), lon: Number(prevLatLng && prevLatLng.lng) }},
+                {{ lat: markerLat, lon: markerLon }}
+              );
+              fadeExistingEstimatedMarkerOut = (
+                Number.isFinite(markerDriftMeters)
+                && markerDriftMeters > mapEstimatedOverlayMaxDriftMeters
+              );
+            }}
+          }}
           seenNodeIds.add(normalizedId);
           if (existingMarker && prevMarkerHash === markerHash) {{
             continue;
           }}
           if (existingMarker) {{
-            nodeLayer.removeLayer(existingMarker);
+            if (fadeExistingEstimatedMarkerOut) {{
+              fadeOutMapNodeMarker(existingMarker, {{
+                layerGroup: nodeLayer,
+                durationMs: mapEstimatedOverlayLongJumpFadeMs,
+                onComplete: () => {{
+                  if (typeof nodeLayer.hasLayer !== "function" || nodeLayer.hasLayer(existingMarker)) {{
+                    nodeLayer.removeLayer(existingMarker);
+                  }}
+                }},
+              }});
+            }} else {{
+              cancelMapNodeMarkerFade(existingMarker);
+              nodeLayer.removeLayer(existingMarker);
+            }}
             nodeMarkers.delete(normalizedId);
           }}
           const markerKind = isEstimated ? "estimated" : "actual";
           const markerConfidence = isEstimated ? Number(estimate && estimate.confidence) : 1;
+          const fadeEstimatedMarkerIn = !!(
+            isEstimated
+            && (
+              !existingMarker
+              || existingMarkerKind !== "estimated"
+              || fadeExistingEstimatedMarkerOut
+            )
+          );
           const marker = createMapNodeMarker(
             markerLat,
             markerLon,
@@ -925,7 +963,20 @@
           marker.on("click", () => {{
             selectNode(normalizedId, true, false);
           }});
+          if (fadeEstimatedMarkerIn) {{
+            marker._meshMapNodeMarkerFadeBaseStyle = (marker.options && typeof marker.options === "object")
+              ? Object.assign({{}}, marker.options)
+              : {{}};
+            setMapNodeMarkerOpacityScale(marker, 0, marker._meshMapNodeMarkerFadeBaseStyle);
+          }}
           marker.addTo(nodeLayer);
+          if (fadeEstimatedMarkerIn) {{
+            fadeInMapNodeMarker(marker, {{
+              layerGroup: nodeLayer,
+              durationMs: mapEstimatedOverlayLongJumpFadeMs,
+              baseStyle: marker._meshMapNodeMarkerFadeBaseStyle,
+            }});
+          }}
           nodeMarkers.set(normalizedId, marker);
           nodeMarkerMeta.set(normalizedId, markerHash);
           nodeMarkerKinds.set(normalizedId, markerKind);
@@ -934,7 +985,20 @@
 
         for (const [nodeId, marker] of Array.from(nodeMarkers.entries())) {{
           if (seenNodeIds.has(nodeId)) continue;
-          nodeLayer.removeLayer(marker);
+          if (nodeMarkerKinds.get(nodeId) === "estimated") {{
+            fadeOutMapNodeMarker(marker, {{
+              layerGroup: nodeLayer,
+              durationMs: mapEstimatedOverlayLongJumpFadeMs,
+              onComplete: () => {{
+                if (typeof nodeLayer.hasLayer !== "function" || nodeLayer.hasLayer(marker)) {{
+                  nodeLayer.removeLayer(marker);
+                }}
+              }},
+            }});
+          }} else {{
+            cancelMapNodeMarkerFade(marker);
+            nodeLayer.removeLayer(marker);
+          }}
           nodeMarkers.delete(nodeId);
           nodeMarkerMeta.delete(nodeId);
           nodeMarkerKinds.delete(nodeId);

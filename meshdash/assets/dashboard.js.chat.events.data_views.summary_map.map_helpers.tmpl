@@ -2644,6 +2644,145 @@
       }}
     }}
 
+    function cancelMapNodeMarkerFade(marker) {{
+      if (!(marker && typeof marker === "object")) return;
+      const state = marker._meshMapNodeMarkerFadeAnimation;
+      if (
+        state
+        && state.raf != null
+        && typeof window.cancelAnimationFrame === "function"
+      ) {{
+        try {{
+          window.cancelAnimationFrame(state.raf);
+        }} catch (_err) {{
+        }}
+      }}
+      marker._meshMapNodeMarkerFadeAnimation = null;
+    }}
+
+    function setMapNodeMarkerOpacityScale(marker, scale, baseStyle = null) {{
+      if (!(marker && typeof marker === "object")) return false;
+      const safeScale = clampMapLinkValue(Number(scale), 0, 1);
+      const sourceStyle = (baseStyle && typeof baseStyle === "object")
+        ? baseStyle
+        : ((marker.options && typeof marker.options === "object") ? marker.options : {{}});
+      const baseOpacity = Number.isFinite(Number(sourceStyle.opacity))
+        ? clampMapLinkValue(Number(sourceStyle.opacity), 0, 1)
+        : 1;
+      if (typeof marker.setStyle === "function") {{
+        const baseFillOpacity = Number.isFinite(Number(sourceStyle.fillOpacity))
+          ? clampMapLinkValue(Number(sourceStyle.fillOpacity), 0, 1)
+          : 0;
+        marker.setStyle({{
+          opacity: baseOpacity * safeScale,
+          fillOpacity: baseFillOpacity * safeScale,
+        }});
+        return true;
+      }}
+      if (typeof marker.setOpacity === "function") {{
+        marker.setOpacity(baseOpacity * safeScale);
+        return true;
+      }}
+      return false;
+    }}
+
+    function fadeMapNodeMarker(marker, options = null) {{
+      if (!(marker && typeof marker === "object")) return false;
+      const opts = (options && typeof options === "object") ? options : {{}};
+      const fromScale = clampMapLinkValue(
+        Number.isFinite(Number(opts.fromScale)) ? Number(opts.fromScale) : 1,
+        0,
+        1
+      );
+      const toScale = clampMapLinkValue(
+        Number.isFinite(Number(opts.toScale)) ? Number(opts.toScale) : 1,
+        0,
+        1
+      );
+      const durationMs = Math.max(
+        0,
+        Number(opts.durationMs) || mapEstimatedOverlayLongJumpFadeMs
+      );
+      const onComplete = typeof opts.onComplete === "function" ? opts.onComplete : null;
+      const parentLayer = opts.layerGroup || (typeof nodeLayer !== "undefined" ? nodeLayer : null);
+      const baseStyle = (opts.baseStyle && typeof opts.baseStyle === "object")
+        ? Object.assign({{}}, opts.baseStyle)
+        : ((marker._meshMapNodeMarkerFadeBaseStyle && typeof marker._meshMapNodeMarkerFadeBaseStyle === "object")
+        ? Object.assign({{}}, marker._meshMapNodeMarkerFadeBaseStyle)
+        : ((marker.options && typeof marker.options === "object")
+        ? Object.assign({{}}, marker.options)
+        : {{}}));
+      marker._meshMapNodeMarkerFadeBaseStyle = baseStyle;
+      cancelMapNodeMarkerFade(marker);
+      setMapNodeMarkerOpacityScale(marker, fromScale, baseStyle);
+      const reduceMotion = typeof prefersReducedMotion === "function" && prefersReducedMotion();
+      if (reduceMotion || durationMs <= 0 || typeof window.requestAnimationFrame !== "function") {{
+        setMapNodeMarkerOpacityScale(marker, toScale, baseStyle);
+        if (onComplete) {{
+          onComplete(marker);
+        }}
+        return true;
+      }}
+      const startedAtMs = mapAnimationNowMs();
+      const state = {{
+        raf: null,
+        startedAtMs,
+        lastFrameMs: startedAtMs,
+        activeElapsedMs: 0,
+        maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
+        durationMs,
+      }};
+      const step = (timestampMs) => {{
+        if (
+          parentLayer
+          && toScale > 0
+          && typeof parentLayer.hasLayer === "function"
+          && !parentLayer.hasLayer(marker)
+        ) {{
+          cancelMapNodeMarkerFade(marker);
+          return;
+        }}
+        const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);
+        const eased = mapDriftEase(elapsedMs / state.durationMs);
+        setMapNodeMarkerOpacityScale(
+          marker,
+          fromScale + ((toScale - fromScale) * eased),
+          baseStyle
+        );
+        if (eased < 1) {{
+          state.raf = window.requestAnimationFrame(step);
+          return;
+        }}
+        setMapNodeMarkerOpacityScale(marker, toScale, baseStyle);
+        marker._meshMapNodeMarkerFadeAnimation = null;
+        if (toScale >= 1) {{
+          marker._meshMapNodeMarkerFadeBaseStyle = null;
+        }}
+        if (onComplete) {{
+          onComplete(marker);
+        }}
+      }};
+      marker._meshMapNodeMarkerFadeAnimation = state;
+      state.raf = window.requestAnimationFrame(step);
+      return true;
+    }}
+
+    function fadeInMapNodeMarker(marker, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      return fadeMapNodeMarker(marker, Object.assign({{}}, opts, {{
+        fromScale: 0,
+        toScale: 1,
+      }}));
+    }}
+
+    function fadeOutMapNodeMarker(marker, options = null) {{
+      const opts = (options && typeof options === "object") ? options : {{}};
+      return fadeMapNodeMarker(marker, Object.assign({{}}, opts, {{
+        fromScale: 1,
+        toScale: 0,
+      }}));
+    }}
+
     function scheduleMapNodeActivityFlashUpdate() {{
       if (mapTraceProgressTimer != null) {{
         window.clearTimeout(mapTraceProgressTimer);
