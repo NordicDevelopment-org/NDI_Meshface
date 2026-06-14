@@ -424,6 +424,15 @@
       const opts = (options && typeof options === "object") ? options : {{}};
       const durationMs = Math.max(0, Number(opts.durationMs) || mapEstimatedOverlayDriftMs);
       const reduceMotion = typeof prefersReducedMotion === "function" && prefersReducedMotion();
+      const activeState = layer._meshPolylineDriftAnimation;
+      if (
+        !reduceMotion
+        && activeState
+        && Array.isArray(activeState.toPath)
+        && mapLatLngPathsSameEnough(activeState.toPath, targetPath)
+      ) {{
+        return true;
+      }}
       const currentPath = normalizeMapLatLngPath(
         typeof layer.getLatLngs === "function" ? layer.getLatLngs() : []
       );
@@ -474,6 +483,7 @@
           activeElapsedMs: 0,
           maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
           durationMs: fadeDurationMs,
+          toPath: targetPath,
           targetOpacity,
         }};
         const step = (timestampMs) => {{
@@ -653,6 +663,19 @@
       const targetPoints = normalizeMapHeatPoints(targetPointsRaw, {{ keyPrefix }});
       const durationMs = Math.max(0, Number(opts.durationMs) || mapEstimatedOverlayDriftMs);
       const reduceMotion = typeof prefersReducedMotion === "function" && prefersReducedMotion();
+      const activeState = layer._meshHeatDriftAnimation;
+      if (
+        !reduceMotion
+        && activeState
+        && !activeState.fadeOut
+        && Array.isArray(activeState.targetPoints)
+        && mapHeatPointsSameEnough(activeState.targetPoints, targetPoints)
+      ) {{
+        if (onComplete) {{
+          activeState.onComplete = onComplete;
+        }}
+        return true;
+      }}
       if (reduceMotion || durationMs <= 0 || typeof window.requestAnimationFrame !== "function") {{
         cancelMapHeatLayerDrift(layer);
         layer._meshHeatCurrentPoints = targetPoints;
@@ -760,6 +783,7 @@
         activeElapsedMs: 0,
         maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
         durationMs,
+        targetPoints,
         transitions,
         onComplete,
         fadeOut: !!opts.fadeOut,
