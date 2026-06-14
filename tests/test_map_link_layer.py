@@ -114,6 +114,7 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "const mapEstimatedPositionSmoothingById = new Map();" in js
     assert "let mapEstimatedPositionSmoothingActive = false;" in js
     assert "const mapEstimatedOverlayDriftMs = 4200;" in js
+    assert "const mapEstimatedOverlayMaxFrameAdvanceMs = 120;" in js
     assert "const mapEstimatedOverlayMaxDriftMeters = 3200;" in js
     assert "const mapEstimatedOverlayLongJumpFadeMs = 900;" in js
     assert "const mapHeatLayerFadeOutMs = 900;" in js
@@ -140,6 +141,9 @@ def test_dashboard_js_supports_map_link_layer_overlay() -> None:
     assert "function animateMapPolylineLatLngs(layer, targetPathRaw, options = null)" in js
     assert "function animateMapHeatLayerLatLngs(layer, targetPointsRaw, options = null)" in js
     assert "function fadeOutMapHeatLayer(layer, options = null)" in js
+    assert "function advanceMapDriftAnimationElapsedMs(state, timestampMs)" in js
+    assert "Math.min(frameDeltaMs, maxFrameAdvanceMs)" in js
+    assert "const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);" in js
     assert "function mapLatLngPathMaxDistanceMeters(a, b)" in js
     assert "function mapHeatPointDistanceMeters(a, b)" in js
     assert "!Number.isFinite(pathDriftMeters) || pathDriftMeters > maxDriftMeters" in js

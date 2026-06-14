@@ -324,6 +324,29 @@
       return t * t * (3 - (2 * t));
     }}
 
+    function advanceMapDriftAnimationElapsedMs(state, timestampMs) {{
+      if (!(state && typeof state === "object")) return 0;
+      const nowMs = Number.isFinite(Number(timestampMs)) ? Number(timestampMs) : mapAnimationNowMs();
+      const previousFrameMs = Number.isFinite(Number(state.lastFrameMs))
+        ? Number(state.lastFrameMs)
+        : nowMs;
+      state.lastFrameMs = nowMs;
+      if (typeof document !== "undefined" && document.hidden) {{
+        return Math.max(0, Number(state.activeElapsedMs) || 0);
+      }}
+      const frameDeltaMs = Math.max(0, nowMs - previousFrameMs);
+      const maxFrameAdvanceMs = Math.max(
+        16,
+        Number(state.maxFrameAdvanceMs) || mapEstimatedOverlayMaxFrameAdvanceMs
+      );
+      const activeElapsedMs = (
+        Math.max(0, Number(state.activeElapsedMs) || 0)
+        + Math.min(frameDeltaMs, maxFrameAdvanceMs)
+      );
+      state.activeElapsedMs = activeElapsedMs;
+      return activeElapsedMs;
+    }}
+
     function normalizeMapLatLngPath(path) {{
       if (!Array.isArray(path)) return [];
       const points = [];
@@ -447,6 +470,9 @@
         const state = {{
           raf: null,
           startedAtMs,
+          lastFrameMs: startedAtMs,
+          activeElapsedMs: 0,
+          maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
           durationMs: fadeDurationMs,
           targetOpacity,
         }};
@@ -456,7 +482,7 @@
             cancelMapPolylineDrift(layer);
             return;
           }}
-          const elapsedMs = Math.max(0, Number(timestampMs) - state.startedAtMs);
+          const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);
           const eased = mapDriftEase(elapsedMs / state.durationMs);
           layer.setStyle({{ opacity: state.targetOpacity * eased }});
           if (eased < 1) {{
@@ -477,6 +503,9 @@
       const state = {{
         raf: null,
         startedAtMs,
+        lastFrameMs: startedAtMs,
+        activeElapsedMs: 0,
+        maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
         durationMs,
         fromPath: currentPath,
         toPath: targetPath,
@@ -487,7 +516,7 @@
           cancelMapPolylineDrift(layer);
           return;
         }}
-        const elapsedMs = Math.max(0, Number(timestampMs) - state.startedAtMs);
+        const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);
         const eased = mapDriftEase(elapsedMs / state.durationMs);
         const framePath = [];
         for (let i = 0; i < state.toPath.length; i += 1) {{
@@ -727,6 +756,9 @@
       const state = {{
         raf: null,
         startedAtMs,
+        lastFrameMs: startedAtMs,
+        activeElapsedMs: 0,
+        maxFrameAdvanceMs: mapEstimatedOverlayMaxFrameAdvanceMs,
         durationMs,
         transitions,
         onComplete,
@@ -738,7 +770,7 @@
           cancelMapHeatLayerDrift(layer);
           return;
         }}
-        const elapsedMs = Math.max(0, Number(timestampMs) - state.startedAtMs);
+        const elapsedMs = advanceMapDriftAnimationElapsedMs(state, timestampMs);
         const eased = mapDriftEase(elapsedMs / state.durationMs);
         const framePoints = [];
         for (const transition of state.transitions) {{
