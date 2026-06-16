@@ -125,7 +125,7 @@ def test_gui_responsiveness_redacts_url_credentials_from_saved_results() -> None
     benchmark = _load_benchmark_module()
 
     assert (
-        benchmark.redact_url_credentials("http://j:j@192.168.1.87:8877/path?x=1")
-        == "http://[redacted]@192.168.1.87:8877/path?x=1"
+        benchmark.redact_url_credentials("http://user:pass@192.0.2.10:8877/path?x=1")
+        == "http://[redacted]@192.0.2.10:8877/path?x=1"
     )
-    assert benchmark.redact_url_credentials("http://192.168.1.87:8877/") == "http://192.168.1.87:8877/"
+    assert benchmark.redact_url_credentials("http://192.0.2.10:8877/") == "http://192.0.2.10:8877/"

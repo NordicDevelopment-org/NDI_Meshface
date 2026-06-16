@@ -11,7 +11,7 @@ Examples:
   ./scripts/deploy_hotspot.sh \
     --target pi@raspberrypi.local \
     --ssid Meshyface \
-    --password 'change-me-please'
+    --password 'replace-with-a-strong-passphrase'
 
   # Configure hotspot on a custom subnet and dashboard port
   ./scripts/deploy_hotspot.sh \
@@ -205,7 +205,7 @@ No hotspot target supplied.
 
 Examples:
   ./scripts/deploy_hotspot.sh --target pi@raspberrypi.local
-  ./scripts/deploy_hotspot.sh --target pi@raspberrypi.local --ssid Meshyface --password 'change-me-please'
+  ./scripts/deploy_hotspot.sh --target pi@raspberrypi.local --ssid Meshyface --password 'replace-with-a-strong-passphrase'
 
 You can also set MESH_DASH_HOTSPOT_TARGET in your environment.
 EOF

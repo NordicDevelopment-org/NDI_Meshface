@@ -3,13 +3,9 @@
 Meshyface is a chat-first Meshtastic dashboard that runs as a single Python
 service and serves a single-page web UI over HTTP.
 
-This repository is currently the private staging home for the curated Meshyface
-app. Keep it private until the publication checklist and third-party notices are
-complete.
-
-During the transition from the older `mesh_py` workspace, source updates are
-published here as clean snapshots from `release/public-v0`. Once development
-moves fully into this repository, use a normal branch-to-`main` workflow here.
+This repository is the public source home for the curated Meshyface app.
+Release candidates should still pass `PUBLICATION_CHECKLIST.md` before tagging
+or publishing a new public cut.
 
 ## Current App Surface
 
@@ -385,7 +381,7 @@ Meshyface as the landing page, use the bundled hotspot deploy helper:
 ./scripts/deploy_hotspot.sh \
   --target pi@raspberrypi.local \
   --ssid Meshyface \
-  --password 'change-me-please'
+  --password 'replace-with-a-strong-passphrase'
 ```
 
 Default behavior:
@@ -638,7 +634,7 @@ Related environment variables:
 
 - `--history-db <path>`: base SQLite DB path
 - `--history-max-rows <n>`: default `200000`
-- `--history-retention-days <days>`: default `7`, use `0` to disable age
+- `--history-retention-days <days>`: default `30`, use `0` to disable age
   pruning
 - `--history-event-max-rows <n>`: append-only packet event cap, default
   `200000`
@@ -826,10 +822,11 @@ groups
 ```
 
 If the UI loads but the map styling or map logic is broken, verify that the
-browser can reach the Leaflet CDN assets. If the map base layer is blank but
-the rest of the UI is healthy, the tile servers may be unreachable and the
-offline atlas fallback should be used instead. The bundled atlas can be rebuilt
-with `python scripts/build_offline_atlas.py --source-dir /path/to/natural-earth-zips`.
+dashboard is serving the vendored Leaflet assets under `/assets/vendor/`. If the
+map base layer is blank but the rest of the UI is healthy, the tile servers may
+be unreachable and the offline atlas fallback should be used instead. The
+bundled atlas can be rebuilt with
+`python scripts/build_offline_atlas.py --source-dir /path/to/natural-earth-zips`.
 
 If the UI looks stale after deploy, hard refresh the browser with
 `Ctrl+Shift+R`.
@@ -845,9 +842,9 @@ python -m pytest -q
 
 ## Publication Status
 
-This repo is intentionally still private. Before making it public, complete
-`PUBLICATION_CHECKLIST.md`, choose a project license, and resolve the bundled
-third-party data notes in `THIRD_PARTY_NOTICES.md`.
+The repository is intended to be public. Before tagging a release or changing
+publication state, complete `PUBLICATION_CHECKLIST.md` and verify the
+third-party notes in `THIRD_PARTY_NOTICES.md`.
 
 ## Security
 
@@ -855,6 +852,9 @@ third-party data notes in `THIRD_PARTY_NOTICES.md`.
 - Do not expose it directly to the public internet without a reverse proxy and
   access control.
 - Use `--private-mode` and/or `--api-token` for stricter write-path control.
+- The built-in `Join Meshyface` channel preset uses an intentionally public
+  shared Meshyface PSK for interoperability between users of this software. Do
+  not use that public channel for private traffic.
 - `--show-secrets` exposes sensitive values in raw JSON panels; do not enable
   it casually on shared displays.
 - BBS and file transfer can consume significant mesh airtime. Keep them

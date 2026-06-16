@@ -1,6 +1,6 @@
 # Publication Checklist
 
-Meshyface is currently staged as a private repository. Before making it public, complete these checks.
+Before tagging a release or changing repository publication state, complete these checks.
 
 ## Required
 
@@ -9,15 +9,14 @@ Meshyface is currently staged as a private repository. Before making it public, 
 - Vendored Leaflet/Leaflet.heat notices are present and full license texts are included in `third_party/licenses/`.
 - Unicode emoji catalog generation is documented in `third_party/emoji_catalog_generation.md` and Unicode License v3 notice is included in `third_party/licenses/unicode-license-v3.txt`.
 - Offline atlas map mode visibly credits Natural Earth and GeoNames in map attribution when atlas layers are active.
-- OSM tile policy requirements are documented and runtime uses `https://tile.openstreetmap.org/{z}/{x}/{y}.png` with visible OpenStreetMap attribution.
-- No hardcoded channel PSKs, shared secrets, tokens, or credentials remain in source or tests.
+- OSM tile policy requirements are documented and runtime uses `https://tile.openstreetmap.org/{z}/{x}/{y}.png` with visible OpenStreetMap attribution, no tile proxy, no restrictive map referrer policy, and no OSM bulk/offline tile prefetch.
+- No hardcoded private channel PSKs, shared secrets, tokens, or credentials remain in source or tests.
+- The bundled shared Meshyface channel PSK remains documented as an intentionally public interoperability preset, not a private credential.
 - No known default hotspot password is shipped; deploy scripts require explicit password input.
 - Python dependency versions are pinned in `requirements.txt` / `requirements-dev.txt`.
 - Python dependency license inventory is generated at `THIRD_PARTY_PYTHON_DEPENDENCIES.md`.
 - `meshtastic` GPL-3.0-only metadata has been reviewed by maintainers before final root-license selection.
 - Zork rights statement retains the MITDDC qualifier: "to the extent MIT holds rights".
-- Colossal Cave Adventure data remains absent from the repository.
-- CARTO/cartocdn remains absent unless explicitly relicensed, documented, and opt-in.
 - Secret scan completed (for example `gitleaks` and/or `trufflehog`).
 - `python -m pytest -q` passes on the release candidate commit.
 

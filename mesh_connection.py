@@ -23,7 +23,7 @@ def add_mesh_connection_args(
     )
     group.add_argument(
         "--mesh-host",
-        help="Connect to a Meshtastic device over TCP by host/IP (e.g. 192.168.1.234).",
+        help="Connect to a Meshtastic device over TCP by host/IP (e.g. 192.0.2.10).",
     )
     parser.add_argument(
         "--mesh-tcp-port",

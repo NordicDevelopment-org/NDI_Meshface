@@ -99,20 +99,23 @@ Included text:
 Preferred citation (from upstream README):
 - `[filename], Zork source code, 1977, Massachusetts Institute of Technology, Tapes of Tech Square (ToTS) collection, MC-0741. Massachusetts Institute of Technology, Department of Distinctive Collections, Cambridge, Massachusetts. swh:1:dir:ab9e2babe84cfc909c64d66291b96bb6b9d8ca15`
 
-### Colossal Cave Adventure
-
-- Colossal Cave Adventure materials are not bundled in this repository.
-- The previously reviewed Adventure data was removed before publication staging because redistribution terms were not clearly documented.
-
 ## Runtime Network Assets
 
 - Online basemap mode uses OpenStreetMap tiles.
+- Official tile usage policy:
+  - `https://operations.osmfoundation.org/policies/tiles/`
 - Runtime tile URL is:
   - `https://tile.openstreetmap.org/{z}/{x}/{y}.png`
 - Runtime map attribution includes a visible OpenStreetMap copyright link:
   - `https://www.openstreetmap.org/copyright`
 - The project does not treat OpenStreetMap as an offline atlas source.
 - Offline atlas generation/runtime does not bulk-download or prefetch OSM tiles.
+- Browser tile requests are expected to use normal browser identification,
+  referer, and caching behavior. Meshyface does not proxy OSM tiles or set a
+  restrictive referrer policy for the map.
+- High-volume, offline, commercial, or prefetching use should use an
+  appropriate third-party provider or self-hosted tiles instead of
+  `tile.openstreetmap.org`.
 
 ## Python Dependencies
 
