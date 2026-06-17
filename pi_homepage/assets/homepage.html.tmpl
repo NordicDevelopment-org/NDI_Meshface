@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" data-theme="{{INITIAL_THEME}}">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{APP_TITLE}}</title>
+<style>
+{{THEME_CSS}}
+{{HOMEPAGE_CSS}}
+</style>
+</head>
+<body>
+<div class="homepage-shell">
+  <header class="homepage-header">
+    <div>
+      <h1 class="homepage-title">{{APP_TITLE}}</h1>
+      <p class="homepage-subtitle">Pi kiosk launcher</p>
+    </div>
+    <div class="homepage-clock" id="homepage-clock"></div>
+  </header>
+  <main class="homepage-tile-grid" id="homepage-tile-grid">
+{{TILE_CARDS}}
+  </main>
+  <footer class="homepage-footer">Status refreshes every {{REFRESH_SECONDS}}s. Edit config/tiles.json to add or change apps.</footer>
+</div>
+<script>
+(function () {
+  var REFRESH_MS = {{REFRESH_MS}};
+
+  function updateClock() {
+    var el = document.getElementById("homepage-clock");
+    if (!el) return;
+    el.textContent = new Date().toLocaleString();
+  }
+
+  function applyStatus(tileId, status) {
+    var card = document.querySelector('.homepage-tile[data-tile-id="' + tileId + '"]');
+    if (!card) return;
+    var dot = card.querySelector(".homepage-tile-status-dot");
+    var label = card.querySelector(".homepage-tile-status-label");
+    if (dot) dot.setAttribute("data-status", status);
+    if (label) label.textContent = status;
+  }
+
+  function refreshStatus() {
+    fetch("/api/status")
+      .then(function (response) { return response.json(); })
+      .then(function (payload) {
+        var tiles = payload.tiles || {};
+        Object.keys(tiles).forEach(function (tileId) {
+          applyStatus(tileId, (tiles[tileId] || {}).status || "unknown");
+        });
+      })
+      .catch(function () {});
+  }
+
+  updateClock();
+  refreshStatus();
+  setInterval(updateClock, 1000);
+  setInterval(refreshStatus, REFRESH_MS);
+})();
+</script>
+</body>
+</html>
