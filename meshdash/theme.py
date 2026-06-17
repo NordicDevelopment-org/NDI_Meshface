@@ -184,7 +184,7 @@ def _mix_rgb(
     clamped = max(0.0, min(1.0, float(ratio)))
     return tuple(
         int(round((channel_start * (1.0 - clamped)) + (channel_end * clamped)))
-        for channel_start, channel_end in zip(start, end)
+        for channel_start, channel_end in zip(start, end, strict=True)
     )
 
 

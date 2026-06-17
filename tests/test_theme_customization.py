@@ -198,7 +198,10 @@ def test_tint_intensity_generates_clear_surface_spread() -> None:
     def _rgb_distance(start: str, end: str) -> int:
         start_rgb = _hex_to_rgb(start)
         end_rgb = _hex_to_rgb(end)
-        return sum(abs(end_channel - start_channel) for start_channel, end_channel in zip(start_rgb, end_rgb))
+        return sum(
+            abs(end_channel - start_channel)
+            for start_channel, end_channel in zip(start_rgb, end_rgb, strict=True)
+        )
 
     neutral = build_palette_theme_preset(
         "#2563eb",

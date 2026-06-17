@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from typing import Optional
 
@@ -28,6 +29,7 @@ from meshdash.config import (
     DEFAULT_HISTORY_ROLLUP_RETENTION_DAYS,
     DEFAULT_HTTP_HOST,
     DEFAULT_HTTP_PORT,
+    DEFAULT_LOG_LEVEL,
     DEFAULT_MESH_PORT,
     DEFAULT_NODE_HISTORY_HOURS,
     DEFAULT_NODE_HISTORY_MAX_POINTS,
@@ -41,7 +43,6 @@ from meshdash.config import (
     UNKNOWN_GIT_COMMIT,
 )
 from meshdash.helpers import (
-    format_epoch as _format_epoch,
     normalize_single_emoji as _normalize_single_emoji,
     to_jsonable as _to_jsonable_helper,
     to_int as _to_int,
@@ -649,6 +650,10 @@ def run_dashboard(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=getattr(logging, str(DEFAULT_LOG_LEVEL).upper(), logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     parser = _build_dashboard_parser_helper(
         add_mesh_connection_args_fn=add_mesh_connection_args,
         default_mesh_port=DEFAULT_MESH_PORT,

@@ -153,7 +153,7 @@ def _features_from_zip(path: Path, property_builder) -> list[dict[str, Any]]:
     geometries = _parse_shp(shp_raw)
     records = _parse_dbf(dbf_raw)
     features: list[dict[str, Any]] = []
-    for geometry, record in zip(geometries, records):
+    for geometry, record in zip(geometries, records, strict=False):
         props = property_builder(record)
         if props is None:
             continue

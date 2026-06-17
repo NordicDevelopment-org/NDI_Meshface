@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from .api_input_channels import ChannelSettingsRequest
+
+logger = logging.getLogger(__name__)
 
 MAX_CHANNEL_NAME_CHARS = 10
 
@@ -32,9 +35,9 @@ def _ensure_channels_loaded(node: object) -> Any:
         if callable(wait_for):
             try:
                 wait_for("channels")
-            except Exception:
+            except Exception as exc:
                 # Best effort; some interfaces don't support waitForConfig.
-                pass
+                logger.debug("waitForConfig('channels') unsupported or failed: %s", exc)
     channels = getattr(node, "channels", None)
     if channels is None:
         raise RuntimeError("Channels are not loaded")
@@ -146,9 +149,9 @@ def apply_channel_settings(
         # Ensure we have channels loaded before invoking setURL (it expects node.channels not None).
         try:
             _ensure_channels_loaded(node)
-        except Exception:
+        except Exception as exc:
             # Best-effort; setURL will emit a nicer error if it truly can't proceed.
-            pass
+            logger.debug("Pre-loading channels before setURL failed (best effort): %s", exc)
 
         locked, release = _acquire_lock(send_lock)
         try:
@@ -235,8 +238,8 @@ def apply_channel_settings(
 
         try:
             ch.role = disabled_role
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to set channel %s role to DISABLED locally before write: %s", idx, exc)
         try:
             if getattr(ch, "settings", None) is not None:
                 ch.settings.name = ""
@@ -248,18 +251,18 @@ def apply_channel_settings(
                     from meshtastic.util import fromPSK  # type: ignore
 
                     ch.settings.psk = fromPSK("default")
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as exc:
+                    logger.warning("Failed to reset PSK while disabling channel %s: %s", idx, exc)
+        except Exception as exc:
+            logger.warning("Failed to clear settings while disabling channel %s: %s", idx, exc)
         try:
             if getattr(ch, "module_settings", None) is not None:
                 if hasattr(ch.module_settings, "is_muted"):
                     ch.module_settings.is_muted = False
                 if hasattr(ch.module_settings, "position_precision"):
                     ch.module_settings.position_precision = 0
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to clear module_settings while disabling channel %s: %s", idx, exc)
 
         # Write to radio with locking.
         locked, release = _acquire_lock(send_lock)
@@ -335,8 +338,8 @@ def apply_channel_settings(
         # Ensure primary.
         try:
             ch.role = primary_role
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to set channel %s role to PRIMARY: %s", idx, exc)
     else:
         if requested_role_value is not None:
             if requested_role_value == primary_role:
@@ -345,15 +348,15 @@ def apply_channel_settings(
                 return {"ok": False, "error": "Use action=disable to disable a channel"}
             try:
                 ch.role = requested_role_value
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to set channel %s role to %s: %s", idx, requested_role_value, exc)
         else:
             # If creating, default to SECONDARY.
             if existing_role == disabled_role:
                 try:
                     ch.role = secondary_role
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to set channel %s role to SECONDARY: %s", idx, exc)
 
     applied_fields: list[str] = []
     ignored_fields: list[str] = []
@@ -376,21 +379,24 @@ def apply_channel_settings(
                 return {"ok": False, "error": "Channel name is required when adding a channel"}
             ch.settings.name = name
             applied_fields.append("settings.name")
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to apply settings.name for channel %s: %s", idx, exc)
             ignored_fields.append("settings.name")
 
     if "uplink_enabled" in settings:
         try:
             ch.settings.uplink_enabled = bool(settings.get("uplink_enabled"))
             applied_fields.append("settings.uplink_enabled")
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to apply settings.uplink_enabled for channel %s: %s", idx, exc)
             ignored_fields.append("settings.uplink_enabled")
 
     if "downlink_enabled" in settings:
         try:
             ch.settings.downlink_enabled = bool(settings.get("downlink_enabled"))
             applied_fields.append("settings.downlink_enabled")
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to apply settings.downlink_enabled for channel %s: %s", idx, exc)
             ignored_fields.append("settings.downlink_enabled")
 
     if "psk" in settings:
@@ -402,7 +408,8 @@ def apply_channel_settings(
 
                 ch.settings.psk = fromPSK(psk_s)
                 applied_fields.append("settings.psk")
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to apply provided settings.psk for channel %s: %s", idx, exc)
                 ignored_fields.append("settings.psk")
         elif is_creating:
             try:
@@ -410,7 +417,8 @@ def apply_channel_settings(
 
                 ch.settings.psk = fromPSK("default")
                 applied_fields.append("settings.psk")
-            except Exception:
+            except Exception as exc:
+                logger.debug("Failed to apply default settings.psk while creating channel %s: %s", idx, exc)
                 ignored_fields.append("settings.psk")
         else:
             # Empty or redacted => preserve.
@@ -421,7 +429,8 @@ def apply_channel_settings(
 
             ch.settings.psk = fromPSK("default")
             applied_fields.append("settings.psk")
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to apply default settings.psk while creating channel %s: %s", idx, exc)
             ignored_fields.append("settings.psk")
 
     if "module_settings" in settings:
@@ -435,13 +444,17 @@ def apply_channel_settings(
                     try:
                         ch.module_settings.is_muted = bool(ms.get("is_muted"))
                         applied_fields.append("module_settings.is_muted")
-                    except Exception:
+                    except Exception as exc:
+                        logger.debug("Failed to apply module_settings.is_muted for channel %s: %s", idx, exc)
                         ignored_fields.append("module_settings.is_muted")
                 if "position_precision" in ms:
                     try:
                         ch.module_settings.position_precision = int(ms.get("position_precision"))
                         applied_fields.append("module_settings.position_precision")
-                    except Exception:
+                    except Exception as exc:
+                        logger.debug(
+                            "Failed to apply module_settings.position_precision for channel %s: %s", idx, exc
+                        )
                         ignored_fields.append("module_settings.position_precision")
 
     if not applied_fields and not is_creating and requested_role_value is None:

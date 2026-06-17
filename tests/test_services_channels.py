@@ -1,7 +1,6 @@
 import sys
 from copy import deepcopy
 from pathlib import Path
-from types import SimpleNamespace
 from types import ModuleType
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
