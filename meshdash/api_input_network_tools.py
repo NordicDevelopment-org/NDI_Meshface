@@ -187,7 +187,7 @@ def parse_network_tool_request(
     try:
         body = json.loads(raw_body.decode("utf-8"))
     except Exception as exc:
-        raise ValueError(f"Invalid JSON: {exc}")
+        raise ValueError(f"Invalid JSON: {exc}") from exc
 
     if not isinstance(body, dict):
         raise ValueError("Expected a JSON object")

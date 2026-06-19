@@ -2,8 +2,10 @@ import colorsys
 import re
 from typing import Dict, Optional
 
-# Single source of truth for dashboard theme tokens.
-# Keep palette changes here so CSS values stay centralized.
+# Vendored from meshdash/theme.py (single source of truth there). Copied
+# verbatim rather than imported so pi_homepage stays standalone/copyable
+# into its own repo later. Re-sync manually if the upstream palette math
+# changes.
 LIGHT_THEME_VARS: Dict[str, str] = {
     "--bg": "#f3f7f1",
     "--ink": "#112015",

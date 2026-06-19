@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import ipaddress
+import logging
 import os
 import threading
 import time
 from collections.abc import Mapping
-from typing import Callable, Optional
+from typing import Callable
 
 try:
     from meshtastic.protobuf import admin_pb2
 except Exception:  # pragma: no cover - exercised via runtime fallback
     admin_pb2 = None  # type: ignore[assignment]
+
+logger = logging.getLogger(__name__)
 
 
 _DEFAULT_REFRESH_SECONDS = 20
@@ -262,7 +265,8 @@ def _resolve_local_node(iface: object) -> object | None:
     if callable(get_node):
         try:
             return get_node("^local")
-        except Exception:
+        except Exception as exc:
+            logger.debug("getNode('^local') failed while resolving local node for connection status: %s", exc)
             return None
     return None
 

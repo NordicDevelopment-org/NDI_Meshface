@@ -219,7 +219,7 @@ def parse_radio_settings_request(raw_body: bytes) -> RadioSettingsRequest:
     try:
         payload = json.loads(raw_body.decode("utf-8"))
     except Exception as exc:
-        raise ValueError(f"Invalid JSON: {exc}")
+        raise ValueError(f"Invalid JSON: {exc}") from exc
 
     if not isinstance(payload, dict):
         raise ValueError("Expected a JSON object")

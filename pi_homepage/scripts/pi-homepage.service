@@ -1,0 +1,20 @@
+# Example unit for a host laid out under /opt/pi-homepage.
+# scripts/deploy_pi_homepage.sh renders a host-specific unit during --bootstrap.
+[Unit]
+Description=Pi Homepage Kiosk Launcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/pi-homepage/app
+EnvironmentFile=/opt/pi-homepage/config/homepage.env
+ExecStart=/opt/pi-homepage/venv/bin/python3 /opt/pi-homepage/app/pi_homepage.py --host ${PI_HOMEPAGE_HOST} --port ${PI_HOMEPAGE_PORT} --tiles-config ${PI_HOMEPAGE_TILES_CONFIG} --refresh-ms ${PI_HOMEPAGE_REFRESH_MS} --health-ttl-seconds ${PI_HOMEPAGE_HEALTH_TTL_SECONDS}
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -699,7 +699,11 @@ def run_dashboard_runtime(
 
         if auto_reconnect and startup_offline:
 
-            def _watch_startup_radio_connect() -> None:
+            def _watch_startup_radio_connect(
+                stop_watcher=stop_watcher,
+                restart_requested=restart_requested,
+                server=server,
+            ) -> None:
                 attempt = 0
                 delay_seconds = 0.5
                 while not stop_watcher.wait(delay_seconds):
@@ -738,7 +742,12 @@ def run_dashboard_runtime(
             watcher_thread.start()
         elif auto_reconnect and not startup_offline and hasattr(context.tracker, "radio_link_connected"):
 
-            def _watch_radio_link_loss() -> None:
+            def _watch_radio_link_loss(
+                stop_watcher=stop_watcher,
+                restart_requested=restart_requested,
+                server=server,
+                context=context,
+            ) -> None:
                 while not stop_watcher.wait(0.5):
                     try:
                         connected = getattr(context.tracker, "radio_link_connected", None)

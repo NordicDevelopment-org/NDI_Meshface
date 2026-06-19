@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 120
+exclude = ["meshdash/assets"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+# E501 (line-too-long) and B009/B010 (getattr/setattr-with-constant) flag
+# hundreds of pre-existing lines across the codebase; deferred to a future
+# dedicated cleanup pass rather than reflowed here.
+ignore = ["E501", "B009", "B010"]
+
+[tool.ruff.lint.per-file-ignores]
+# sys.path is mutated before importing the package under test.
+"tests/conftest.py" = ["E402"]

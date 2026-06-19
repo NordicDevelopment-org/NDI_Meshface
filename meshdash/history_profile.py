@@ -1,6 +1,9 @@
+import logging
 import os
 import re
 import time
+
+logger = logging.getLogger(__name__)
 
 _CANONICAL_NODE_ID_RE = re.compile(r"^![0-9a-fA-F]{8}$")
 _PROFILE_KEY_MAX_LEN = 64
@@ -51,7 +54,8 @@ def resolve_history_local_node_id(
     while True:
         try:
             local_node_id = str(get_local_node_id_fn(iface) or "").strip()
-        except Exception:
+        except Exception as exc:
+            logger.debug("get_local_node_id_fn failed while resolving local node id: %s", exc)
             local_node_id = ""
 
         clean_local_node_id = _canonical_local_node_id(local_node_id)
@@ -86,7 +90,8 @@ def resolve_history_profile_key(
         while True:
             try:
                 local_node_id = str(get_local_node_id_fn(iface) or "").strip()
-            except Exception:
+            except Exception as exc:
+                logger.debug("get_local_node_id_fn failed while resolving history profile key: %s", exc)
                 local_node_id = ""
 
             local_key = _key_from_local_node_id(local_node_id)
